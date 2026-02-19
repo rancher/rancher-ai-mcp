@@ -142,6 +142,20 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		`},
 		t.createK3kCluster)
 	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "createImportedCluster",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Creates an imported cluster within Rancher.
+					  This should only be used when the user wants to create a new imported cluster. Do not use this tool when the user asks to create a new custom cluster.'
+	
+		Parameters:
+		clusterName (string, required): The name of the cluster to be created.
+	    description (string, optional): A short description added to the cluster.
+		versionManagementSetting (string, optional): Specifies the version management setting for the cluster. Potential values are 'system-default', 'true', and 'false'. If not specified, the global version management setting will be used.
+		`},
+		t.CreateImportedCluster)
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listSupportedKubernetesVersions",
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
