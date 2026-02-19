@@ -89,6 +89,26 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		machineName (string): The name of the machine to get
 		`},
 		t.GetClusterMachine)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "scaleClusterNodePool",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Changes the size of an existing node pool for an rke2 or k3s cluster.
+   					  This should be used when the user wants to change the size of an existing node pool for an rke2 or k3s cluster.
+                      Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.'
+
+		Parameters:
+		cluster (string): The name of the Kubernetes cluster.
+	    namespace (string): The namespace where the resource is located. The default namespace will be used if not provided.
+		nodePoolName (string): The name of the node pool to scale.
+		desiredSize (int, optional): The desired size of the node pool. Overridden by amountToAdd and amountToSubtract if either are specified. If no specific size is provided, use zero.
+		amountToAdd (int, optional): The amount of nodes to add to the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToSubtract. If no specific amount is provided, use zero.
+		amountToSubtract (int, optional): The amount of nodes to remove from the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToAdd. If no specific amount is provided, use zero.
+		`},
+		t.ScaleClusterNodePool)
+
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listK3kClusters",
 		Meta: map[string]any{
