@@ -155,6 +155,24 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		versionManagementSetting (string, optional): Specifies the version management setting for the cluster. Potential values are 'system-default', 'true', and 'false'. If not specified, the global version management setting will be used.
 		`},
 		t.CreateImportedCluster)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "createCustomCluster",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Creates a custom cluster within Rancher.
+   					  This should only be used when the user wants to create a new custom cluster. Do not use this tool if a user asks to create an imported cluster.'
+
+		Parameters:
+		clusterName (string, required): The name of the cluster to be created.
+	    description (string, optional): A short description added to the cluster.
+		kubernetesVersion (string, required): The rke2 or k3s version that will be used for the cluster.
+		CNI (string, required): The CNI that will be used for the cluster.
+		distribution (string, required): The distribution of the cluster, either "rke2" or "k3s".
+		`},
+		t.CreateCustomCluster)
+
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listSupportedKubernetesVersions",
 		Meta: map[string]any{
