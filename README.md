@@ -70,6 +70,10 @@ Each tool is exposed through the MCP protocol and can be invoked by the Rancher 
 | `analyzeCluster`           | Retrieve multiple kubernetes resources related to a downstream cluster and its current state |
 | `analyzeClusterMachines`   | Retrieve all Cluster API objects related to all machines within a downstream cluster         |
 | `getClusterMachine`        | Retrieve all cluster API objects related to a specific machine within a downstream cluster   |
+| `listKubernetesVersions`   | Lists all of the RKE2 and K3s versions that Rancher can provision.                           |
+| `createImportedCluster`    | Creates an imported cluster using the provided name and settings                             |
+| `createCustomCluster`      | Creates a custom cluster using the provided name and settings                                |
+| `scaleClusterNodePool`     | Scales an existing node pool within a Rancher provisioned cluster up or down                 |
 
 ## Configuration
 
