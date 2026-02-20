@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/dynamiclistener"
@@ -52,16 +53,36 @@ func init() {
 	serveCmd.Flags().StringVar(&resourceURL, "resource-url", "", "Resource URL for this server - this should be the address to access the MCP server")
 }
 
+func rancherURLFromAuthServerURL(s string) (string, error) {
+	if s == "" {
+		return "", nil
+	}
+	parsed, err := url.Parse(s)
+	if err != nil {
+		return "", err
+	}
+
+	parsed.Path = ""
+
+	return parsed.String(), nil
+}
+
 func runServe(cmd *cobra.Command, args []string) error {
 	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "rancher mcp server", Version: "v1.0.0"}, nil)
 	client := client.NewClient(insecure)
 
-	toolsets.AddAllTools(client, mcpServer)
+	rancherURL, err := rancherURLFromAuthServerURL(authzServerURL)
+	if err != nil {
+		return fmt.Errorf("parsing authz-server-url: %w", err)
+	}
+
+	toolsets.AddAllTools(client, mcpServer, rancherURL)
 
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return mcpServer
 	}, &mcp.StreamableHTTPOptions{})
 
+	zap.L().Info("Rancher Server", zap.String("url", rancherURL), zap.String("authzServerURL", authzServerURL))
 	oauthConfig := middleware.NewOAuthConfig(authzServerURL, jwksURL, resourceURL, []string{"offline_access", "rancher:mcp"})
 	if insecure {
 		oauthConfig.InsecureTLS = true

@@ -25,7 +25,7 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 		Cluster:   params.Cluster,
 		Kind:      params.Kind,
 		Namespace: params.Namespace,
-		URL:       toolReq.Extra.Header.Get(urlHeader),
+		URL:       t.rancherURL(toolReq),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	"go.uber.org/zap"
@@ -24,8 +25,8 @@ func (t *Tools) listGitRepos(ctx context.Context, toolReq *mcp.CallToolRequest, 
 		Cluster:   "local",
 		Kind:      "gitrepo",
 		Namespace: params.Workspace,
-		URL:       toolReq.Extra.Header.Get(urlHeader),
-		Token:     toolReq.Extra.Header.Get(tokenHeader),
+		URL:       t.rancherURL(toolReq),
+		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
 		zap.L().Error("failed to list gitrepos", zap.String("tool", "listGitRepos"), zap.Error(err))

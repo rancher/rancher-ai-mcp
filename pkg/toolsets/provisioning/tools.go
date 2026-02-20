@@ -1,25 +1,50 @@
 package provisioning
 
 import (
+	"context"
+
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
 )
 
 const (
 	toolsSet    = "provisioning"
 	toolsSetAnn = "toolset"
-	tokenHeader = "R_token"
 	urlHeader   = "R_url"
 )
 
-type Tools struct {
-	client *client.Client
+type toolsClient interface {
+	GetResource(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error)
+	GetResourceAtAnyAPIVersion(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error)
+	GetResourcesAtAnyAPIVersion(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
+	GetResourceByGVR(ctx context.Context, params client.GetParams, gvr schema.GroupVersionResource) (*unstructured.Unstructured, error)
+	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
+	GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
 }
 
-func NewTools(client *client.Client) *Tools {
+// Tools contains tools for accessing provisioning information.
+type Tools struct {
+	client     toolsClient
+	RancherURL string
+}
+
+// NewTools creates and returns a new Tools instance.
+func NewTools(client toolsClient, rancherURL string) *Tools {
 	return &Tools{
-		client: client,
+		client:     client,
+		RancherURL: rancherURL,
 	}
+}
+
+func (t *Tools) rancherURL(toolReq *mcp.CallToolRequest) string {
+	if t.RancherURL == "" {
+		return toolReq.Extra.Header.Get(urlHeader)
+	}
+
+	return t.RancherURL
 }
 
 func (t *Tools) AddTools(mcpServer *mcp.Server) {

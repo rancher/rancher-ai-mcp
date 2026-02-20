@@ -6,6 +6,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -64,8 +65,12 @@ func TestListKubernetesResources(t *testing.T) {
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
-		params         listKubernetesResourcesParams
-		fakeDynClient  *dynamicfake.FakeDynamicClient
+		params        listKubernetesResourcesParams
+		fakeDynClient *dynamicfake.FakeDynamicClient
+		// used in the CallToolRequest
+		requestURL string
+		// used in the creation of the Tools.
+		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -78,6 +83,7 @@ func TestListKubernetesResources(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePod1, fakePod2),
+			requestURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -99,31 +105,67 @@ func TestListKubernetesResources(t *testing.T) {
 				Namespace: "kube-system",
 				Cluster:   "local",
 			},
+			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}),
 			expectedResult: `{"llm": "no resources found"}`,
 		},
+		"list pods - when tool is configured with URL": {
+			params: listKubernetesResourcesParams{
+				Kind:      "pod",
+				Namespace: "default",
+				Cluster:   "local",
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
+				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
+			}, fakePod1, fakePod2),
+			rancherURL: fakeUrl,
+			expectedResult: `{
+				"llm": [
+					{
+						"metadata": {"name": "pod-1", "namespace": "default"},
+						"spec": {"containers": [{"image": "nginx:latest", "name": "nginx", "resources": {}}]},
+						"status": {"phase": "Running"}
+					},
+					{
+						"metadata": {"name": "pod-2", "namespace": "default"},
+						"spec": {"containers": [{"image": "redis:latest", "name": "redis", "resources": {}}]},
+						"status": {"phase": "Running"}
+					}
+				]
+			}`,
+		},
+		"list pods - no rancherURL or request URL": {
+			params: listKubernetesResourcesParams{
+				Kind:      "pod",
+				Namespace: "kube-system",
+				Cluster:   "local",
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
+				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
+			}),
+			expectedError: "no URL for rancher request",
+		},
 	}
 
-	for name, test := range tests {
+	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &client.Client{
 				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return test.fakeDynClient, nil
+					return tt.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: newFakeToolsClient(c, fakeToken)}
+			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
+			req := test.NewCallToolRequest(tt.requestURL)
 
-			result, _, err := tools.listKubernetesResources(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-			}, test.params)
+			result, _, err := tools.listKubernetesResources(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
 
-			if test.expectedError != "" {
-				assert.ErrorContains(t, err, test.expectedError)
+			if tt.expectedError != "" {
+				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				require.NoError(t, err)
-				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
+				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
 		})
 	}

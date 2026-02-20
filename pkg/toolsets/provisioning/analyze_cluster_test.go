@@ -1,11 +1,12 @@
 package provisioning
 
 import (
-	"context"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	provisioningV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/dynamic"
@@ -16,9 +17,13 @@ import (
 
 func TestAnalyzeCluster(t *testing.T) {
 	tests := map[string]struct {
-		params         InspectClusterParams
-		fakeClientset  kubernetes.Interface
-		fakeDynClient  *dynamicfake.FakeDynamicClient
+		params        InspectClusterParams
+		fakeClientset kubernetes.Interface
+		fakeDynClient *dynamicfake.FakeDynamicClient
+		// used in the CallToolRequest
+		requestURL string
+		// used in the creation of the Tools.
+		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -27,6 +32,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
@@ -219,6 +225,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
@@ -282,6 +289,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
@@ -376,6 +384,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "local",
 				Namespace: "",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newProvisioningCluster("local", "fleet-local", "local"),
@@ -439,6 +448,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "nonexistent-cluster",
 				Namespace: "fleet-default",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds()),
 			expectedError: "provisioning cluster nonexistent-cluster not found in namespace fleet-default",
@@ -448,6 +458,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "multi-cluster",
 				Namespace: "fleet-default",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newProvisioningCluster("multi-cluster", "fleet-default", "c-m-multi123"),
@@ -771,6 +782,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "unhealthy-cluster",
 				Namespace: "fleet-default",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newProvisioningCluster("unhealthy-cluster", "fleet-default", "c-m-unhealthy"),
@@ -834,6 +846,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "rke-cluster",
 				Namespace: "fleet-default",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newProvisioningClusterWithRKEConfig("rke-cluster", "fleet-default", "c-m-rke123", []provisioningV1.RKEMachinePool{
@@ -1090,6 +1103,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
@@ -1184,6 +1198,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "minimal-cluster",
 				Namespace: "fleet-default",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newProvisioningCluster("minimal-cluster", "fleet-default", "c-m-minimal"),
@@ -1247,6 +1262,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "single-machine-cluster",
 				Namespace: "fleet-default",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newProvisioningCluster("single-machine-cluster", "fleet-default", "c-m-single"),
@@ -1434,29 +1450,38 @@ func TestAnalyzeCluster(t *testing.T) {
 				]
 			}`,
 		},
+		"analyze cluster - no rancherURL or request URL": {
+			params: InspectClusterParams{
+				Cluster:   "test-cluster",
+				Namespace: "fleet-default",
+			},
+			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
+				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
+				newManagementCluster("c-m-abc123", true),
+			),
+			expectedError: "no URL for rancher request",
+		},
 	}
 
-	for name, test := range tests {
+	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &client.Client{
 				ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
-					return test.fakeClientset, nil
+					return tt.fakeClientset, nil
 				},
 				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return test.fakeDynClient, nil
+					return tt.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: c}
+			tools := NewTools(test.WrapClient(c, testToken, testURL), tt.rancherURL)
+			req := test.NewCallToolRequest(tt.requestURL)
+			req.Params = &mcp.CallToolParamsRaw{Name: "analyze-cluster"}
 
-			result, _, err := tools.AnalyzeCluster(context.TODO(), &mcp.CallToolRequest{
-				Params: &mcp.CallToolParamsRaw{
-					Name: "analyze-cluster",
-				},
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {testURL}, tokenHeader: {testToken}}},
-			}, test.params)
+			result, _, err := tools.AnalyzeCluster(middleware.WithToken(t.Context(), testToken), req, tt.params)
 
-			if test.expectedError != "" {
-				assert.ErrorContains(t, err, test.expectedError)
+			if tt.expectedError != "" {
+				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 
@@ -1464,7 +1489,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				assert.Truef(t, ok, "expected type *mcp.TextContent")
 
 				assert.Truef(t, ok, "expected expectedResult to be a JSON string")
-				assert.JSONEq(t, test.expectedResult, text.Text)
+				assert.JSONEq(t, tt.expectedResult, text.Text)
 			}
 		})
 	}

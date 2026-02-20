@@ -14,16 +14,19 @@ type toolsAdder interface {
 }
 
 // AddAllTools adds all available tools to the MCP server.
-func AddAllTools(client *client.Client, mcpServer *mcp.Server) {
-	for _, ta := range allToolSets(client) {
+//
+// The rancherServerURL can be empty in which case we'll fall back to the R_url
+// value.
+func AddAllTools(client *client.Client, mcpServer *mcp.Server, rancherServerURL string) {
+	for _, ta := range allToolSets(client, rancherServerURL) {
 		ta.AddTools(mcpServer)
 	}
 }
 
-func allToolSets(client *client.Client) []toolsAdder {
+func allToolSets(client *client.Client, rancherURL string) []toolsAdder {
 	return []toolsAdder{
-		core.NewTools(client),
-		fleet.NewTools(client),
-		provisioning.NewTools(client),
+		core.NewTools(client, rancherURL),
+		fleet.NewTools(client, rancherURL),
+		provisioning.NewTools(client, rancherURL),
 	}
 }

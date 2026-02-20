@@ -6,6 +6,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -53,13 +54,19 @@ func TestGetClusterImages(t *testing.T) {
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
-		params         getClusterImagesParams
-		fakeDynClient  *dynamicfake.FakeDynamicClient
+		params        getClusterImagesParams
+		fakeDynClient *dynamicfake.FakeDynamicClient
+		// used in the CallToolRequest
+		requestURL string
+		// used in the creation of the Tools.
+		rancherURL string
+
 		expectedResult string
 		expectedError  string
 	}{
 		"get images from single cluster": {
-			params: getClusterImagesParams{Clusters: []string{"local"}},
+			params:     getClusterImagesParams{Clusters: []string{"local"}},
+			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(podScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePodWithImage),
@@ -68,7 +75,8 @@ func TestGetClusterImages(t *testing.T) {
 			}`,
 		},
 		"get images from cluster with no pods": {
-			params: getClusterImagesParams{Clusters: []string{"local"}},
+			params:     getClusterImagesParams{Clusters: []string{"local"}},
+			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(podScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}),
@@ -76,26 +84,45 @@ func TestGetClusterImages(t *testing.T) {
 				"local": []
 			}`,
 		},
+		"get images from cluster when tool is configured with URL": {
+			params: getClusterImagesParams{Clusters: []string{"local"}},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(podScheme(), map[schema.GroupVersionResource]string{
+				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
+			}, fakePodWithImage),
+			rancherURL: fakeUrl,
+			expectedResult: `{
+				"local": ["busybox:latest", "nginx:1.21", "redis:alpine"]
+			}`,
+		},
+		"get images from cluster - no rancherURL or request URL": {
+			// fails because requestURL and rancherURL are not configured (no
+			// R_Url or configured Rancher URL.
+			params: getClusterImagesParams{Clusters: []string{"local"}},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(podScheme(), map[schema.GroupVersionResource]string{
+				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
+			}, fakePodWithImage),
+			expectedError: "no URL for rancher request",
+		},
 	}
 
-	for name, test := range tests {
+	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &client.Client{
 				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return test.fakeDynClient, nil
+					return tt.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
-			result, _, err := tools.getClusterImages(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-			}, test.params)
+			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
+			req := test.NewCallToolRequest(tt.requestURL)
 
-			if test.expectedError != "" {
-				assert.ErrorContains(t, err, test.expectedError)
+			result, _, err := tools.getClusterImages(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
+
+			if tt.expectedError != "" {
+				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				require.NoError(t, err)
-				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
+				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
 		})
 	}

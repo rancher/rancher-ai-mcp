@@ -6,6 +6,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -47,8 +48,12 @@ func TestGetNodes(t *testing.T) {
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
-		params         getNodesParams
-		fakeDynClient  *dynamicfake.FakeDynamicClient
+		params        getNodesParams
+		fakeDynClient *dynamicfake.FakeDynamicClient
+		// used in the CallToolRequest
+		requestURL string
+		// used in the creation of the Tools.
+		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -57,6 +62,39 @@ func TestGetNodes(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
 				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
 			}, fakeNode),
+			requestURL: fakeUrl,
+			expectedResult: `{
+				"llm": [
+					{
+						"metadata": {"name": "node-1"},
+						"spec": {},
+						"status": {
+							"allocatable": {"cpu": "4", "memory": "8Gi"},
+							"capacity": {"cpu": "4", "memory": "8Gi"},
+							"daemonEndpoints": {"kubeletEndpoint": {"Port": 0}},
+							"nodeInfo": {
+								"architecture": "",
+								"bootID": "",
+								"containerRuntimeVersion": "",
+								"kernelVersion": "",
+								"kubeProxyVersion": "",
+								"kubeletVersion": "",
+								"machineID": "",
+								"operatingSystem": "",
+								"osImage": "",
+								"systemUUID": ""
+							}
+						}
+					}
+				]
+			}`,
+		},
+		"get nodes when tool is configured with URL": {
+			params: getNodesParams{Cluster: "local"},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
+				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
+			}, fakeNode),
+			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -84,33 +122,40 @@ func TestGetNodes(t *testing.T) {
 			}`,
 		},
 		"get nodes - not found": {
-			params: getNodesParams{Cluster: "local"},
+			params:     getNodesParams{Cluster: "local"},
+			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "nodes"}:                    "NodeList",
 				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
 			}),
 			expectedResult: `{"llm":"no resources found"}`,
 		},
+		"get nodes no rancherURL or request URL": {
+			params: getNodesParams{Cluster: "local"},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
+				{Group: "", Version: "v1", Resource: "nodes"}:                    "NodeList",
+				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
+			}),
+			expectedError: "no URL for rancher request",
+		},
 	}
 
-	for name, test := range tests {
+	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &client.Client{
 				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return test.fakeDynClient, nil
+					return tt.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: newFakeToolsClient(c, fakeToken)}
+			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
+			req := test.NewCallToolRequest(tt.requestURL)
 
-			result, _, err := tools.getNodes(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-			}, test.params)
-
-			if test.expectedError != "" {
-				assert.ErrorContains(t, err, test.expectedError)
+			result, _, err := tools.getNodes(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
+			if tt.expectedError != "" {
+				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				require.NoError(t, err)
-				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
+				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
 		})
 	}

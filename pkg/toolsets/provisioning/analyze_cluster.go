@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
@@ -65,8 +66,8 @@ func (t *Tools) AnalyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 		// Unlike provisioning clusters, management cluster objects are cluster scoped.
 		Namespace: "",
 		Name:      provCluster.Status.ClusterName,
-		URL:       toolReq.Extra.Header.Get(urlHeader),
-		Token:     toolReq.Extra.Header.Get(tokenHeader),
+		URL:       t.rancherURL(toolReq),
+		Token:     middleware.Token(ctx),
 	})
 	if err != nil && !apierrors.IsNotFound(err) {
 		log.Error("failed to get management cluster",
@@ -89,8 +90,8 @@ func (t *Tools) AnalyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 		Kind:      converter.CAPIClusterResourceKind,
 		Namespace: DefaultClusterResourcesNamespace,
 		Name:      provCluster.Name,
-		URL:       toolReq.Extra.Header.Get(urlHeader),
-		Token:     toolReq.Extra.Header.Get(tokenHeader),
+		URL:       t.rancherURL(toolReq),
+		Token:     middleware.Token(ctx),
 	})
 	if err != nil && !apierrors.IsNotFound(err) {
 		log.Error("failed to get CAPI cluster",

@@ -6,6 +6,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -92,8 +93,12 @@ func TestGetDeploymentDetails(t *testing.T) {
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
-		params         specificResourceParams
-		fakeDynClient  *dynamicfake.FakeDynamicClient
+		params        specificResourceParams
+		fakeDynClient *dynamicfake.FakeDynamicClient
+		// used in the CallToolRequest
+		requestURL string
+		// used in the creation of the Tools.
+		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -103,6 +108,7 @@ func TestGetDeploymentDetails(t *testing.T) {
 				Namespace: "default",
 				Cluster:   "local",
 			},
+			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(deploymentScheme(), map[schema.GroupVersionResource]string{
 				{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
 				{Group: "", Version: "v1", Resource: "pods"}:            "PodList",
@@ -148,32 +154,89 @@ func TestGetDeploymentDetails(t *testing.T) {
 				Namespace: "default",
 				Cluster:   "local",
 			},
+			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(deploymentScheme(), map[schema.GroupVersionResource]string{
 				{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
 				{Group: "", Version: "v1", Resource: "pods"}:            "PodList",
 			}),
 			expectedError: `deployments.apps "nonexistent-deployment" not found`,
 		},
+		"get deployment when tool is configured with URL": {
+			params: specificResourceParams{
+				Name:      "nginx-deployment",
+				Namespace: "default",
+				Cluster:   "local",
+			},
+			rancherURL: fakeUrl,
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(deploymentScheme(), map[schema.GroupVersionResource]string{
+				{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
+				{Group: "", Version: "v1", Resource: "pods"}:            "PodList",
+			}, fakeDeployment, fakeDeploymentPod),
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "apps/v1",
+						"kind": "Deployment",
+						"metadata": {"name": "nginx-deployment", "namespace": "default"},
+						"spec": {
+							"replicas": 2,
+							"selector": {"matchLabels": {"app": "nginx"}},
+							"strategy": {},
+							"template": {
+								"metadata": {"labels": {"app": "nginx"}},
+								"spec": {
+									"containers": [
+										{"image": "nginx:1.21", "name": "nginx", "ports": [{"containerPort": 80, "protocol": "TCP"}], "resources": {}}
+									]
+								}
+							}
+						},
+						"status": {}
+					},
+					{
+						"apiVersion": "v1",
+						"kind": "Pod",
+						"metadata": {"labels": {"app": "nginx"}, "name": "nginx-deployment-abc123", "namespace": "default"},
+						"spec": {"containers": [{"image": "nginx:1.21", "name": "nginx", "resources": {}}]},
+						"status": {"phase": "Running"}
+					}
+				],
+				"uiContext": [
+					{"cluster": "local", "kind": "Deployment", "name": "nginx-deployment", "namespace": "default", "type": "apps.deployment"},
+					{"cluster": "local", "kind": "Pod", "name": "nginx-deployment-abc123", "namespace": "default", "type": "pod"}
+				]
+			}`,
+		},
+		"get deployment from cluster - no rancherURL or request URL": {
+			params: specificResourceParams{
+				Name:      "nonexistent-deployment",
+				Namespace: "default",
+				Cluster:   "local",
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(deploymentScheme(), map[schema.GroupVersionResource]string{
+				{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
+				{Group: "", Version: "v1", Resource: "pods"}:            "PodList",
+			}),
+			expectedError: "no URL for rancher request",
+		},
 	}
 
-	for name, test := range tests {
+	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &client.Client{
 				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return test.fakeDynClient, nil
+					return tt.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: newFakeToolsClient(c, fakeToken)}
+			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
+			req := test.NewCallToolRequest(tt.requestURL)
 
-			result, _, err := tools.getDeploymentDetails(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-			}, test.params)
-
-			if test.expectedError != "" {
-				assert.ErrorContains(t, err, test.expectedError)
+			result, _, err := tools.getDeploymentDetails(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
+			if tt.expectedError != "" {
+				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				require.NoError(t, err)
-				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
+				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
 		})
 	}

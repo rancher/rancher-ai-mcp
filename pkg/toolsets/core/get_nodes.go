@@ -22,7 +22,7 @@ func (t *Tools) getNodes(ctx context.Context, toolReq *mcp.CallToolRequest, para
 	nodeResource, err := t.client.GetResources(ctx, client.ListParams{
 		Cluster: params.Cluster,
 		Kind:    "node",
-		URL:     toolReq.Extra.Header.Get(urlHeader),
+		URL:     t.rancherURL(toolReq),
 		Token:   middleware.Token(ctx),
 	})
 	if err != nil {
@@ -34,7 +34,7 @@ func (t *Tools) getNodes(ctx context.Context, toolReq *mcp.CallToolRequest, para
 	nodeMetricsResource, _ := t.client.GetResources(ctx, client.ListParams{
 		Cluster: params.Cluster,
 		Kind:    "node.metrics.k8s.io",
-		URL:     toolReq.Extra.Header.Get(urlHeader),
+		URL:     t.rancherURL(toolReq),
 		Token:   middleware.Token(ctx),
 	})
 

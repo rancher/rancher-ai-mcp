@@ -1,11 +1,12 @@
 package provisioning
 
 import (
-	"context"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -15,9 +16,13 @@ import (
 
 func TestGetClusterMachine(t *testing.T) {
 	tests := map[string]struct {
-		params         GetClusterMachineParams
-		fakeClientset  kubernetes.Interface
-		fakeDynClient  *dynamicfake.FakeDynamicClient
+		params        GetClusterMachineParams
+		fakeClientset kubernetes.Interface
+		fakeDynClient *dynamicfake.FakeDynamicClient
+		// used in the CallToolRequest
+		requestURL string
+		// used in the creation of the Tools.
+		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -26,6 +31,7 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "test-cluster",
 				MachineName: "test-cluster-machine-1",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newCAPIMachineWithBootstrap("test-cluster-machine-1", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1", "RKEBootstrap", "test-cluster-machine-1"),
@@ -81,6 +87,7 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "test-cluster",
 				MachineName: "nonexistent-machine",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newCAPIMachine("test-cluster-machine-1", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1"),
@@ -92,6 +99,7 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "empty-cluster",
 				MachineName: "",
 			},
+			requestURL:     testURL,
 			fakeClientset:  newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds()),
 			expectedResult: `{"llm":"no resources found"}`,
@@ -101,6 +109,7 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "standalone-cluster",
 				MachineName: "standalone-machine",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newCAPIMachine("standalone-machine", "fleet-default", "standalone-cluster", "", ""),
@@ -138,6 +147,7 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "test-cluster",
 				MachineName: "test-cluster-machine-3",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newCAPIMachine("test-cluster-machine-3", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-2"),
@@ -212,6 +222,7 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "test-cluster",
 				MachineName: "test-cluster-machine-4",
 			},
+			requestURL:    testURL,
 			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
 				newCAPIMachine("test-cluster-machine-4", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-3"),
@@ -320,29 +331,44 @@ func TestGetClusterMachine(t *testing.T) {
 				]
 			}`,
 		},
+		"get machines from cluster when the tool is configured with a rancher URL": {
+			params: GetClusterMachineParams{
+				Cluster:     "empty-cluster",
+				MachineName: "",
+			},
+			rancherURL:     testURL,
+			fakeClientset:  newFakeClientsetWithCAPIDiscovery(),
+			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds()),
+			expectedResult: `{"llm":"no resources found"}`,
+		},
+		"get machines from cluster - no rancherURL or request URL": {
+			params: GetClusterMachineParams{
+				Cluster:     "empty-cluster",
+				MachineName: "",
+			},
+			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds()),
+			expectedError: "no URL for rancher request",
+		},
 	}
 
-	for name, test := range tests {
+	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &client.Client{
 				ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
-					return test.fakeClientset, nil
+					return tt.fakeClientset, nil
 				},
 				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return test.fakeDynClient, nil
+					return tt.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: c}
+			tools := NewTools(test.WrapClient(c, testToken, testURL), tt.rancherURL)
+			req := test.NewCallToolRequest(tt.requestURL)
+			req.Params = &mcp.CallToolParamsRaw{Name: "get-cluster-machine"}
 
-			result, _, err := tools.GetClusterMachine(context.TODO(), &mcp.CallToolRequest{
-				Params: &mcp.CallToolParamsRaw{
-					Name: "get-cluster-machine",
-				},
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {testURL}, tokenHeader: {testToken}}},
-			}, test.params)
-
-			if test.expectedError != "" {
-				assert.ErrorContains(t, err, test.expectedError)
+			result, _, err := tools.GetClusterMachine(middleware.WithToken(t.Context(), testToken), req, tt.params)
+			if tt.expectedError != "" {
+				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				assert.NoError(t, err)
 
@@ -350,7 +376,7 @@ func TestGetClusterMachine(t *testing.T) {
 				assert.Truef(t, ok, "expected type *mcp.TextContent")
 
 				assert.Truef(t, ok, "expected expectedResult to be a JSON string")
-				assert.JSONEq(t, test.expectedResult, text.Text)
+				assert.JSONEq(t, tt.expectedResult, text.Text)
 			}
 		})
 	}

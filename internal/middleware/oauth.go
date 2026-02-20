@@ -116,11 +116,13 @@ func (c *OAuthConfig) OAuthMiddleware(next http.Handler) http.Handler {
 
 		token, err := c.extractToken(r)
 		if err != nil {
+			zap.L().Debug("Failed to extract token from header", zap.Error(err))
 			c.sendUnauthorized(w)
 			return
 		}
 
 		if err := c.validateJWT(token); err != nil {
+			zap.L().Debug("Failed to validat token", zap.Error(err))
 			c.sendUnauthorized(w)
 			return
 		}
@@ -219,6 +221,7 @@ func (c *OAuthConfig) sendUnauthorized(w http.ResponseWriter) {
 //
 // https://modelcontextprotocol.io/specification/draft/basic/authorization#protected-resource-metadata-discovery-requirements
 func (c *OAuthConfig) HandleProtectedResourceMetadata(w http.ResponseWriter, r *http.Request) {
+	zap.L().Debug("Serving protected metadata")
 	// Set CORS headers
 	w.Header().Set("Access-Control-Allow-Origin", corsAllowOrigin)
 	w.Header().Set("Access-Control-Allow-Methods", corsAllowMethods)

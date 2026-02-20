@@ -28,7 +28,7 @@ func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 		clusterList, err := t.client.GetResources(ctx, client.ListParams{
 			Cluster: "local",
 			Kind:    "managementcluster",
-			URL:     toolReq.Extra.Header.Get(urlHeader),
+			URL:     t.rancherURL(toolReq),
 			Token:   middleware.Token(ctx),
 		})
 
@@ -50,7 +50,7 @@ func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 		unstructuredPods, err := t.client.GetResources(ctx, client.ListParams{
 			Cluster: cluster,
 			Kind:    "pod",
-			URL:     toolReq.Extra.Header.Get(urlHeader),
+			URL:     t.rancherURL(toolReq),
 			Token:   middleware.Token(ctx),
 		})
 		if err != nil {
@@ -77,7 +77,7 @@ func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 	response, err := json.Marshal(imagesInClusters)
 	if err != nil {
 		zap.L().Error("failed to create response", zap.String("tool", "getClusterImages"), zap.Error(err))
-		return nil, nil, fmt.Errorf("failed to marsha JSON: %w", err)
+		return nil, nil, fmt.Errorf("failed to marshal JSON: %w", err)
 	}
 
 	return &mcp.CallToolResult{

@@ -6,6 +6,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
@@ -14,9 +15,8 @@ import (
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes/fake"
-
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
 	"k8s.io/utils/ptr"
 )
@@ -101,7 +101,11 @@ func TestInspectPod(t *testing.T) {
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
-		params         specificResourceParams
+		params specificResourceParams
+		// used in the CallToolRequest
+		requestURL string
+		// used in the creation of the Tools.
+		rancherURL     string
 		fakeClientset  *fake.Clientset
 		fakeDynClient  *dynamicfake.FakeDynamicClient
 		expectedError  string
@@ -115,6 +119,7 @@ func TestInspectPod(t *testing.T) {
 			},
 			fakeClientset: fake.NewSimpleClientset(fakeDeploymentForInspect, fakeReplicaSet, fakePodForInspect),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme(), fakePodForInspect, fakeReplicaSet, fakeDeploymentForInspect),
+			requestURL:    fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -200,6 +205,101 @@ func TestInspectPod(t *testing.T) {
 				]
 			}`,
 		},
+		"inspect pod when tool is configured with URL": {
+			params: specificResourceParams{
+				Name:      "nginx-pod-abc123",
+				Namespace: "default",
+				Cluster:   "local",
+			},
+			fakeClientset: fake.NewSimpleClientset(fakeDeploymentForInspect, fakeReplicaSet, fakePodForInspect),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme(), fakePodForInspect, fakeReplicaSet, fakeDeploymentForInspect),
+			rancherURL:    fakeUrl,
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "v1",
+						"kind": "Pod",
+						"metadata": {
+							"name": "nginx-pod-abc123",
+							"namespace": "default",
+							"ownerReferences": [
+								{
+									"apiVersion": "apps/v1",
+									"controller": true,
+									"kind": "ReplicaSet",
+									"name": "nginx-replicaset",
+									"uid": ""
+								}
+							]
+						},
+						"spec": {
+							"containers": [
+								{
+									"image": "nginx:1.21",
+									"name": "nginx",
+									"resources": {}
+								},
+								{
+									"image": "busybox:latest",
+									"name": "sidecar",
+									"resources": {}
+								}
+							]
+						},
+						"status": {
+							"phase": "Running"
+						}
+					},
+					{
+						"apiVersion": "apps/v1",
+						"kind": "Deployment",
+						"metadata": {
+							"name": "nginx-deployment",
+							"namespace": "default"
+						},
+						"spec": {
+							"replicas": 1,
+							"selector": {
+								"matchLabels": {
+									"app": "nginx"
+								}
+							},
+							"strategy": {},
+							"template": {
+								"metadata": {},
+								"spec": {
+									"containers": null
+								}
+							}
+						},
+						"status": {}
+					},
+					{
+						"pod-logs": {
+							"nginx": "fake logs",
+							"sidecar": "fake logs"
+						}
+					}
+				],
+				"uiContext": [
+					{
+						"cluster": "local",
+						"kind": "Pod",
+						"name": "nginx-pod-abc123",
+						"namespace": "default",
+						"type": "pod"
+					},
+					{
+						"cluster": "local",
+						"kind": "Deployment",
+						"name": "nginx-deployment",
+						"namespace": "default",
+						"type": "apps.deployment"
+					}
+				]
+			}`,
+		},
+
 		"inspect pod - not found": {
 			params: specificResourceParams{
 				Name:      "nonexistent-pod",
@@ -208,6 +308,7 @@ func TestInspectPod(t *testing.T) {
 			},
 			fakeClientset: fake.NewSimpleClientset(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme()),
+			requestURL:    fakeUrl,
 			expectedError: `pods "nonexistent-pod" not found`,
 		},
 		"inspect pod - statefulset parent": {
@@ -250,6 +351,7 @@ func TestInspectPod(t *testing.T) {
 					},
 				},
 			),
+			requestURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -366,6 +468,7 @@ func TestInspectPod(t *testing.T) {
 					},
 				},
 			),
+			requestURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -443,30 +546,38 @@ func TestInspectPod(t *testing.T) {
 				]
 			}`,
 		},
+		"inspect pod - no rancherURL or request URL": {
+			params: specificResourceParams{
+				Name:      "nonexistent-pod",
+				Namespace: "default",
+				Cluster:   "local",
+			},
+			fakeClientset: fake.NewSimpleClientset(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme()),
+			expectedError: "no URL for rancher request",
+		},
 	}
 
-	for name, test := range tests {
+	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &client.Client{
 				ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
-					return test.fakeClientset, nil
+					return tt.fakeClientset, nil
 				},
 				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return test.fakeDynClient, nil
+					return tt.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: newFakeToolsClient(c, fakeToken)}
+			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
+			req := test.NewCallToolRequest(tt.requestURL)
 
-			result, _, err := tools.inspectPod(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-			}, test.params)
-
-			if test.expectedError != "" {
-				assert.ErrorContains(t, err, test.expectedError)
+			result, _, err := tools.inspectPod(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
+			if tt.expectedError != "" {
+				assert.ErrorContains(t, err, tt.expectedError)
 				assert.Nil(t, result)
 			} else {
 				require.NoError(t, err)
-				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
+				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
 		})
 	}

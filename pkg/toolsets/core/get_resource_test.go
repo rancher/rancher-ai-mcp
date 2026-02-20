@@ -6,6 +6,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
@@ -42,41 +43,57 @@ func TestGetResource(t *testing.T) {
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
-		params         resourceParams
-		fakeDynClient  *dynamicfake.FakeDynamicClient
+		params        resourceParams
+		fakeDynClient *dynamicfake.FakeDynamicClient
+		// used in the CallToolRequest
+		requestURL string
+		// used in the creation of the Tools.
+		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
 		"get pod": {
 			params:         resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClient(scheme(), fakePod),
+			requestURL:     fakeUrl,
+			expectedResult: `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"rancher","namespace":"default"},"spec":{"containers":[{"image":"rancher:latest","name":"rancher-container","resources":{}}]},"status":{}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"}]}`,
+		},
+		"get node when tool is configured with URL": {
+			params:         resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
+			fakeDynClient:  dynamicfake.NewSimpleDynamicClient(scheme(), fakePod),
+			rancherURL:     fakeUrl,
 			expectedResult: `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"rancher","namespace":"default"},"spec":{"containers":[{"image":"rancher:latest","name":"rancher-container","resources":{}}]},"status":{}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"}]}`,
 		},
 		"get pod - not found": {
 			params:        resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),
+			requestURL:    fakeUrl,
 			expectedError: `pods "rancher" not found`,
+		},
+		"get pod no rancherURL or request URL": {
+			params:        resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),
+			expectedError: "no URL for rancher request",
 		},
 	}
 
-	for name, test := range tests {
+	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &client.Client{
 				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return test.fakeDynClient, nil
+					return tt.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
-			result, _, err := tools.getResource(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-			}, test.params)
+			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
+			req := test.NewCallToolRequest(tt.requestURL)
 
-			if test.expectedError != "" {
-				assert.ErrorContains(t, err, test.expectedError)
+			result, _, err := tools.getResource(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
+			if tt.expectedError != "" {
+				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				require.NoError(t, err)
-				assert.JSONEq(t, test.expectedResult, result.Content[0].(*mcp.TextContent).Text)
+				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
 		})
 	}

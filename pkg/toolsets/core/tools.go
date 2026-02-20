@@ -25,14 +25,24 @@ type toolsClient interface {
 
 // Tools contains all tools for the MCP server
 type Tools struct {
-	client toolsClient
+	client     toolsClient
+	RancherURL string
 }
 
 // NewTools creates and returns a new Tools instance.
-func NewTools(client *client.Client) *Tools {
+func NewTools(client toolsClient, rancherURL string) *Tools {
 	return &Tools{
-		client: client,
+		client:     client,
+		RancherURL: rancherURL,
 	}
+}
+
+func (t *Tools) rancherURL(toolReq *mcp.CallToolRequest) string {
+	if t.RancherURL == "" {
+		return toolReq.Extra.Header.Get(urlHeader)
+	}
+
+	return t.RancherURL
 }
 
 // AddTools registers all Rancher Kubernetes tools with the provided MCP server.

@@ -32,7 +32,9 @@ type createKubernetesResourceParams struct {
 func (t *Tools) createKubernetesResource(ctx context.Context, toolReq *mcp.CallToolRequest, params createKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("createKubernetesResource called")
 
-	resourceInterface, err := t.client.GetResourceInterface(ctx, middleware.Token(ctx), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
+	resourceInterface, err := t.client.GetResourceInterface(
+		ctx, middleware.Token(ctx), t.rancherURL(toolReq),
+		params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, nil, err
 	}

@@ -1,27 +1,43 @@
 package fleet
 
 import (
+	"context"
+
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 const (
 	toolsSet    = "fleet"
 	toolsSetAnn = "toolset"
-	tokenHeader = "R_token"
 	urlHeader   = "R_url"
 )
 
+type toolsClient interface {
+	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
+}
+
 // Tools contains all tools for the MCP server
 type Tools struct {
-	client *client.Client
+	client     toolsClient
+	RancherURL string
 }
 
 // NewTools creates and returns a new Tools instance.
-func NewTools(client *client.Client) *Tools {
+func NewTools(client toolsClient, rancherURL string) *Tools {
 	return &Tools{
-		client: client,
+		client:     client,
+		RancherURL: rancherURL,
 	}
+}
+
+func (t *Tools) rancherURL(toolReq *mcp.CallToolRequest) string {
+	if t.RancherURL == "" {
+		return toolReq.Extra.Header.Get(urlHeader)
+	}
+
+	return t.RancherURL
 }
 
 // AddTools registers all Rancher Kubernetes tools with the provided MCP server.
