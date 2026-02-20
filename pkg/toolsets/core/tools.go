@@ -152,4 +152,25 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Parameters:
 		clusters (array of strings): List of clusters to get images from. Empty for return images for all clusters.`},
 		t.getClusterImages)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "getProject",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Returns a project resource and its associated namespaces.'
+		Parameters:
+		name (string): The name of the project resource.
+		cluster (string): The name of the cluster the project belongs to.`},
+		t.getProject)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "listProjects",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Returns a list of project resources for a specified cluster.'
+		Parameters:
+		cluster (string): The name of the cluster.`},
+		t.listProjects)
 }
