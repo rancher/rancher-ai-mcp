@@ -84,6 +84,24 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		t.updateKubernetesResource)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "patchKubernetesResource_plan",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation.'
+		Parameters:
+		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
+		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
+		name (string): The name of the specific resource to patch.
+		cluster (string): The name of the Kubernetes cluster.
+		patch (json): Patch to apply. This must be a JSON object. The content type used is application/json-patch+json.
+		Returns the planned patch operation.
+		
+		Example of the patch parameter:
+		[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
+		t.updateKubernetesResourcePlan)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listKubernetesResources",
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
@@ -142,6 +160,20 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
 		resource (json): Resource to be created. This must be a JSON object.`},
 		t.createKubernetesResource)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "createKubernetesResource_plan",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Plans to create a resource in a kubernetes cluster. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.'
+		Parameters:
+		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
+		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
+		name (string): The name of the specific resource to patch.
+		cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
+		resource (json): Resource to be created. This must be a JSON object.`},
+		t.createKubernetesResourcePlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getClusterImages",

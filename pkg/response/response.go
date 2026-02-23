@@ -93,3 +93,86 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (strin
 
 	return string(bytes), nil
 }
+
+// OperationType represents the type of operation in a plan
+type OperationType string
+
+const (
+	// OperationCreate represents a resource creation operation
+	OperationCreate OperationType = "create"
+	// OperationUpdate represents a resource update operation
+	OperationUpdate OperationType = "update"
+	// OperationDelete represents a resource deletion operation
+	OperationDelete OperationType = "delete"
+)
+
+// Resource identifies a Kubernetes resource by name, kind, cluster, and namespace.
+type Resource struct {
+	// Name is the name of the Kubernetes resource.
+	Name string `json:"name"`
+	// Kind is the type of the Kubernetes resource (e.g., "Pod", "Deployment").
+	Kind string `json:"kind"`
+	// Cluster is the Rancher cluster where the resource resides.
+	Cluster string `json:"cluster"`
+	// Namespace is the Kubernetes namespace of the resource.
+	Namespace string `json:"namespace"`
+}
+
+// PlanResource represents a single planned operation on a Kubernetes resource.
+// It pairs an operation type (CREATE, UPDATE, DELETE) with the target resource
+// metadata and the operation payload.
+type PlanResource struct {
+	// Type is the operation to perform on the resource.
+	Type OperationType `json:"type" jsonschema:"enum=CREATE,enum=UPDATE,enum=DELETE"`
+	// Payload holds the resource body for CREATE operations or the patch data for UPDATE operations.
+	Payload any `json:"payload"`
+	// Resource identifies the target Kubernetes resource.
+	Resource Resource `json:"resource"`
+}
+
+// NewCreateResourceInput constructs a PlanResource for a CREATE operation.
+// It extracts the resource metadata from the given unstructured object and
+// sets the full object as the payload.
+func NewCreateResourceInput(obj *unstructured.Unstructured, cluster string) PlanResource {
+	plan_resource := PlanResource{
+		Type: OperationCreate,
+		Resource: Resource{
+			Name:      obj.GetName(),
+			Kind:      obj.GetKind(),
+			Cluster:   cluster,
+			Namespace: obj.GetNamespace(),
+		},
+		Payload: obj,
+	}
+
+	return plan_resource
+}
+
+// NewUpdateResourceInput constructs a PlanResource for an UPDATE operation.
+// It extracts the resource metadata from the given unstructured object and
+// uses the provided patch bytes as the payload.
+func NewUpdateResourceInput(obj *unstructured.Unstructured, patch []byte, cluster string) PlanResource {
+	plan_resource := PlanResource{
+		Type: OperationUpdate,
+		Resource: Resource{
+			Name:      obj.GetName(),
+			Kind:      obj.GetKind(),
+			Cluster:   cluster,
+			Namespace: obj.GetNamespace(),
+		},
+		Payload: patch,
+	}
+
+	return plan_resource
+}
+
+// CreatePlanResponse serializes a slice of PlanResource into a JSON string.
+// It returns the JSON representation and any marshalling error encountered.
+func CreatePlanResponse(resources []PlanResource) (string, error) {
+	bytes, err := json.Marshal(resources)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal plan response: %w", err)
+	}
+
+	return string(bytes), nil
+}
