@@ -63,6 +63,8 @@ func rancherURLFromAuthServerURL(s string) (string, error) {
 	}
 
 	parsed.Path = ""
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
 
 	return parsed.String(), nil
 }

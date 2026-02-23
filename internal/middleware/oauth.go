@@ -122,7 +122,7 @@ func (c *OAuthConfig) OAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		if err := c.validateJWT(token); err != nil {
-			zap.L().Debug("Failed to validat token", zap.Error(err))
+			zap.L().Debug("Failed to validate token", zap.Error(err))
 			c.sendUnauthorized(w)
 			return
 		}

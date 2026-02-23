@@ -58,7 +58,7 @@ func TestGetResource(t *testing.T) {
 			requestURL:     fakeUrl,
 			expectedResult: `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"rancher","namespace":"default"},"spec":{"containers":[{"image":"rancher:latest","name":"rancher-container","resources":{}}]},"status":{}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"}]}`,
 		},
-		"get node when tool is configured with URL": {
+		"get pod when tool is configured with URL": {
 			params:         resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClient(scheme(), fakePod),
 			rancherURL:     fakeUrl,
