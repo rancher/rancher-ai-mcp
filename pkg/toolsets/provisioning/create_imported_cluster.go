@@ -3,10 +3,11 @@ package provisioning
 import (
 	"context"
 	"fmt"
-	"mcp/internal/middleware"
-	"mcp/pkg/converter"
-	"mcp/pkg/response"
-	"mcp/pkg/utils"
+
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/converter"
+	"github.com/rancher/rancher-ai-mcp/pkg/response"
+	"github.com/rancher/rancher-ai-mcp/pkg/utils"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"

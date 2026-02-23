@@ -2,10 +2,11 @@ package provisioning
 
 import (
 	"context"
-	"mcp/pkg/client"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"

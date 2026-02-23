@@ -3,8 +3,9 @@ package provisioning
 import (
 	"context"
 	"encoding/json"
-	"mcp/pkg/client"
 	"testing"
+
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"

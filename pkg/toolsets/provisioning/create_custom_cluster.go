@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"mcp/internal/middleware"
-	"mcp/pkg/converter"
-	"mcp/pkg/response"
-	"mcp/pkg/utils"
 	"strings"
+
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/converter"
+	"github.com/rancher/rancher-ai-mcp/pkg/response"
+	"github.com/rancher/rancher-ai-mcp/pkg/utils"
 
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
