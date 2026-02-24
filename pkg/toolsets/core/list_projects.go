@@ -24,7 +24,7 @@ func (t *Tools) listProjects(ctx context.Context, toolReq *mcp.CallToolRequest, 
 		Cluster:   "local",
 		Kind:      "project",
 		Namespace: params.Cluster,
-		URL:       toolReq.Extra.Header.Get(urlHeader),
+		URL:       t.rancherURL(toolReq),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {

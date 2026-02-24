@@ -28,7 +28,7 @@ func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Kind:      "project",
 		Namespace: params.Cluster,
 		Name:      params.Name,
-		URL:       toolReq.Extra.Header.Get(urlHeader),
+		URL:       t.rancherURL(toolReq),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
@@ -50,7 +50,7 @@ func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Cluster:       params.Cluster,
 		Kind:          "namespace",
 		LabelSelector: projectLabel.String(),
-		URL:           toolReq.Extra.Header.Get(urlHeader),
+		URL:           t.rancherURL(toolReq),
 		Token:         middleware.Token(ctx),
 	})
 	if err != nil {
