@@ -84,7 +84,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		t.updateKubernetesResource)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "patchKubernetesResource_plan",
+		Name: "patchKubernetesResourcePlan",
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
@@ -162,7 +162,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		t.createKubernetesResource)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "createKubernetesResource_plan",
+		Name: "createKubernetesResourcePlan",
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
