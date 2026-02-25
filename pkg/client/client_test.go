@@ -126,7 +126,7 @@ func TestGetClusterId(t *testing.T) {
 				},
 			}
 
-			clusterID, err := c.getClusterId(context.TODO(), fakeToken, fakeUrl, test.clusterNameOrIDInput)
+			clusterID, err := c.GetClusterID(context.TODO(), fakeToken, fakeUrl, test.clusterNameOrIDInput)
 
 			if test.expectErr != "" {
 				require.ErrorContains(t, err, test.expectErr)

@@ -65,3 +65,10 @@ func (f *fakeToolsClient) CreateClientSet(ctx context.Context, token string, url
 	}
 	return f.client.CreateClientSet(ctx, token, url, cluster)
 }
+
+func (f *fakeToolsClient) GetClusterID(ctx context.Context, token string, url string, clusterNameOrID string) (string, error) {
+	if err := f.validateToken(token); err != nil {
+		return "", err
+	}
+	return f.client.GetClusterID(ctx, token, url, clusterNameOrID)
+}

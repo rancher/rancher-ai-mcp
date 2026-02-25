@@ -64,7 +64,7 @@ func NewClient(insecure bool) *Client {
 
 // CreateClientSet creates a new Kubernetes clientset for the given Token and URL.
 func (c *Client) CreateClientSet(ctx context.Context, token string, url string, cluster string) (kubernetes.Interface, error) {
-	clusterID, err := c.getClusterId(ctx, token, url, cluster)
+	clusterID, err := c.GetClusterID(ctx, token, url, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -78,7 +78,7 @@ func (c *Client) CreateClientSet(ctx context.Context, token string, url string, 
 
 // GetResourceInterface returns a dynamic resource interface for the given Token, URL, Namespace, and GroupVersionResource.
 func (c *Client) GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
-	clusterID, err := c.getClusterId(ctx, token, url, cluster)
+	clusterID, err := c.GetClusterID(ctx, token, url, cluster)
 	if err != nil {
 		return nil, err
 	}
@@ -261,7 +261,7 @@ func (c *Client) GetResourcesAtAnyAPIVersion(ctx context.Context, params ListPar
 //  4. If not found, fall back to listing all clusters and matching by display name.
 //
 // both cluster ID and display name are cached for future lookups.
-func (c *Client) getClusterId(ctx context.Context, token string, url string, clusterNameOrID string) (string, error) {
+func (c *Client) GetClusterID(ctx context.Context, token string, url string, clusterNameOrID string) (string, error) {
 	// handle the special case for the local cluster, it always exists and is known by ID and displayName "local"
 	if clusterNameOrID == "local" {
 		return "local", nil
@@ -372,7 +372,7 @@ func (c *Client) createRestConfig(token string, url string, clusterID string) (*
 // getAPIVersionsForGR queries the API server for all supported versions of the specified GroupResource.
 // It returns a slice of version strings or an error if the query fails.
 func (c *Client) getAPIVersionsForGR(ctx context.Context, token, url, cluster string, groupResource schema.GroupResource) ([]string, error) {
-	clusterID, err := c.getClusterId(ctx, token, url, cluster)
+	clusterID, err := c.GetClusterID(ctx, token, url, cluster)
 	if err != nil {
 		return nil, err
 	}

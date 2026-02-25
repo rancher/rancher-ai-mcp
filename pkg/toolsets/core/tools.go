@@ -21,6 +21,7 @@ type toolsClient interface {
 	GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
 	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
 	CreateClientSet(ctx context.Context, token string, url string, cluster string) (kubernetes.Interface, error)
+	GetClusterID(ctx context.Context, token string, url string, clusterNameOrID string) (string, error)
 }
 
 // Tools contains all tools for the MCP server
@@ -224,5 +225,17 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Parameters:
 		None`},
 		t.listClusters,
+	)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "getProjectResourceUsage",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Returns the resource usage for a specific project. Usage totals are provided for the entire project as well as broken down by namespace. The resource usage includes CPU and memory requests, limits and actual usage, as well as the total number of pods.'
+		Parameters:
+		name (string): The name of the project resource.
+		cluster (string): The name of the cluster the project belongs to.`},
+		t.getProjectResourceUsage,
 	)
 }

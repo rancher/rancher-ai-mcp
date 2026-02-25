@@ -2,12 +2,15 @@ package core
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	"go.uber.org/zap"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -16,18 +19,73 @@ var zapGetProject = zap.String("tool", "getProject")
 
 type getProjectParams struct {
 	Name    string `json:"name" jsonschema:"the name of the project resource"`
-	Cluster string `json:"cluster" jsonschema:"the name of the cluster resource the project belongs to"`
+	Cluster string `json:"cluster" jsonschema:"the cluster of the project resource"`
 }
 
-// getProject retrieves a project and its associated resources.
+// getProjectID retrieves the project ID for a given project name or ID within a cluster.
+func (t *Tools) getProjectID(ctx context.Context, token, url, clusterID, projectNameOrID string) (string, error) {
+	projectResource, err := t.client.GetResource(ctx, client.GetParams{
+		Cluster:   LocalCluster,
+		Kind:      "project",
+		Namespace: clusterID,
+		Name:      projectNameOrID,
+		URL:       url,
+		Token:     token,
+	})
+	if err == nil {
+		return projectResource.GetName(), nil
+	}
+
+	if !apierrors.IsNotFound(err) {
+		return "", err
+	}
+
+	resources, err := t.client.GetResources(ctx, client.ListParams{
+		Cluster:   LocalCluster,
+		Kind:      "project",
+		Namespace: clusterID,
+		URL:       url,
+		Token:     token,
+	})
+	if err != nil {
+		return "", err
+	}
+
+	for _, resource := range resources {
+		displayName, found, err := unstructured.NestedString(resource.Object, "spec", "displayName")
+		if err != nil || !found {
+			continue
+		}
+
+		if strings.EqualFold(displayName, projectNameOrID) {
+			return resource.GetName(), nil
+		}
+	}
+
+	return "", fmt.Errorf("project '%s' not found in cluster '%s'", projectNameOrID, clusterID)
+}
+
+// getProject retrieves a project resource.
 func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, params getProjectParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("getProject called")
+
+	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), params.Cluster)
+	if err != nil {
+		zap.L().Error("failed to get cluster ID", zapGetProject, zap.Error(err))
+		return nil, nil, err
+	}
+
+	projectID, err := t.getProjectID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), clusterID, params.Name)
+	if err != nil {
+		zap.L().Error("failed to get project ID", zapGetProject, zap.Error(err))
+		return nil, nil, err
+	}
 
 	projectResource, err := t.client.GetResource(ctx, client.GetParams{
 		Cluster:   LocalCluster,
 		Kind:      "project",
-		Namespace: params.Cluster,
-		Name:      params.Name,
+		Namespace: clusterID,
+		Name:      projectID,
 		URL:       t.rancherURL(toolReq),
 		Token:     middleware.Token(ctx),
 	})
@@ -38,7 +96,7 @@ func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 
 	projectLabel, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
 		MatchLabels: map[string]string{
-			"field.cattle.io/projectId": params.Name,
+			"field.cattle.io/projectId": projectID,
 		},
 	})
 	if err != nil {
@@ -47,7 +105,7 @@ func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 	}
 
 	projectNamespaces, err := t.client.GetResources(ctx, client.ListParams{
-		Cluster:       params.Cluster,
+		Cluster:       clusterID,
 		Kind:          "namespace",
 		LabelSelector: projectLabel.String(),
 		URL:           t.rancherURL(toolReq),
@@ -60,7 +118,7 @@ func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 
 	resources := append([]*unstructured.Unstructured{projectResource}, projectNamespaces...)
 
-	mcpResponse, err := response.CreateMcpResponse(resources, params.Cluster)
+	mcpResponse, err := response.CreateMcpResponse(resources, clusterID)
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapGetProject, zap.Error(err))
 		return nil, nil, err

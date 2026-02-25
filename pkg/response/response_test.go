@@ -321,3 +321,47 @@ func TestCreatePlanResponse(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateMcpResponseAny(t *testing.T) {
+	tests := map[string]struct {
+		data        any
+		uiContext   []UIContext
+		expected    string
+		expectError bool
+	}{
+		"map data without uiContext": {
+			data:     map[string]any{"key": "value"},
+			expected: `{"llm":{"key":"value"}}`,
+		},
+		"map data with uiContext entries": {
+			data: map[string]any{"count": 2},
+			uiContext: []UIContext{
+				{Namespace: "default", Kind: "Pod", Cluster: "local", Name: "pod-1", Type: "pod"},
+				{Namespace: "default", Kind: "Pod", Cluster: "local", Name: "pod-2", Type: "pod"},
+			},
+			expected: `{"llm":{"count":2},"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"pod-1","type":"pod"},{"namespace":"default","kind":"Pod","cluster":"local","name":"pod-2","type":"pod"}]}`,
+		},
+		"string data": {
+			data: "no resources found",
+			uiContext: []UIContext{
+				{Namespace: "default", Kind: "Pod", Cluster: "local", Name: "test-pod", Type: "pod"},
+			},
+			expected: `{"llm":"no resources found","uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"test-pod","type":"pod"}]}`,
+		},
+		"nil data": {
+			data:     nil,
+			expected: `{"llm":null}`,
+		},
+	}
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			resp, err := CreateMcpResponseAny(test.data, test.uiContext...)
+			if test.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.JSONEq(t, test.expected, resp)
+			}
+		})
+	}
+}

@@ -77,13 +77,20 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (strin
 		})
 	}
 
-	resp := MCPResponse{
-		UIContext: uiContext,
-	}
+	var data any = "no resources found"
 	if len(objs) > 0 {
-		resp.LLM = objs
-	} else {
-		resp.LLM = "no resources found"
+		data = objs
+	}
+
+	return CreateMcpResponseAny(data, uiContext...)
+}
+
+// CreateMcpResponseAny constructs an MCPResponse with any data that can be marshaled into JSON.
+// This gives a full control over the shape of the returned data and the optional UI context.
+func CreateMcpResponseAny(data any, uiContext ...UIContext) (string, error) {
+	resp := MCPResponse{
+		LLM:       data,
+		UIContext: uiContext,
 	}
 
 	bytes, err := json.Marshal(resp)

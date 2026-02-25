@@ -20,10 +20,16 @@ type listProjectsParams struct {
 func (t *Tools) listProjects(ctx context.Context, toolReq *mcp.CallToolRequest, params listProjectsParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("listProjects called")
 
+	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), params.Cluster)
+	if err != nil {
+		zap.L().Error("failed to get cluster ID", zapGetProject, zap.Error(err))
+		return nil, nil, err
+	}
+
 	resources, err := t.client.GetResources(ctx, client.ListParams{
 		Cluster:   LocalCluster,
 		Kind:      "project",
-		Namespace: params.Cluster,
+		Namespace: clusterID,
 		URL:       t.rancherURL(toolReq),
 		Token:     middleware.Token(ctx),
 	})
@@ -32,7 +38,7 @@ func (t *Tools) listProjects(ctx context.Context, toolReq *mcp.CallToolRequest, 
 		return nil, nil, err
 	}
 
-	mcpResponse, err := response.CreateMcpResponse(resources, params.Cluster)
+	mcpResponse, err := response.CreateMcpResponse(resources, clusterID)
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapListProjects, zap.Error(err))
 		return nil, nil, err

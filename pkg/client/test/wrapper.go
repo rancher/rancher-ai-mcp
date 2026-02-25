@@ -138,6 +138,17 @@ func (f *clientWrapper) GetResourcesAtAnyAPIVersion(ctx context.Context, params 
 	return f.client.GetResourcesAtAnyAPIVersion(ctx, params)
 }
 
+func (f *clientWrapper) GetClusterID(ctx context.Context, token string, url string, clusterNameOrID string) (string, error) {
+	if err := f.validateToken(token); err != nil {
+		return "", err
+	}
+	if err := f.validateRequestURL(url); err != nil {
+		return "", err
+	}
+
+	return f.client.GetClusterID(ctx, token, url, clusterNameOrID)
+}
+
 // NewCallToolRequest creates and returns a CallToolRequest.
 //
 // The R_url header will be set to the requestURL if requestURL is not empty.
