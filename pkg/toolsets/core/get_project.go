@@ -16,15 +16,15 @@ var zapGetProject = zap.String("tool", "getProject")
 
 type getProjectParams struct {
 	Name    string `json:"name" jsonschema:"the name of the project resource"`
-	Cluster string `json:"cluster" jsonschema:"the cluster of the project resource"`
+	Cluster string `json:"cluster" jsonschema:"the name of the cluster resource the project belongs to"`
 }
 
-// getProject retrieves a project resource.
+// getProject retrieves a project and its associated resources.
 func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, params getProjectParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("getProject called")
 
 	projectResource, err := t.client.GetResource(ctx, client.GetParams{
-		Cluster:   "local",
+		Cluster:   LocalCluster,
 		Kind:      "project",
 		Namespace: params.Cluster,
 		Name:      params.Name,

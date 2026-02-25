@@ -13,15 +13,15 @@ import (
 var zapListProjects = zap.String("tool", "listProjects")
 
 type listProjectsParams struct {
-	Cluster string `json:"cluster" jsonschema:"the cluster of the project resource"`
+	Cluster string `json:"cluster" jsonschema:"the name of the cluster resource the project belongs to"`
 }
 
-// listProjects retrieves a project resource.
+// listProjects retrieves a list of projects in a cluster.
 func (t *Tools) listProjects(ctx context.Context, toolReq *mcp.CallToolRequest, params listProjectsParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("listProjects called")
 
 	resources, err := t.client.GetResources(ctx, client.ListParams{
-		Cluster:   "local",
+		Cluster:   LocalCluster,
 		Kind:      "project",
 		Namespace: params.Cluster,
 		URL:       t.rancherURL(toolReq),

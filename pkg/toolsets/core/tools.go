@@ -81,7 +81,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		
 		Example of the patch parameter:
 		[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
-		t.updateKubernetesResource)
+		t.updateKubernetesResource,
+	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "patchKubernetesResourcePlan",
@@ -111,7 +112,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
 		namespace (string): The namespace where the resource are located. It must be empty for all namespaces or cluster-wide resources.
 		cluster (string): The name of the Kubernetes cluster.`},
-		t.listKubernetesResources)
+		t.listKubernetesResources,
+	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "inspectPod",
@@ -123,7 +125,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		namespace (string): The namespace where the resource are located.
 		cluster (string): The name of the Kubernetes cluster.
 		name (string): The name of the Pod.`},
-		t.inspectPod)
+		t.inspectPod,
+	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getDeployment",
@@ -135,7 +138,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		namespace (string): The namespace where the resource are located.
 		cluster (string): The name of the Kubernetes cluster.
 		name (string): The name of the Deployment.`},
-		t.getDeploymentDetails)
+		t.getDeploymentDetails,
+	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getNodeMetrics",
@@ -145,7 +149,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.'
 		Parameters:
 		cluster (string): The name of the Kubernetes cluster.`},
-		t.getNodes)
+		t.getNodes,
+	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createKubernetesResource",
@@ -159,7 +164,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		name (string): The name of the specific resource to patch.
 		cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
 		resource (json): Resource to be created. This must be a JSON object.`},
-		t.createKubernetesResource)
+		t.createKubernetesResource,
+	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createKubernetesResourcePlan",
@@ -183,7 +189,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Description: `Returns a list of all container images for the specified clusters.'
 		Parameters:
 		clusters (array of strings): List of clusters to get images from. Empty for return images for all clusters.`},
-		t.getClusterImages)
+		t.getClusterImages,
+	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getProject",
@@ -192,9 +199,10 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		},
 		Description: `Returns a project resource and its associated namespaces.'
 		Parameters:
-		name (string): The name of the project resource.
-		cluster (string): The name of the cluster the project belongs to.`},
-		t.getProject)
+		name (string): The name of the project resource. Users often use project display name instead of project resource name. When unsure if the provided name is in fact the project resource name it's best to list projects first and find the project resource name that corresponds to the project display name.
+		cluster (string): The name of the cluster resource the project belongs to. Users can often use cluster display name instead of cluster resource name. When unsure if the provided value is in fact the cluster resource name it's best to list clusters first and find the cluster resource name that corresponds to the cluster display name.`},
+		t.getProject,
+	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listProjects",
@@ -203,6 +211,18 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		},
 		Description: `Returns a list of project resources for a specified cluster.'
 		Parameters:
-		cluster (string): The name of the cluster.`},
-		t.listProjects)
+		cluster (string): The name of the cluster resource the project belongs to. Users can often use cluster display name instead of cluster resource name. When unsure if the provided name is in fact the cluster resource name it's best to list clusters first and find the cluster resource name that corresponds to the cluster display name.`},
+		t.listProjects,
+	)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "listClusters",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Returns a list of all Rancher clusters, including local and downstream clusters.'
+		Parameters:
+		None`},
+		t.listClusters,
+	)
 }
