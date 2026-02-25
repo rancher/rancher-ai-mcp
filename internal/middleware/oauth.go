@@ -100,10 +100,9 @@ func (c *OAuthConfig) LoadJWKS(ctx context.Context) error {
 // OAuthMiddleware is a middleware that performs OAuth 2.1 authorization.
 func (c *OAuthConfig) OAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// If the token comes in the header no validation is done, it's passed
-		// through directly.
-		if token := r.Header.Get(tokenHeader); token != "" {
-			next.ServeHTTP(w, r.Clone(WithToken(r.Context(), token)))
+		// If OAuth is disabled then pass through the token if it's provided.
+		if c.AuthorizationServerURL == "" {
+			next.ServeHTTP(w, r.Clone(WithToken(r.Context(), r.Header.Get(tokenHeader))))
 			return
 		}
 

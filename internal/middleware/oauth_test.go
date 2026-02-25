@@ -36,23 +36,11 @@ const (
 
 var privateKey = mustGenerateRSAKey(2048)
 
-func TestMiddlewareWithLegacyTokenHeader(t *testing.T) {
-	config := &OAuthConfig{
-		AuthorizationServerURL: testAuthServerURL,
-		ResourceURL:            testResourceURL,
-		SupportedScopes:        []string{testScope},
-	}
-	claims := jwt.MapClaims{
-		"iss":   config.AuthorizationServerURL,
-		"aud":   config.ResourceURL,
-		"scope": []any{testScope},
-		"exp":   time.Now().Add(1 * time.Hour).Unix(),
-		"iat":   time.Now().Unix(),
-	}
-	token := createTestToken(t, privateKey, claims)
+func TestMiddlewareWithLegacyTokenHeaderWhenOAuthDisabled(t *testing.T) {
+	config := &OAuthConfig{}
 	handler := config.OAuthMiddleware(testHandler())
 	req := httptest.NewRequest(http.MethodGet, "/test", nil)
-	req.Header.Set("R_token", token)
+	req.Header.Set("R_token", "test-token")
 
 	rr := httptest.NewRecorder()
 	handler.ServeHTTP(rr, req)
@@ -61,9 +49,46 @@ func TestMiddlewareWithLegacyTokenHeader(t *testing.T) {
 		t.Errorf("Expected status 200, got %d", rr.Code)
 	}
 
-	expectedBody := "success with token " + token
+	expectedBody := "success with token test-token"
 	if rr.Body.String() != expectedBody {
 		t.Errorf("Expected body %q, got %q", expectedBody, rr.Body)
+	}
+}
+
+func TestMiddlewareWithNoTokenAndNoOAuth(t *testing.T) {
+	config := &OAuthConfig{}
+	handler := config.OAuthMiddleware(testHandler())
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", rr.Code)
+	}
+
+	expectedBody := "success with token "
+	if rr.Body.String() != expectedBody {
+		t.Errorf("Expected body %q, got %q", expectedBody, rr.Body)
+	}
+}
+
+func TestMiddlewareWithLegacyTokenOAuthConfigured(t *testing.T) {
+	// No way to verify the token.
+	config := setupTestConfig(t, privateKey)
+	handler := config.OAuthMiddleware(testHandler())
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusUnauthorized {
+		t.Errorf("Expected status 401, got %d", rr.Code)
+	}
+
+	authHeader := rr.Header().Get("WWW-Authenticate")
+	if authHeader == "" {
+		t.Error("Expected WWW-Authenticate header")
 	}
 }
 
