@@ -241,4 +241,14 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		namespace (string): (optional) The name of a specific namespace. If provided, only data for this namespace is returned.`},
 		t.getResourceUsage,
 	)
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "createProject",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Creates a project resource for a specified cluster.
+		Parameters:
+		cluster (string): The name of the cluster.
+		resource (json): The project resource to be created. This must be a JSON object.`},
+		t.createProject)
 }
