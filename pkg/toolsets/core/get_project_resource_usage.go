@@ -249,44 +249,64 @@ func (t *Tools) getNamespaceResourceUsage(ctx context.Context, toolReq *mcp.Call
 			return empty, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
 		}
 
-		// Skip pods that are not running or succeeded
+		// Skip pods that are not running or succeeded.
 		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodSucceeded {
 			continue
 		}
 
 		totals.podCount++
 
-		// Aggregate resources from all containers
+		// The pod's effective request/limit for a resource is calulated as follows:
+		// effective = max(sum(app containers), max(init containers))
+		// See https://kubernetes.io/docs/concepts/workloads/pods/init-containers/#resource-sharing-within-containers
+
+		// Sum of all app containers request/limit for resources.
+		appCPURequests := resource.NewQuantity(0, resource.DecimalSI)
+		appCPULimits := resource.NewQuantity(0, resource.DecimalSI)
+		appMemoryRequests := resource.NewQuantity(0, resource.BinarySI)
+		appMemoryLimits := resource.NewQuantity(0, resource.BinarySI)
+
 		for _, container := range pod.Spec.Containers {
 			if cpuReq, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
-				totals.cpuRequests.Add(cpuReq)
+				appCPURequests.Add(cpuReq)
 			}
 			if cpuLimit, ok := container.Resources.Limits[corev1.ResourceCPU]; ok {
-				totals.cpuLimits.Add(cpuLimit)
+				appCPULimits.Add(cpuLimit)
 			}
 			if memReq, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
-				totals.memoryRequests.Add(memReq)
+				appMemoryRequests.Add(memReq)
 			}
 			if memLimit, ok := container.Resources.Limits[corev1.ResourceMemory]; ok {
-				totals.memoryLimits.Add(memLimit)
+				appMemoryLimits.Add(memLimit)
 			}
 		}
 
-		// Aggregate resources from init containers
+		// The effective (max) init request/limit for resources.
+		initCPURequests := resource.NewQuantity(0, resource.DecimalSI)
+		initCPULimits := resource.NewQuantity(0, resource.DecimalSI)
+		initMemoryRequests := resource.NewQuantity(0, resource.BinarySI)
+		initMemoryLimits := resource.NewQuantity(0, resource.BinarySI)
+
 		for _, container := range pod.Spec.InitContainers {
 			if cpuReq, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
-				totals.cpuRequests.Add(cpuReq)
+				initCPURequests = quantityMax(initCPURequests, &cpuReq)
 			}
 			if cpuLimit, ok := container.Resources.Limits[corev1.ResourceCPU]; ok {
-				totals.cpuLimits.Add(cpuLimit)
+				initCPULimits = quantityMax(initCPULimits, &cpuLimit)
 			}
 			if memReq, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
-				totals.memoryRequests.Add(memReq)
+				initMemoryRequests = quantityMax(initMemoryRequests, &memReq)
 			}
 			if memLimit, ok := container.Resources.Limits[corev1.ResourceMemory]; ok {
-				totals.memoryLimits.Add(memLimit)
+				initMemoryLimits = quantityMax(initMemoryLimits, &memLimit)
 			}
 		}
+
+		// Pod's effective request/limit = max(sum(app containers), max(init containers)).
+		totals.cpuRequests.Add(*quantityMax(appCPURequests, initCPURequests))
+		totals.cpuLimits.Add(*quantityMax(appCPULimits, initCPULimits))
+		totals.memoryRequests.Add(*quantityMax(appMemoryRequests, initMemoryRequests))
+		totals.memoryLimits.Add(*quantityMax(appMemoryLimits, initMemoryLimits))
 
 		if m, hasMetrics := metricsByPod[pod.GetName()]; hasMetrics {
 			var podMetrics metricsv1beta1.PodMetrics
@@ -306,6 +326,14 @@ func (t *Tools) getNamespaceResourceUsage(ctx context.Context, toolReq *mcp.Call
 	}
 
 	return totals, nil
+}
+
+// quantityMax returns a pointer to the larger of two resource quantities.
+func quantityMax(a, b *resource.Quantity) *resource.Quantity {
+	if a.Cmp(*b) >= 0 {
+		return a
+	}
+	return b
 }
 
 func toNamespaceSummary(name string, s sample) map[string]any {

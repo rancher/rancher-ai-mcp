@@ -320,15 +320,82 @@ func TestGetResourceUsage(t *testing.T) {
 					"displayName": "My Project",
 					"totals": {
 						"podCount": 1,
-						"cpu": {"requests": "150m", "limits": "300m", "usage": "0"},
-						"memory": {"requests": "192Mi", "limits": "384Mi", "usage": "0"}
+						"cpu": {"requests": "100m", "limits": "200m", "usage": "0"},
+						"memory": {"requests": "128Mi", "limits": "256Mi", "usage": "0"}
 					},
 					"namespaces": [{
 						"namespace": "ns-1",
 						"totals": {
 							"podCount": 1,
-							"cpu": {"requests": "150m", "limits": "300m", "usage": "0"},
-							"memory": {"requests": "192Mi", "limits": "384Mi", "usage": "0"}
+							"cpu": {"requests": "100m", "limits": "200m", "usage": "0"},
+							"memory": {"requests": "128Mi", "limits": "256Mi", "usage": "0"}
+						}
+					}]
+				}]
+			}
+		}`, text)
+	})
+
+	t.Run("init container resources larger than app container", func(t *testing.T) {
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+			[]runtime.Object{
+				cluster,
+				project,
+				ns1,
+				fakeRunningPodWithInitContainer("pod-large-init", "ns-1",
+					// container requests
+					corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					// container limits
+					corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("200m"),
+						corev1.ResourceMemory: resource.MustParse("256Mi"),
+					},
+					// init container requests (larger than app)
+					corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("300m"),
+						corev1.ResourceMemory: resource.MustParse("512Mi"),
+					},
+					// init container limits (larger than app)
+					corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("500m"),
+						corev1.ResourceMemory: resource.MustParse("1Gi"),
+					},
+				),
+			},
+			nil,
+		)
+
+		result, _, err := tools.getResourceUsage(
+			middleware.WithToken(t.Context(), fakeToken),
+			test.NewCallToolRequest(fakeURL),
+			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Len(t, result.Content, 1)
+		text := result.Content[0].(*mcp.TextContent).Text
+		t.Logf("got result: %s", text)
+		assert.JSONEq(t, `{
+			"llm": {
+				"cluster": "test-cluster",
+				"projects": [{
+					"name": "my-project",
+					"displayName": "My Project",
+					"totals": {
+						"podCount": 1,
+						"cpu": {"requests": "300m", "limits": "500m", "usage": "0"},
+						"memory": {"requests": "512Mi", "limits": "1Gi", "usage": "0"}
+					},
+					"namespaces": [{
+						"namespace": "ns-1",
+						"totals": {
+							"podCount": 1,
+							"cpu": {"requests": "300m", "limits": "500m", "usage": "0"},
+							"memory": {"requests": "512Mi", "limits": "1Gi", "usage": "0"}
 						}
 					}]
 				}]
@@ -365,7 +432,7 @@ func TestGetResourceUsage(t *testing.T) {
 		assert.ErrorContains(t, err, "not found")
 	})
 
-	t.Run("all projects when no project specified", func(t *testing.T) {
+	t.Run("usage for all projects", func(t *testing.T) {
 		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
 			[]runtime.Object{
 				cluster,
@@ -420,7 +487,7 @@ func TestGetResourceUsage(t *testing.T) {
 		}`, text)
 	})
 
-	t.Run("namespace query", func(t *testing.T) {
+	t.Run("usage for a namespace", func(t *testing.T) {
 		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
 			[]runtime.Object{
 				cluster,
