@@ -61,6 +61,8 @@ func (t *Tools) getResourceUsage(ctx context.Context, toolReq *mcp.CallToolReque
 	}
 
 	if params.Namespace != "" {
+		// Make sure the namespace does exist.
+		// If it doesn't, we want to return an error instead of the empty usage.
 		ns, err := t.client.GetResource(ctx, client.GetParams{
 			Cluster: clusterID,
 			Kind:    "namespace",
@@ -81,27 +83,14 @@ func (t *Tools) getResourceUsage(ctx context.Context, toolReq *mcp.CallToolReque
 
 		usageSummary["namespace"] = toNamespaceSummary(params.Namespace, nsTotals)
 	} else {
-
 		var projectResources []*unstructured.Unstructured
 		if params.Project != "" {
-			projectID, err := t.getProjectID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), clusterID, params.Project)
-			if err != nil {
-				zap.L().Error("failed to get project ID", zapGetResourceUsage, zap.Error(err))
-				return nil, nil, err
-			}
-
-			projectResource, err := t.client.GetResource(ctx, client.GetParams{
-				Cluster:   LocalCluster,
-				Kind:      "project",
-				Namespace: clusterID,
-				Name:      projectID,
-				URL:       t.rancherURL(toolReq),
-				Token:     middleware.Token(ctx),
-			})
+			_, projectResource, err := t.getProjectID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), clusterID, params.Project)
 			if err != nil {
 				zap.L().Error("failed to get project", zapGetResourceUsage, zap.Error(err))
 				return nil, nil, err
 			}
+
 			projectResources = []*unstructured.Unstructured{projectResource}
 		} else {
 			projectResources, err = t.client.GetResources(ctx, client.ListParams{
@@ -249,8 +238,8 @@ func (t *Tools) getNamespaceResourceUsage(ctx context.Context, toolReq *mcp.Call
 			return empty, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
 		}
 
-		// Skip pods that are not running or succeeded.
-		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodSucceeded {
+		// Skip pods that are not running.
+		if pod.Status.Phase != corev1.PodRunning {
 			continue
 		}
 

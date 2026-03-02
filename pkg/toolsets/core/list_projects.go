@@ -22,7 +22,7 @@ func (t *Tools) listProjects(ctx context.Context, toolReq *mcp.CallToolRequest, 
 
 	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), params.Cluster)
 	if err != nil {
-		zap.L().Error("failed to get cluster ID", zapGetProject, zap.Error(err))
+		zap.L().Error("failed to get cluster ID", zapListProjects, zap.Error(err))
 		return nil, nil, err
 	}
 

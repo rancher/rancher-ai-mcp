@@ -22,8 +22,8 @@ type getProjectParams struct {
 	Cluster string `json:"cluster" jsonschema:"the cluster of the project resource"`
 }
 
-// getProjectID retrieves the project ID for a given project name or ID within a cluster.
-func (t *Tools) getProjectID(ctx context.Context, token, url, clusterID, projectNameOrID string) (string, error) {
+// getProjectID retrieves the project ID for a given project name.
+func (t *Tools) getProjectID(ctx context.Context, token, url, clusterID, projectNameOrID string) (string, *unstructured.Unstructured, error) {
 	projectResource, err := t.client.GetResource(ctx, client.GetParams{
 		Cluster:   LocalCluster,
 		Kind:      "project",
@@ -33,11 +33,11 @@ func (t *Tools) getProjectID(ctx context.Context, token, url, clusterID, project
 		Token:     token,
 	})
 	if err == nil {
-		return projectResource.GetName(), nil
+		return projectResource.GetName(), projectResource, nil
 	}
 
 	if !apierrors.IsNotFound(err) {
-		return "", err
+		return "", nil, err
 	}
 
 	resources, err := t.client.GetResources(ctx, client.ListParams{
@@ -48,7 +48,7 @@ func (t *Tools) getProjectID(ctx context.Context, token, url, clusterID, project
 		Token:     token,
 	})
 	if err != nil {
-		return "", err
+		return "", nil, err
 	}
 
 	for _, resource := range resources {
@@ -58,11 +58,11 @@ func (t *Tools) getProjectID(ctx context.Context, token, url, clusterID, project
 		}
 
 		if strings.EqualFold(displayName, projectNameOrID) {
-			return resource.GetName(), nil
+			return resource.GetName(), resource, nil
 		}
 	}
 
-	return "", fmt.Errorf("project '%s' not found in cluster '%s'", projectNameOrID, clusterID)
+	return "", nil, fmt.Errorf("project '%s' not found in cluster '%s'", projectNameOrID, clusterID)
 }
 
 // getProject retrieves a project resource.
@@ -75,20 +75,7 @@ func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		return nil, nil, err
 	}
 
-	projectID, err := t.getProjectID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), clusterID, params.Name)
-	if err != nil {
-		zap.L().Error("failed to get project ID", zapGetProject, zap.Error(err))
-		return nil, nil, err
-	}
-
-	projectResource, err := t.client.GetResource(ctx, client.GetParams{
-		Cluster:   LocalCluster,
-		Kind:      "project",
-		Namespace: clusterID,
-		Name:      projectID,
-		URL:       t.rancherURL(toolReq),
-		Token:     middleware.Token(ctx),
-	})
+	projectID, projectResource, err := t.getProjectID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), clusterID, params.Name)
 	if err != nil {
 		zap.L().Error("failed to get project", zapGetProject, zap.Error(err))
 		return nil, nil, err
