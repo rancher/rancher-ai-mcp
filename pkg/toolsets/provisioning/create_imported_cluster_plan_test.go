@@ -5,10 +5,10 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
-
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/dynamic"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
@@ -16,9 +16,7 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-const nameRegex = `^c-[a-z0-9]{5}$`
-
-func TestImportedCluster(t *testing.T) {
+func TestCreateImportedClusterPlan(t *testing.T) {
 	tests := []struct {
 		name           string
 		fakeClientset  kubernetes.Interface
@@ -38,29 +36,29 @@ func TestImportedCluster(t *testing.T) {
 			},
 			expectedError: "",
 			expectedResult: `{
-  "llm" : [ {
-    "apiVersion" : "management.cattle.io/v3",
-    "kind" : "Cluster",
-    "metadata" : {
-      "annotations" : {
-        "generate-name" : "c-",
-        "rancher.io/imported-cluster-version-management" : "true"
+  "payload": {
+    "apiVersion": "management.cattle.io/v3",
+    "kind": "Cluster",
+    "metadata": {
+      "annotations": {
+        "generate-name": "c-",
+        "rancher.io/imported-cluster-version-management": "true"
       },
-      "name" : ""
+      "name": ""
     },
-    "spec" : {
-      "description" : "A test cluster",
-      "displayName" : "test-cluster",
-      "imported" : true
+    "spec": {
+      "description": "A test cluster",
+      "displayName": "test-cluster",
+      "imported": true
     }
-  } ],
-  "uiContext" : [ {
-    "namespace" : "",
-    "kind" : "Cluster",
-    "cluster" : "local",
-    "name" : "",
-    "type" : "management.cattle.io.cluster"
-  } ]
+  },
+  "resource": {
+    "cluster": "local",
+    "kind": "Cluster",
+    "name": "",
+    "namespace": ""
+  },
+  "type": "create"
 }`,
 		},
 		{
@@ -74,29 +72,29 @@ func TestImportedCluster(t *testing.T) {
 			},
 			expectedError: "",
 			expectedResult: `{
-  "llm" : [ {
-    "apiVersion" : "management.cattle.io/v3",
-    "kind" : "Cluster",
-    "metadata" : {
-      "annotations" : {
-        "generate-name" : "c-",
-        "rancher.io/imported-cluster-version-management" : "false"
+  "payload": {
+    "apiVersion": "management.cattle.io/v3",
+    "kind": "Cluster",
+    "metadata": {
+      "annotations": {
+        "generate-name": "c-",
+        "rancher.io/imported-cluster-version-management": "false"
       },
-      "name" : ""
+      "name": ""
     },
-    "spec" : {
-      "description" : "A test cluster",
-      "displayName" : "test-cluster",
-      "imported" : true
+    "spec": {
+      "description": "A test cluster",
+      "displayName": "test-cluster",
+      "imported": true
     }
-  } ],
-  "uiContext" : [ {
-    "namespace" : "",
-    "kind" : "Cluster",
-    "cluster" : "local",
-    "name" : "",
-    "type" : "management.cattle.io.cluster"
-  } ]
+  },
+  "resource": {
+    "cluster": "local",
+    "kind": "Cluster",
+    "name": "",
+    "namespace": ""
+  },
+  "type": "create"
 }`,
 		},
 		{
@@ -110,29 +108,29 @@ func TestImportedCluster(t *testing.T) {
 			},
 			expectedError: "",
 			expectedResult: `{
-  "llm" : [ {
-    "apiVersion" : "management.cattle.io/v3",
-    "kind" : "Cluster",
-    "metadata" : {
-      "annotations" : {
-        "generate-name" : "c-",
-        "rancher.io/imported-cluster-version-management" : "system-default"
+  "payload": {
+    "apiVersion": "management.cattle.io/v3",
+    "kind": "Cluster",
+    "metadata": {
+      "annotations": {
+        "generate-name": "c-",
+        "rancher.io/imported-cluster-version-management": "system-default"
       },
-      "name" : ""
+      "name": ""
     },
-    "spec" : {
-      "description" : "A test cluster",
-      "displayName" : "test-cluster",
-      "imported" : true
+    "spec": {
+      "description": "A test cluster",
+      "displayName": "test-cluster",
+      "imported": true
     }
-  } ],
-  "uiContext" : [ {
-    "namespace" : "",
-    "kind" : "Cluster",
-    "cluster" : "local",
-    "name" : "",
-    "type" : "management.cattle.io.cluster"
-  } ]
+  },
+  "resource": {
+    "cluster": "local",
+    "kind": "Cluster",
+    "name": "",
+    "namespace": ""
+  },
+  "type": "create"
 }`,
 		},
 		{
@@ -146,29 +144,29 @@ func TestImportedCluster(t *testing.T) {
 			},
 			expectedError: "",
 			expectedResult: `{
-  "llm" : [ {
-    "apiVersion" : "management.cattle.io/v3",
-    "kind" : "Cluster",
-    "metadata" : {
-      "annotations" : {
-        "generate-name" : "c-",
-        "rancher.io/imported-cluster-version-management" : "system-default"
+  "payload": {
+    "apiVersion": "management.cattle.io/v3",
+    "kind": "Cluster",
+    "metadata": {
+      "annotations": {
+        "generate-name": "c-",
+        "rancher.io/imported-cluster-version-management": "system-default"
       },
-      "name" : ""
+      "name": ""
     },
-    "spec" : {
-      "displayName" : "test-cluster",
-	  "description": "",
-      "imported" : true
+    "spec": {
+      "description": "",
+      "displayName": "test-cluster",
+      "imported": true
     }
-  } ],
-  "uiContext" : [ {
-    "namespace" : "",
-    "kind" : "Cluster",
-    "cluster" : "local",
-    "name" : "",
-    "type" : "management.cattle.io.cluster"
-  } ]
+  },
+  "resource": {
+    "cluster": "local",
+    "kind": "Cluster",
+    "name": "",
+    "namespace": ""
+  },
+  "type": "create"
 }`,
 		},
 		{
@@ -197,9 +195,9 @@ func TestImportedCluster(t *testing.T) {
 			}
 			tools := Tools{client: c}
 
-			result, _, err := tools.CreateImportedCluster(context.Background(), &mcp.CallToolRequest{
+			result, _, err := tools.CreateImportedClusterPlan(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{
-					Name: "createImportedCluster",
+					Name: "createImportedClusterPlan",
 				},
 				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {testURL}}},
 			}, test.params)
@@ -213,12 +211,14 @@ func TestImportedCluster(t *testing.T) {
 				assert.Truef(t, ok, "expected type *mcp.TextContent")
 				assert.Truef(t, ok, "expected expectedResult to be a JSON string")
 
-				obj := make(map[string]interface{})
+				var obj []map[string]interface{}
 				err = json.Unmarshal([]byte(text.Text), &obj)
+				require.NoError(t, err)
+
+				strippedResultBytes, err := json.Marshal(checkAndStripClusterNameOnPlan(t, obj[0]))
 				assert.NoError(t, err)
 
-				strippedResultBytes, err := json.Marshal(checkAndStripClusterNameOnCreate(t, obj))
-				assert.NoError(t, err)
+				t.Log(string(strippedResultBytes))
 
 				assert.JSONEq(t, test.expectedResult, string(strippedResultBytes), "expected result does not match actual result")
 			}
@@ -226,41 +226,32 @@ func TestImportedCluster(t *testing.T) {
 	}
 }
 
-// NB: Imported clusters have a randomly generated name assigned to them.
-// In order to compare the actual result with the expected result, we need to
-// strip out the name from the actual result, as it will be different every time the test is run.
-// This function will validate that the name is in the correct format
-// (starts with "c-" followed by 5 random alphanumeric characters) and then empty out the relevant name fields.
-func checkAndStripClusterNameOnCreate(t *testing.T, obj map[string]interface{}) map[string]interface{} {
-	llmSlice, found, _ := unstructured.NestedSlice(obj, "llm")
-	assert.True(t, found)
-	assert.Equal(t, len(llmSlice), 1)
-	firstItem, ok := llmSlice[0].(map[string]interface{})
-	assert.True(t, ok)
+func checkAndStripClusterNameOnPlan(t *testing.T, obj map[string]interface{}) map[string]interface{} {
+	resource, found, err := unstructured.NestedMap(obj, "resource")
+	assert.NoError(t, err)
+	assert.True(t, found, "resource field not found in object")
 
-	name, found, err := unstructured.NestedString(firstItem, "metadata", "name")
+	name, found, err := unstructured.NestedString(resource, "name")
 	assert.NoError(t, err)
 	assert.True(t, found)
 	assert.Regexp(t, nameRegex, name, "expected name to match the pattern 'c-' followed by 5 random alphanumeric characters")
-	err = unstructured.SetNestedField(firstItem, "", "metadata", "name")
+	err = unstructured.SetNestedField(resource, "", "name")
 	assert.NoError(t, err)
-	llmSlice[0] = firstItem
 
-	uiContextSlice, found, _ := unstructured.NestedSlice(obj, "uiContext")
+	obj["resource"] = resource
+
+	payload, found, err := unstructured.NestedMap(obj, "payload")
+	assert.NoError(t, err)
+	assert.True(t, found, "payload field not found in object")
+
+	name, found, err = unstructured.NestedString(payload, "metadata", "name")
+	assert.NoError(t, err)
 	assert.True(t, found)
-	assert.Equal(t, len(uiContextSlice), 1)
-	itemMap, ok := uiContextSlice[0].(map[string]interface{})
-	assert.True(t, ok)
-
-	name, ok = itemMap["name"].(string)
-	assert.True(t, ok)
-	assert.NotNil(t, name)
 	assert.Regexp(t, nameRegex, name, "expected name to match the pattern 'c-' followed by 5 random alphanumeric characters")
-	itemMap["name"] = ""
-	uiContextSlice[0] = itemMap
+	err = unstructured.SetNestedField(payload, "", "metadata", "name")
+	assert.NoError(t, err)
 
-	obj["llm"] = llmSlice
-	obj["uiContext"] = uiContextSlice
+	obj["payload"] = payload
 
 	return obj
 }
