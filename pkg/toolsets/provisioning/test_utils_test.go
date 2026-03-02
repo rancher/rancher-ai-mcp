@@ -2,7 +2,6 @@ package provisioning
 
 import (
 	"encoding/json"
-	"fmt"
 
 	provisioningV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -396,76 +395,4 @@ func createDummyKDMData(versions ...string) string {
 	m["data"] = d
 	result, _ := json.Marshal(m)
 	return string(result)
-}
-
-func createCustomClusterOutput(params CreateCustomClusterParams, finalK8sVersion string) string {
-	return fmt.Sprintf(`{
-  "llm" : [ {
-    "apiVersion" : "provisioning.cattle.io/v1",
-    "kind" : "Cluster",
-    "metadata" : {
-      "annotations" : {
-        "field.cattle.io/description" : "%s"
-      },
-      "name" : "%s",
-      "namespace" : "fleet-default"
-    },
-    "spec" : {
-      "kubernetesVersion" : "%s",
-      "localClusterAuthEndpoint" : { },
-      "rkeConfig" : {
-        "chartValues" : null,
-        "dataDirectories" : { },
-        "etcd" : {
-          "snapshotRetention" : 5,
-          "snapshotScheduleCron" : "0 */5 * * *"
-        },
-        "machineGlobalConfig" : {
-          "cni" : "%s"
-        },
-        "machinePoolDefaults" : { },
-        "upgradeStrategy" : {
-          "controlPlaneConcurrency" : "1",
-          "controlPlaneDrainOptions" : {
-            "deleteEmptyDirData" : true,
-            "disableEviction" : false,
-            "enabled" : false,
-            "force" : false,
-            "gracePeriod" : -1,
-            "ignoreDaemonSets" : true,
-            "ignoreErrors" : false,
-            "postDrainHooks" : null,
-            "preDrainHooks" : null,
-            "skipWaitForDeleteTimeoutSeconds" : 0,
-            "timeout" : 120
-          },
-          "workerConcurrency" : "1",
-          "workerDrainOptions" : {
-            "deleteEmptyDirData" : true,
-            "disableEviction" : false,
-            "enabled" : false,
-            "force" : false,
-            "gracePeriod" : -1,
-            "ignoreDaemonSets" : true,
-            "ignoreErrors" : false,
-            "postDrainHooks" : null,
-            "preDrainHooks" : null,
-            "skipWaitForDeleteTimeoutSeconds" : 0,
-            "timeout" : 120
-          }
-        }
-      }
-    },
-    "status" : {
-      "observedGeneration" : 0
-    }
-  } ],
-  "uiContext" : [ {
-    "namespace" : "fleet-default",
-    "kind" : "Cluster",
-    "cluster" : "local",
-    "name" : "%s",
-    "type" : "provisioning.cattle.io.cluster"
-  } ]
-}`, params.ClusterDescription, params.ClusterName, finalK8sVersion, params.CNI, params.ClusterName)
 }

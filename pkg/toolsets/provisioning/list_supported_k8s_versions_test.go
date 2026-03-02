@@ -53,7 +53,7 @@ func TestListSupportedKubernetesVersions(t *testing.T) {
 				Params: &mcp.CallToolParamsRaw{
 					Name: "listSupportedKubernetesVersions",
 				},
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {svr.URL}, tokenHeader: {testToken}}},
+				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {svr.URL}}},
 			}, test.params)
 
 			if test.expectedError != "" {

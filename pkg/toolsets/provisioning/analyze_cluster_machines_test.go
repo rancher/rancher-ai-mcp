@@ -153,8 +153,8 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Namespace: "fleet-default",
 			},
 			requestURL:    testURL,
-			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine, fakeCAPIMachine2, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
 			expectedResult: `{
 				"llm": [
@@ -302,8 +302,8 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Namespace: "fleet-default",
 			},
 			requestURL:     testURL,
-			fakeClientset:  newFakeClientsetWithCAPIDiscovery(),
-			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds()),
+			fakeClientset:  newFakeClientSet(),
+			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
 			expectedResult: `{"llm":"no resources found"}`,
 		},
 		"analyze cluster with default namespace": {
@@ -312,8 +312,8 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Namespace: "",
 			},
 			requestURL:    testURL,
-			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
 			expectedResult: `{
 				"llm": [
@@ -429,8 +429,8 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Namespace: "fleet-default",
 			},
 			requestURL:    testURL,
-			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds(),
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine),
 			expectedResult: `{
 				"llm": [
@@ -483,8 +483,8 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Namespace: "fleet-default",
 			},
 			rancherURL:     testURL,
-			fakeClientset:  newFakeClientsetWithCAPIDiscovery(),
-			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds()),
+			fakeClientset:  newFakeClientSet(),
+			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
 			expectedResult: `{"llm":"no resources found"}`,
 		},
 		"analyze cluster machines - no rancherURL or request URL": {
@@ -492,8 +492,8 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "empty-cluster",
 				Namespace: "fleet-default",
 			},
-			fakeClientset: newFakeClientsetWithCAPIDiscovery(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(capiMachineScheme(), capiCustomListKinds()),
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
 			expectedError: "no URL for rancher request",
 		},
 	}

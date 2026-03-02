@@ -27,7 +27,7 @@ func (t *Tools) ListSupportedKubernetesVersions(_ context.Context, toolReq *mcp.
 
 	log.Debug("ListSupportedKubernetesVersions called")
 
-	versions, err := getKDMReleases(toolReq.Extra.Header.Get(urlHeader), params.Distribution)
+	versions, err := getKDMReleases(t.rancherURL(toolReq), params.Distribution)
 	if err != nil {
 		return nil, nil, err
 	}
