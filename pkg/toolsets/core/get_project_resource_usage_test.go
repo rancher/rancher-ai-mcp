@@ -57,7 +57,7 @@ func newProjectResourceUsageTools(t *testing.T, fakeToken, fakeURL, rancherURL s
 	return NewTools(test.WrapClient(c, fakeToken, fakeURL), rancherURL)
 }
 
-func TestGetProjectResourceUsage(t *testing.T) {
+func TestGetResourceUsage(t *testing.T) {
 	fakeURL := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
@@ -90,10 +90,10 @@ func TestGetProjectResourceUsage(t *testing.T) {
 			},
 		)
 
-		result, _, err := tools.getProjectResourceUsage(
+		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
 			test.NewCallToolRequest(fakeURL),
-			getProjectResourceUsageParams{Name: "my-project", Cluster: "test-cluster"},
+			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
 		)
 
 		require.NoError(t, err)
@@ -103,29 +103,24 @@ func TestGetProjectResourceUsage(t *testing.T) {
 		t.Logf("got result: %s", text)
 		assert.JSONEq(t, `{
 			"llm": {
-				"projectResourceUsageSummary": {
-					"project": {
-						"name": "my-project",
-						"displayName": "My Project",
-						"cluster": "test-cluster",
+				"cluster": "test-cluster",
+				"projects": [{
+					"name": "my-project",
+					"displayName": "My Project",
+					"totals": {
+						"podCount": 1,
+						"cpu": {"requests": "100m", "limits": "200m", "usage": "50m"},
+						"memory": {"requests": "128Mi", "limits": "256Mi", "usage": "64Mi"}
+					},
+					"namespaces": [{
+						"namespace": "ns-1",
 						"totals": {
 							"podCount": 1,
 							"cpu": {"requests": "100m", "limits": "200m", "usage": "50m"},
 							"memory": {"requests": "128Mi", "limits": "256Mi", "usage": "64Mi"}
 						}
-					},
-					"namespaces": {
-						"ns-1": {
-							"namespace": "ns-1",
-							"cluster": "test-cluster",
-							"totals": {
-								"podCount": 1,
-								"cpu": {"requests": "100m", "limits": "200m", "usage": "50m"},
-								"memory": {"requests": "128Mi", "limits": "256Mi", "usage": "64Mi"}
-							}
-						}
-					}
-				}
+					}]
+				}]
 			}
 		}`, text)
 	})
@@ -150,10 +145,10 @@ func TestGetProjectResourceUsage(t *testing.T) {
 			nil,
 		)
 
-		result, _, err := tools.getProjectResourceUsage(
+		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
 			test.NewCallToolRequest(fakeURL),
-			getProjectResourceUsageParams{Name: "my-project", Cluster: "test-cluster"},
+			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
 		)
 
 		require.NoError(t, err)
@@ -163,29 +158,24 @@ func TestGetProjectResourceUsage(t *testing.T) {
 		t.Logf("got result: %s", text)
 		assert.JSONEq(t, `{
 			"llm": {
-				"projectResourceUsageSummary": {
-					"project": {
-						"name": "my-project",
-						"displayName": "My Project",
-						"cluster": "test-cluster",
+				"cluster": "test-cluster",
+				"projects": [{
+					"name": "my-project",
+					"displayName": "My Project",
+					"totals": {
+						"podCount": 1,
+						"cpu": {"requests": "100m", "limits": "200m", "usage": "0"},
+						"memory": {"requests": "128Mi", "limits": "256Mi", "usage": "0"}
+					},
+					"namespaces": [{
+						"namespace": "ns-1",
 						"totals": {
 							"podCount": 1,
 							"cpu": {"requests": "100m", "limits": "200m", "usage": "0"},
 							"memory": {"requests": "128Mi", "limits": "256Mi", "usage": "0"}
 						}
-					},
-					"namespaces": {
-						"ns-1": {
-							"namespace": "ns-1",
-							"cluster": "test-cluster",
-							"totals": {
-								"podCount": 1,
-								"cpu": {"requests": "100m", "limits": "200m", "usage": "0"},
-								"memory": {"requests": "128Mi", "limits": "256Mi", "usage": "0"}
-							}
-						}
-					}
-				}
+					}]
+				}]
 			}
 		}`, text)
 	})
@@ -196,10 +186,10 @@ func TestGetProjectResourceUsage(t *testing.T) {
 			nil,
 		)
 
-		result, _, err := tools.getProjectResourceUsage(
+		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
 			test.NewCallToolRequest(fakeURL),
-			getProjectResourceUsageParams{Name: "my-project", Cluster: "test-cluster"},
+			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
 		)
 
 		require.NoError(t, err)
@@ -209,19 +199,17 @@ func TestGetProjectResourceUsage(t *testing.T) {
 		t.Logf("got result: %s", text)
 		assert.JSONEq(t, `{
 			"llm": {
-				"projectResourceUsageSummary": {
-					"project": {
-						"name": "my-project",
-						"displayName": "My Project",
-						"cluster": "test-cluster",
-						"totals": {
-							"podCount": 0,
-							"cpu": {"requests": "0", "limits": "0", "usage": "0"},
-							"memory": {"requests": "0", "limits": "0", "usage": "0"}
-						}
+				"cluster": "test-cluster",
+				"projects": [{
+					"name": "my-project",
+					"displayName": "My Project",
+					"totals": {
+						"podCount": 0,
+						"cpu": {"requests": "0", "limits": "0", "usage": "0"},
+						"memory": {"requests": "0", "limits": "0", "usage": "0"}
 					},
-					"namespaces": {}
-				}
+					"namespaces": null
+				}]
 			}
 		}`, text)
 	})
@@ -246,10 +234,10 @@ func TestGetProjectResourceUsage(t *testing.T) {
 			nil,
 		)
 
-		result, _, err := tools.getProjectResourceUsage(
+		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
 			test.NewCallToolRequest(fakeURL),
-			getProjectResourceUsageParams{Name: "my-project", Cluster: "test-cluster"},
+			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
 		)
 
 		require.NoError(t, err)
@@ -259,29 +247,24 @@ func TestGetProjectResourceUsage(t *testing.T) {
 		t.Logf("got result: %s", text)
 		assert.JSONEq(t, `{
 			"llm": {
-				"projectResourceUsageSummary": {
-					"project": {
-						"name": "my-project",
-						"displayName": "My Project",
-						"cluster": "test-cluster",
+				"cluster": "test-cluster",
+				"projects": [{
+					"name": "my-project",
+					"displayName": "My Project",
+					"totals": {
+						"podCount": 0,
+						"cpu": {"requests": "0", "limits": "0", "usage": "0"},
+						"memory": {"requests": "0", "limits": "0", "usage": "0"}
+					},
+					"namespaces": [{
+						"namespace": "ns-1",
 						"totals": {
 							"podCount": 0,
 							"cpu": {"requests": "0", "limits": "0", "usage": "0"},
 							"memory": {"requests": "0", "limits": "0", "usage": "0"}
 						}
-					},
-					"namespaces": {
-						"ns-1": {
-							"namespace": "ns-1",
-							"cluster": "test-cluster",
-							"totals": {
-								"podCount": 0,
-								"cpu": {"requests": "0", "limits": "0", "usage": "0"},
-								"memory": {"requests": "0", "limits": "0", "usage": "0"}
-							}
-						}
-					}
-				}
+					}]
+				}]
 			}
 		}`, text)
 	})
@@ -318,10 +301,10 @@ func TestGetProjectResourceUsage(t *testing.T) {
 			nil,
 		)
 
-		result, _, err := tools.getProjectResourceUsage(
+		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
 			test.NewCallToolRequest(fakeURL),
-			getProjectResourceUsageParams{Name: "my-project", Cluster: "test-cluster"},
+			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
 		)
 
 		require.NoError(t, err)
@@ -331,29 +314,24 @@ func TestGetProjectResourceUsage(t *testing.T) {
 		t.Logf("got result: %s", text)
 		assert.JSONEq(t, `{
 			"llm": {
-				"projectResourceUsageSummary": {
-					"project": {
-						"name": "my-project",
-						"displayName": "My Project",
-						"cluster": "test-cluster",
+				"cluster": "test-cluster",
+				"projects": [{
+					"name": "my-project",
+					"displayName": "My Project",
+					"totals": {
+						"podCount": 1,
+						"cpu": {"requests": "150m", "limits": "300m", "usage": "0"},
+						"memory": {"requests": "192Mi", "limits": "384Mi", "usage": "0"}
+					},
+					"namespaces": [{
+						"namespace": "ns-1",
 						"totals": {
 							"podCount": 1,
 							"cpu": {"requests": "150m", "limits": "300m", "usage": "0"},
 							"memory": {"requests": "192Mi", "limits": "384Mi", "usage": "0"}
 						}
-					},
-					"namespaces": {
-						"ns-1": {
-							"namespace": "ns-1",
-							"cluster": "test-cluster",
-							"totals": {
-								"podCount": 1,
-								"cpu": {"requests": "150m", "limits": "300m", "usage": "0"},
-								"memory": {"requests": "192Mi", "limits": "384Mi", "usage": "0"}
-							}
-						}
-					}
-				}
+					}]
+				}]
 			}
 		}`, text)
 	})
@@ -364,10 +342,10 @@ func TestGetProjectResourceUsage(t *testing.T) {
 			nil,
 		)
 
-		_, _, err := tools.getProjectResourceUsage(
+		_, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
 			test.NewCallToolRequest(fakeURL),
-			getProjectResourceUsageParams{Name: "nonexistent-project", Cluster: "test-cluster"},
+			getResourceUsageParams{Project: "nonexistent-project", Cluster: "test-cluster"},
 		)
 
 		require.Error(t, err)
@@ -377,14 +355,119 @@ func TestGetProjectResourceUsage(t *testing.T) {
 	t.Run("cluster not found", func(t *testing.T) {
 		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "", nil, nil)
 
-		_, _, err := tools.getProjectResourceUsage(
+		_, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
 			test.NewCallToolRequest(fakeURL),
-			getProjectResourceUsageParams{Name: "my-project", Cluster: "nonexistent-cluster"},
+			getResourceUsageParams{Project: "my-project", Cluster: "nonexistent-cluster"},
 		)
 
 		require.Error(t, err)
 		assert.ErrorContains(t, err, "not found")
+	})
+
+	t.Run("all projects when no project specified", func(t *testing.T) {
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+			[]runtime.Object{
+				cluster,
+				project,
+				ns1,
+				fakeRunningPod("pod-1", "ns-1",
+					corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("200m"),
+						corev1.ResourceMemory: resource.MustParse("256Mi"),
+					},
+				),
+			},
+			nil,
+		)
+
+		result, _, err := tools.getResourceUsage(
+			middleware.WithToken(t.Context(), fakeToken),
+			test.NewCallToolRequest(fakeURL),
+			getResourceUsageParams{Cluster: "test-cluster"},
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Len(t, result.Content, 1)
+		text := result.Content[0].(*mcp.TextContent).Text
+		t.Logf("got result: %s", text)
+		assert.JSONEq(t, `{
+			"llm": {
+				"cluster": "test-cluster",
+				"projects": [{
+					"name": "my-project",
+					"displayName": "My Project",
+					"totals": {
+						"podCount": 1,
+						"cpu": {"requests": "100m", "limits": "200m", "usage": "0"},
+						"memory": {"requests": "128Mi", "limits": "256Mi", "usage": "0"}
+					},
+					"namespaces": [{
+						"namespace": "ns-1",
+						"totals": {
+							"podCount": 1,
+							"cpu": {"requests": "100m", "limits": "200m", "usage": "0"},
+							"memory": {"requests": "128Mi", "limits": "256Mi", "usage": "0"}
+						}
+					}]
+				}]
+			}
+		}`, text)
+	})
+
+	t.Run("namespace query", func(t *testing.T) {
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+			[]runtime.Object{
+				cluster,
+				ns1,
+				fakeRunningPod("pod-1", "ns-1",
+					corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("100m"),
+						corev1.ResourceMemory: resource.MustParse("128Mi"),
+					},
+					corev1.ResourceList{
+						corev1.ResourceCPU:    resource.MustParse("200m"),
+						corev1.ResourceMemory: resource.MustParse("256Mi"),
+					},
+				),
+			},
+			[]runtime.Object{
+				fakePodMetrics("pod-1", "ns-1", corev1.ResourceList{
+					corev1.ResourceCPU:    resource.MustParse("50m"),
+					corev1.ResourceMemory: resource.MustParse("64Mi"),
+				}),
+			},
+		)
+
+		result, _, err := tools.getResourceUsage(
+			middleware.WithToken(t.Context(), fakeToken),
+			test.NewCallToolRequest(fakeURL),
+			getResourceUsageParams{Cluster: "test-cluster", Namespace: "ns-1"},
+		)
+
+		require.NoError(t, err)
+		require.NotNil(t, result)
+		require.Len(t, result.Content, 1)
+		text := result.Content[0].(*mcp.TextContent).Text
+		t.Logf("got result: %s", text)
+		assert.JSONEq(t, `{
+			"llm": {
+				"cluster": "test-cluster",
+				"namespace": {
+					"namespace": "ns-1",
+					"totals": {
+						"podCount": 1,
+						"cpu": {"requests": "100m", "limits": "200m", "usage": "50m"},
+						"memory": {"requests": "128Mi", "limits": "256Mi", "usage": "64Mi"}
+					}
+				}
+			}
+		}`, text)
 	})
 }
 

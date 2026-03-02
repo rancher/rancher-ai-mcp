@@ -228,14 +228,17 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "getProjectResourceUsage",
+		Name: "getResourceUsage",
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns the resource usage for a specific project. Usage totals are provided for the entire project as well as broken down by namespace. The resource usage includes CPU and memory requests, limits and actual usage, as well as the total number of pods.'
+		Description: `Returns the resource usage for a namespace, project or all projects in a cluster.
+		Usage totals are provided for the entire project as well as broken down by namespace.
+		The resource usage includes CPU and memory requests, limits and actual usage, as well as the total number of pods.'
 		Parameters:
-		name (string): The name of the project resource.
-		cluster (string): The name of the cluster the project belongs to.`},
-		t.getProjectResourceUsage,
+		cluster (string): The name of the cluster resource. Users can often use cluster display name instead of cluster resource name. When unsure if the provided name is in fact the cluster resource name it's best to list clusters first and find the cluster resource name that corresponds to the cluster display name.
+		project (string): (optional) The name of the project resource. Users often use project display name instead of project resource name. When unsure if the provided name is in fact the project resource name it's best to list projects first and find the project resource name that corresponds to the project display name.
+		namespace (string): (optional) The name of the namespace resource.`},
+		t.getResourceUsage,
 	)
 }

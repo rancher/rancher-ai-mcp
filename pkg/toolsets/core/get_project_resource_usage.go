@@ -17,11 +17,12 @@ import (
 	metricsv1beta1 "k8s.io/metrics/pkg/apis/metrics/v1beta1"
 )
 
-var zapToolName = zap.String("tool", "getProjectResourceUsage")
+var zapGetResourceUsage = zap.String("tool", "getResourceUsage")
 
-type getProjectResourceUsageParams struct {
-	Name    string `json:"name" jsonschema:"the name of the project resource"`
-	Cluster string `json:"cluster" jsonschema:"the name of the cluster resource the project belongs to"`
+type getResourceUsageParams struct {
+	Cluster   string `json:"cluster" jsonschema:"the name of the cluster resource"`
+	Project   string `json:"project,omitempty" jsonschema:"(optional) the name of the project resource"`
+	Namespace string `json:"namespace,omitempty" jsonschema:"(optional) the namespace to query for resource usage"`
 }
 
 type sample struct {
@@ -45,207 +46,137 @@ func newSample() sample {
 	}
 }
 
-// getProjectResourceUsage retrieves the resource usage for a specific project.
-func (t *Tools) getProjectResourceUsage(ctx context.Context, toolReq *mcp.CallToolRequest, params getProjectResourceUsageParams) (*mcp.CallToolResult, any, error) {
-	zap.L().Debug("getProjectResourceUsage called")
+// getResourceUsage retrieves the resource usage for a namespace, project or all projects in a cluster.
+func (t *Tools) getResourceUsage(ctx context.Context, toolReq *mcp.CallToolRequest, params getResourceUsageParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("getResourceUsage called")
 
 	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), params.Cluster)
 	if err != nil {
-		zap.L().Error("failed to get cluster ID", zapGetProject, zap.Error(err))
+		zap.L().Error("failed to get cluster ID", zapGetResourceUsage, zap.Error(err))
 		return nil, nil, err
 	}
 
-	projectID, err := t.getProjectID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), clusterID, params.Name)
-	if err != nil {
-		zap.L().Error("failed to get project ID", zapGetProject, zap.Error(err))
-		return nil, nil, err
+	usageSummary := map[string]any{
+		"cluster": clusterID,
 	}
 
-	projectResource, err := t.client.GetResource(ctx, client.GetParams{
-		Cluster:   LocalCluster,
-		Kind:      "project",
-		Namespace: clusterID,
-		Name:      projectID,
-		URL:       t.rancherURL(toolReq),
-		Token:     middleware.Token(ctx),
-	})
-	if err != nil {
-		zap.L().Error("failed to get project", zapToolName, zap.Error(err))
-		return nil, nil, err
-	}
-
-	projectDisplayName, _, err := unstructured.NestedString(projectResource.Object, "spec", "displayName")
-	if err != nil {
-		zap.L().Error("failed to get displayName from project", zapToolName, zap.Error(err))
-		return nil, nil, err
-	}
-
-	projectLabel, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"field.cattle.io/projectId": projectID,
-		},
-	})
-	if err != nil {
-		zap.L().Error("failed to create label selector", zapToolName, zap.Error(err))
-		return nil, nil, err
-	}
-
-	projectNamespaces, err := t.client.GetResources(ctx, client.ListParams{
-		Cluster:       clusterID,
-		Kind:          "namespace",
-		LabelSelector: projectLabel.String(),
-		URL:           t.rancherURL(toolReq),
-		Token:         middleware.Token(ctx),
-	})
-	if err != nil {
-		zap.L().Error("failed to get namespaces for project", zapToolName, zap.Error(err))
-		return nil, nil, err
-	}
-
-	totals := newSample()
-	byNs := make(map[string]sample)
-
-	// aggregate resource usage across all namespaces in the project
-	for _, ns := range projectNamespaces {
-		// Fetch pods.
-		podResources, err := t.client.GetResources(ctx, client.ListParams{
-			Cluster:   clusterID,
-			Kind:      "pod",
-			Namespace: ns.GetName(),
-			URL:       t.rancherURL(toolReq),
-			Token:     middleware.Token(ctx),
+	if params.Namespace != "" {
+		ns, err := t.client.GetResource(ctx, client.GetParams{
+			Cluster: clusterID,
+			Kind:    "namespace",
+			Name:    params.Namespace,
+			URL:     t.rancherURL(toolReq),
+			Token:   middleware.Token(ctx),
 		})
 		if err != nil {
-			zap.L().Error("failed to get pods for namespace", zapToolName, zap.String("namespace", ns.GetName()), zap.Error(err))
+			zap.L().Error("failed to get namespace", zapGetResourceUsage, zap.String("namespace", params.Namespace), zap.Error(err))
 			return nil, nil, err
 		}
 
-		// Fetch pod metrics.
-		metricsResources, err := t.client.GetResources(ctx, client.ListParams{
-			Cluster:   clusterID,
-			Kind:      "pod.metrics.k8s.io",
-			Namespace: ns.GetName(),
-			URL:       t.rancherURL(toolReq),
-			Token:     middleware.Token(ctx),
-		})
+		nsTotals, err := t.getNamespaceResourceUsage(ctx, toolReq, clusterID, ns.GetName())
 		if err != nil {
-			// Log warning but don't fail - metrics server might not be installed
-			zap.L().Warn("failed to get pod metrics, will skip actual usage data", zapToolName, zap.String("namespace", ns.GetName()), zap.Error(err))
+			zap.L().Error("failed to get resource usage for namespace", zapGetResourceUsage, zap.String("namespace", params.Namespace), zap.Error(err))
+			return nil, nil, err
 		}
 
-		// Metrics lookup map.
-		metricsByPod := make(map[string]*unstructured.Unstructured)
-		for _, m := range metricsResources {
-			metricsByPod[m.GetName()] = m
-		}
+		usageSummary["namespace"] = toNamespaceSummary(params.Namespace, nsTotals)
+	} else {
 
-		nsTotals := newSample()
-
-		for _, podResource := range podResources {
-			var pod corev1.Pod
-			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(podResource.Object, &pod); err != nil {
-				zap.L().Error("failed to convert unstructured object to Pod", zapToolName, zap.Error(err))
-				return nil, nil, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
+		var projectResources []*unstructured.Unstructured
+		if params.Project != "" {
+			projectID, err := t.getProjectID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), clusterID, params.Project)
+			if err != nil {
+				zap.L().Error("failed to get project ID", zapGetResourceUsage, zap.Error(err))
+				return nil, nil, err
 			}
 
-			// Skip pods that are not running or succeeded
-			if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodSucceeded {
-				continue
+			projectResource, err := t.client.GetResource(ctx, client.GetParams{
+				Cluster:   LocalCluster,
+				Kind:      "project",
+				Namespace: clusterID,
+				Name:      projectID,
+				URL:       t.rancherURL(toolReq),
+				Token:     middleware.Token(ctx),
+			})
+			if err != nil {
+				zap.L().Error("failed to get project", zapGetResourceUsage, zap.Error(err))
+				return nil, nil, err
 			}
-
-			totals.podCount++
-			nsTotals.podCount++
-
-			// Aggregate resources from all containers
-			for _, container := range pod.Spec.Containers {
-				if cpuReq, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
-					totals.cpuRequests.Add(cpuReq)
-					nsTotals.cpuRequests.Add(cpuReq)
-				}
-				if cpuLimit, ok := container.Resources.Limits[corev1.ResourceCPU]; ok {
-					totals.cpuLimits.Add(cpuLimit)
-					nsTotals.cpuLimits.Add(cpuLimit)
-				}
-				if memReq, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
-					totals.memoryRequests.Add(memReq)
-					nsTotals.memoryRequests.Add(memReq)
-				}
-				if memLimit, ok := container.Resources.Limits[corev1.ResourceMemory]; ok {
-					totals.memoryLimits.Add(memLimit)
-					nsTotals.memoryLimits.Add(memLimit)
-				}
-			}
-
-			// Aggregate resources from init containers
-			for _, container := range pod.Spec.InitContainers {
-				if cpuReq, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
-					totals.cpuRequests.Add(cpuReq)
-					nsTotals.cpuRequests.Add(cpuReq)
-				}
-				if cpuLimit, ok := container.Resources.Limits[corev1.ResourceCPU]; ok {
-					totals.cpuLimits.Add(cpuLimit)
-					nsTotals.cpuLimits.Add(cpuLimit)
-				}
-				if memReq, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
-					totals.memoryRequests.Add(memReq)
-					nsTotals.memoryRequests.Add(memReq)
-				}
-				if memLimit, ok := container.Resources.Limits[corev1.ResourceMemory]; ok {
-					totals.memoryLimits.Add(memLimit)
-					nsTotals.memoryLimits.Add(memLimit)
-				}
-			}
-
-			if m, hasMetrics := metricsByPod[pod.GetName()]; hasMetrics {
-				var podMetrics metricsv1beta1.PodMetrics
-				if err := runtime.DefaultUnstructuredConverter.FromUnstructured(m.Object, &podMetrics); err != nil {
-					zap.L().Error("failed to convert unstructured object to PodMetrics", zapToolName, zap.Error(err))
-					return nil, nil, fmt.Errorf("failed to convert unstructured object to PodMetrics: %w", err)
-				}
-
-				for _, container := range podMetrics.Containers {
-					if cpu, ok := container.Usage[corev1.ResourceCPU]; ok {
-						totals.cpuUsage.Add(cpu)
-						nsTotals.cpuUsage.Add(cpu)
-					}
-					if mem, ok := container.Usage[corev1.ResourceMemory]; ok {
-						totals.memoryUsage.Add(mem)
-						nsTotals.memoryUsage.Add(mem)
-					}
-				}
+			projectResources = []*unstructured.Unstructured{projectResource}
+		} else {
+			projectResources, err = t.client.GetResources(ctx, client.ListParams{
+				Cluster:   LocalCluster,
+				Kind:      "project",
+				Namespace: clusterID,
+				URL:       t.rancherURL(toolReq),
+				Token:     middleware.Token(ctx),
+			})
+			if err != nil {
+				zap.L().Error("failed to list projects", zapGetResourceUsage, zap.Error(err))
+				return nil, nil, err
 			}
 		}
-		byNs[ns.GetName()] = nsTotals
-	}
 
-	// Create a resource usage summary object
-	namespaceSummary := make(map[string]any)
-	for ns, nsTotals := range byNs {
-		namespaceSummary[ns] = map[string]any{
-			"namespace": ns,
-			"cluster":   clusterID,
-			"totals": map[string]any{
-				"podCount": nsTotals.podCount,
-				"cpu": map[string]any{
-					"requests": nsTotals.cpuRequests.String(),
-					"limits":   nsTotals.cpuLimits.String(),
-					"usage":    nsTotals.cpuUsage.String(),
+		var projectSummary []map[string]any
+		for _, projectResource := range projectResources {
+			projectDisplayName, _, err := unstructured.NestedString(projectResource.Object, "spec", "displayName")
+			if err != nil {
+				zap.L().Error("failed to get displayName from project", zapGetResourceUsage, zap.Error(err))
+				return nil, nil, err
+			}
+
+			projectLabel, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{
+				MatchLabels: map[string]string{
+					"field.cattle.io/projectId": projectResource.GetName(),
 				},
-				"memory": map[string]any{
-					"requests": nsTotals.memoryRequests.String(),
-					"limits":   nsTotals.memoryLimits.String(),
-					"usage":    nsTotals.memoryUsage.String(),
-				},
-			},
-		}
-	}
+			})
+			if err != nil {
+				zap.L().Error("failed to create label selector", zapGetResourceUsage, zap.Error(err))
+				return nil, nil, err
+			}
 
-	resourceUsageSummary := map[string]any{
-		"projectResourceUsageSummary": map[string]any{
-			"project": map[string]any{
-				"name":        projectID,
+			projectNamespaces, err := t.client.GetResources(ctx, client.ListParams{
+				Cluster:       clusterID,
+				Kind:          "namespace",
+				LabelSelector: projectLabel.String(),
+				URL:           t.rancherURL(toolReq),
+				Token:         middleware.Token(ctx),
+			})
+			if err != nil {
+				zap.L().Error("failed to get namespaces for project", zapGetResourceUsage, zap.Error(err))
+				return nil, nil, err
+			}
+
+			totals := newSample()
+			byNs := make(map[string]sample)
+
+			// aggregate resource usage across all namespaces in the project
+			for _, ns := range projectNamespaces {
+				nsTotals, err := t.getNamespaceResourceUsage(ctx, toolReq, clusterID, ns.GetName())
+				if err != nil {
+					zap.L().Error("failed to get resource usage for namespace", zapGetResourceUsage, zap.String("namespace", ns.GetName()), zap.Error(err))
+					return nil, nil, err
+				}
+
+				totals.podCount += nsTotals.podCount
+				totals.cpuRequests.Add(*nsTotals.cpuRequests)
+				totals.cpuLimits.Add(*nsTotals.cpuLimits)
+				totals.memoryRequests.Add(*nsTotals.memoryRequests)
+				totals.memoryLimits.Add(*nsTotals.memoryLimits)
+				totals.cpuUsage.Add(*nsTotals.cpuUsage)
+				totals.memoryUsage.Add(*nsTotals.memoryUsage)
+
+				byNs[ns.GetName()] = nsTotals
+			}
+
+			var namespaceSummary []map[string]any
+			for ns, nsTotals := range byNs {
+				namespaceSummary = append(namespaceSummary, toNamespaceSummary(ns, nsTotals))
+			}
+
+			projectSummary = append(projectSummary, map[string]any{
+				"name":        projectResource.GetName(),
 				"displayName": projectDisplayName,
-				"cluster":     clusterID,
 				"totals": map[string]any{
 					"podCount": totals.podCount,
 					"cpu": map[string]any{
@@ -259,18 +190,139 @@ func (t *Tools) getProjectResourceUsage(ctx context.Context, toolReq *mcp.CallTo
 						"usage":    totals.memoryUsage.String(),
 					},
 				},
-			},
-			"namespaces": namespaceSummary,
-		},
+				"namespaces": namespaceSummary,
+			})
+		}
+
+		usageSummary["projects"] = projectSummary
 	}
 
-	mcpResponse, err := response.CreateMcpResponseAny(resourceUsageSummary)
+	mcpResponse, err := response.CreateMcpResponseAny(usageSummary)
 	if err != nil {
-		zap.L().Error("failed to create mcp response", zapToolName, zap.Error(err))
+		zap.L().Error("failed to create mcp response", zapGetResourceUsage, zap.Error(err))
 		return nil, nil, err
 	}
 
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
 	}, nil, nil
+}
+
+func (t *Tools) getNamespaceResourceUsage(ctx context.Context, toolReq *mcp.CallToolRequest, clusterID, namespace string) (sample, error) {
+	empty := newSample()
+
+	// Fetch pods.
+	podResources, err := t.client.GetResources(ctx, client.ListParams{
+		Cluster:   clusterID,
+		Kind:      "pod",
+		Namespace: namespace,
+		URL:       t.rancherURL(toolReq),
+		Token:     middleware.Token(ctx),
+	})
+	if err != nil {
+		return empty, fmt.Errorf("failed to get pods for namespace %s: %w", namespace, err)
+	}
+
+	// Fetch pod metrics.
+	metricsResources, err := t.client.GetResources(ctx, client.ListParams{
+		Cluster:   clusterID,
+		Kind:      "pod.metrics.k8s.io",
+		Namespace: namespace,
+		URL:       t.rancherURL(toolReq),
+		Token:     middleware.Token(ctx),
+	})
+	if err != nil {
+		// Log warning but don't fail - metrics server might not be installed
+		zap.L().Warn("failed to get pod metrics, will skip actual usage data", zapGetResourceUsage, zap.String("namespace", namespace), zap.Error(err))
+	}
+
+	// Metrics lookup map.
+	metricsByPod := make(map[string]*unstructured.Unstructured)
+	for _, m := range metricsResources {
+		metricsByPod[m.GetName()] = m
+	}
+
+	totals := newSample()
+	for _, podResource := range podResources {
+		var pod corev1.Pod
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(podResource.Object, &pod); err != nil {
+			return empty, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
+		}
+
+		// Skip pods that are not running or succeeded
+		if pod.Status.Phase != corev1.PodRunning && pod.Status.Phase != corev1.PodSucceeded {
+			continue
+		}
+
+		totals.podCount++
+
+		// Aggregate resources from all containers
+		for _, container := range pod.Spec.Containers {
+			if cpuReq, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
+				totals.cpuRequests.Add(cpuReq)
+			}
+			if cpuLimit, ok := container.Resources.Limits[corev1.ResourceCPU]; ok {
+				totals.cpuLimits.Add(cpuLimit)
+			}
+			if memReq, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
+				totals.memoryRequests.Add(memReq)
+			}
+			if memLimit, ok := container.Resources.Limits[corev1.ResourceMemory]; ok {
+				totals.memoryLimits.Add(memLimit)
+			}
+		}
+
+		// Aggregate resources from init containers
+		for _, container := range pod.Spec.InitContainers {
+			if cpuReq, ok := container.Resources.Requests[corev1.ResourceCPU]; ok {
+				totals.cpuRequests.Add(cpuReq)
+			}
+			if cpuLimit, ok := container.Resources.Limits[corev1.ResourceCPU]; ok {
+				totals.cpuLimits.Add(cpuLimit)
+			}
+			if memReq, ok := container.Resources.Requests[corev1.ResourceMemory]; ok {
+				totals.memoryRequests.Add(memReq)
+			}
+			if memLimit, ok := container.Resources.Limits[corev1.ResourceMemory]; ok {
+				totals.memoryLimits.Add(memLimit)
+			}
+		}
+
+		if m, hasMetrics := metricsByPod[pod.GetName()]; hasMetrics {
+			var podMetrics metricsv1beta1.PodMetrics
+			if err := runtime.DefaultUnstructuredConverter.FromUnstructured(m.Object, &podMetrics); err != nil {
+				return empty, fmt.Errorf("failed to convert unstructured object to PodMetrics: %w", err)
+			}
+
+			for _, container := range podMetrics.Containers {
+				if cpu, ok := container.Usage[corev1.ResourceCPU]; ok {
+					totals.cpuUsage.Add(cpu)
+				}
+				if mem, ok := container.Usage[corev1.ResourceMemory]; ok {
+					totals.memoryUsage.Add(mem)
+				}
+			}
+		}
+	}
+
+	return totals, nil
+}
+
+func toNamespaceSummary(name string, s sample) map[string]any {
+	return map[string]any{
+		"namespace": name,
+		"totals": map[string]any{
+			"podCount": s.podCount,
+			"cpu": map[string]any{
+				"requests": s.cpuRequests.String(),
+				"limits":   s.cpuLimits.String(),
+				"usage":    s.cpuUsage.String(),
+			},
+			"memory": map[string]any{
+				"requests": s.memoryRequests.String(),
+				"limits":   s.memoryLimits.String(),
+				"usage":    s.memoryUsage.String(),
+			},
+		},
+	}
 }
