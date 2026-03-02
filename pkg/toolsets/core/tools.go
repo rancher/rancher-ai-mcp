@@ -57,7 +57,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Description: `Fetches a Kubernetes resource from the cluster.
 		Parameters:
 		name (string, required): The name of the Kubernetes resource.
-		kind (string, required): The kind of the Kubernetes resource (e.g. 'Deployment', 'Service').
+		kind (string, required): The kind of the Kubernetes resource (e.g. Deployment, Service).
 		cluster (string): The name of the Kubernetes cluster managed by Rancher.
 		namespace (string, optional): The namespace of the resource. It must be empty for all namespaces or cluster-wide resources.
 		
@@ -71,7 +71,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation.'
+		Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation.
 		Parameters:
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
 		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
@@ -90,7 +90,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation.'
+		Description: `Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation.
 		Parameters:
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
 		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
@@ -108,7 +108,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of kubernetes resources.'
+		Description: `Returns a list of kubernetes resources.
 		Parameters:
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
 		namespace (string): The namespace where the resource are located. It must be empty for all namespaces or cluster-wide resources.
@@ -121,7 +121,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns all information related to a Pod. It includes its parent Deployment or StatefulSet, the CPU and memory consumption and the logs. It must be used for troubleshooting problems with pods.'
+		Description: `Returns all information related to a Pod. It includes its parent Deployment or StatefulSet, the CPU and memory consumption and the logs. It must be used for troubleshooting problems with pods.
 		Parameters:
 		namespace (string): The namespace where the resource are located.
 		cluster (string): The name of the Kubernetes cluster.
@@ -134,7 +134,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a Deployment and its Pods. It must be used for troubleshooting problems with deployments.'
+		Description: `Returns a Deployment and its Pods. It must be used for troubleshooting problems with deployments.
 		Parameters:
 		namespace (string): The namespace where the resource are located.
 		cluster (string): The name of the Kubernetes cluster.
@@ -147,7 +147,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.'
+		Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.
 		Parameters:
 		cluster (string): The name of the Kubernetes cluster.`},
 		t.getNodes,
@@ -158,7 +158,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Creates a resource in a kubernetes cluster.'
+		Description: `Creates a resource in a kubernetes cluster.
 		Parameters:
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
 		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
@@ -173,7 +173,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Plans to create a resource in a kubernetes cluster. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.'
+		Description: `Plans to create a resource in a kubernetes cluster. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.
 		Parameters:
 		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
 		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
@@ -187,7 +187,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of all container images for the specified clusters.'
+		Description: `Returns a list of all container images for the specified clusters.
 		Parameters:
 		clusters (array of strings): List of clusters to get images from. Empty for return images for all clusters.`},
 		t.getClusterImages,
@@ -198,7 +198,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a project resource and its associated namespaces.'
+		Description: `Returns a project resource and its associated namespaces.
 		Parameters:
 		name (string): The name of the project resource. Users often use project display name instead of project resource name. When unsure if the provided name is in fact the project resource name it's best to list projects first and find the project resource name that corresponds to the project display name.
 		cluster (string): The name of the cluster resource the project belongs to. Users can often use cluster display name instead of cluster resource name. When unsure if the provided value is in fact the cluster resource name it's best to list clusters first and find the cluster resource name that corresponds to the cluster display name.`},
@@ -210,7 +210,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of project resources for a specified cluster.'
+		Description: `Returns a list of project resources for a specified cluster.
 		Parameters:
 		cluster (string): The name of the cluster resource the project belongs to. Users can often use cluster display name instead of cluster resource name. When unsure if the provided name is in fact the cluster resource name it's best to list clusters first and find the cluster resource name that corresponds to the cluster display name.`},
 		t.listProjects,
@@ -221,7 +221,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of all Rancher clusters, including local and downstream clusters.'
+		Description: `Returns a list of all Rancher clusters, including local and downstream clusters.
 		Parameters:
 		None`},
 		t.listClusters,
@@ -234,7 +234,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		},
 		Description: `Returns the resource usage for a namespace, project or all projects in a cluster.
 		Usage totals are provided for the entire project as well as broken down by namespace.
-		The resource usage includes CPU and memory requests, limits and actual usage, as well as the total number of pods.'
+		The resource usage includes CPU and memory requests, limits and actual usage, as well as the total number of pods.
 		Parameters:
 		cluster (string): The name of the cluster resource. Users can often use cluster display name instead of cluster resource name. When unsure if the provided name is in fact the cluster resource name it's best to list clusters first and find the cluster resource name that corresponds to the cluster display name.
 		project (string): (optional) The name of the project resource. Users often use project display name instead of project resource name. When unsure if the provided name is in fact the project resource name it's best to list projects first and find the project resource name that corresponds to the project display name.
