@@ -6,6 +6,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/rest"
 )
 
 const (
@@ -19,17 +20,23 @@ type toolsClient interface {
 	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
 }
 
+type resourceAnalyser interface {
+	analiseFleetResources(ctx context.Context, restCfg *rest.Config) (string, error)
+}
+
 // Tools contains all tools for the MCP server
 type Tools struct {
-	client     toolsClient
-	RancherURL string
+	client           toolsClient
+	RancherURL       string
+	resourceAnalyser resourceAnalyser
 }
 
 // NewTools creates and returns a new Tools instance.
 func NewTools(client toolsClient, rancherURL string) *Tools {
 	return &Tools{
-		client:     client,
-		RancherURL: rancherURL,
+		client:           client,
+		RancherURL:       rancherURL,
+		resourceAnalyser: &cli{},
 	}
 }
 
