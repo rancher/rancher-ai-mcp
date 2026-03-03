@@ -25,19 +25,6 @@ func TestCreateProject(t *testing.T) {
 	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
-	projectResource := map[string]any{
-		"apiVersion": "management.cattle.io/v3",
-		"kind":       "Project",
-		"metadata": map[string]any{
-			"name":      "test-project",
-			"namespace": "local",
-		},
-		"spec": map[string]any{
-			"clusterName": "local",
-			"displayName": "Test Project",
-		},
-	}
-
 	tests := map[string]struct {
 		params        createProjectParams
 		fakeDynClient *dynamicfake.FakeDynamicClient
@@ -51,8 +38,10 @@ func TestCreateProject(t *testing.T) {
 	}{
 		"create project": {
 			params: createProjectParams{
-				Cluster:  "local",
-				Resource: projectResource,
+				Cluster:     "local",
+				Name:        "test-project",
+				DisplayName: "Test Project",
+				Description: "A test project",
 			},
 			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createProjectScheme(), map[schema.GroupVersionResource]string{
@@ -64,7 +53,12 @@ func TestCreateProject(t *testing.T) {
 						"apiVersion": "management.cattle.io/v3",
 						"kind": "Project",
 						"metadata": {"name": "test-project", "namespace": "local"},
-						"spec": {"clusterName": "local", "displayName": "Test Project"}
+						"spec": {
+							"clusterName": "local",
+							"displayName": "Test Project",
+							"description": "A test project",
+							"containerDefaultResourceLimit": {}
+						}
 					}
 				],
 				"uiContext": [
@@ -72,10 +66,47 @@ func TestCreateProject(t *testing.T) {
 				]
 			}`,
 		},
+		"create project with resource limits": {
+			params: createProjectParams{
+				Cluster:           "local",
+				Name:              "project-with-limits",
+				DisplayName:       "Project with Limits",
+				CPULimit:          2000,
+				CPUReservation:    1000,
+				MemoryLimit:       4096,
+				MemoryReservation: 2048,
+			},
+			requestURL: fakeUrl,
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createProjectScheme(), map[schema.GroupVersionResource]string{
+				{Group: "management.cattle.io", Version: "v3", Resource: "projects"}: "ProjectList",
+			}),
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "management.cattle.io/v3",
+						"kind": "Project",
+						"metadata": {"name": "project-with-limits", "namespace": "local"},
+						"spec": {
+							"clusterName": "local",
+							"displayName": "Project with Limits",
+							"containerDefaultResourceLimit": {
+								"limitsCpu": "2000m",
+								"requestsCpu": "1000m",
+								"limitsMemory": "4096Mi",
+								"requestsMemory": "2048Mi"
+							}
+						}
+					}
+				],
+				"uiContext": [
+					{"namespace": "local", "kind": "Project", "cluster": "local", "name": "project-with-limits", "type": "project"}
+				]
+			}`,
+		},
 		"create project when tool is configured with URL": {
 			params: createProjectParams{
-				Cluster:  "local",
-				Resource: projectResource,
+				Cluster: "local",
+				Name:    "configured-url-project",
 			},
 			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createProjectScheme(), map[schema.GroupVersionResource]string{
@@ -86,41 +117,24 @@ func TestCreateProject(t *testing.T) {
 					{
 						"apiVersion": "management.cattle.io/v3",
 						"kind": "Project",
-						"metadata": {"name": "test-project", "namespace": "local"},
-						"spec": {"clusterName": "local", "displayName": "Test Project"}
+						"metadata": {"name": "configured-url-project", "namespace": "local"},
+						"spec": {
+							"clusterName": "local",
+							"containerDefaultResourceLimit": {}
+						}
 					}
 				],
 				"uiContext": [
-					{"namespace": "local", "kind": "Project", "cluster": "local", "name": "test-project", "type": "project"}
+					{"namespace": "local", "kind": "Project", "cluster": "local", "name": "configured-url-project", "type": "project"}
 				]
 			}`,
-		},
-		"create project - marshal error": {
-			params: createProjectParams{
-				Cluster:  "local",
-				Resource: make(chan int),
-			},
-			requestURL:    fakeUrl,
-			fakeDynClient: dynamicfake.NewSimpleDynamicClient(createProjectScheme()),
-			expectedError: `failed to marshal resource`,
-		},
-		"create project - invalid": {
-			params: createProjectParams{
-				Cluster:  "local",
-				Resource: "invalid-resource-type",
-			},
-			requestURL: fakeUrl,
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createProjectScheme(), map[schema.GroupVersionResource]string{
-				{Group: "management.cattle.io", Version: "v3", Resource: "projects"}: "ProjectList",
-			}),
-			expectedError: "failed to create unstructured object",
 		},
 		"create project - no rancherURL or request URL": {
 			// fails because requestURL and rancherURL are not configured (no
 			// R_Url or configured Rancher URL.
 			params: createProjectParams{
-				Cluster:  "local",
-				Resource: make(chan int),
+				Cluster: "local",
+				Name:    "error-project",
 			},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(createProjectScheme()),
 			expectedError: "no URL for rancher request",

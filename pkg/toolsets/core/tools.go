@@ -246,9 +246,15 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Creates a project resource for a specified cluster.
+		Description: `Creates a project resource for a specified cluster with the given containerResourceQuota.
 		Parameters:
-		cluster (string): The name of the cluster.
-		resource (json): The project resource to be created. This must be a JSON object.`},
+		cluster (string): The name of the cluster the project belongs to.
+		name (string): The name of the project to be created.
+		description (string, optional): An optional description for the project.
+		displayName (string, optional): An optional display name for the project.
+		cpuLimit (string, optional): The maximum amount of CPU resources (in mCPUs) that can be used by containers in the project.
+		cpuReservation (string, optional): The amount of CPU resources (in mCPUs) reserved for containers in the project.
+		memoryLimit (string, optional): The maximum amount of memory resources (in MiB) that can be used by containers in the project.
+		memoryReservation (string, optional): The amount of memory resources (in MiB) reserved for containers in the project.`},
 		t.createProject)
 }
