@@ -1,8 +1,8 @@
 module github.com/rancher/rancher-ai-mcp
 
-go 1.24.0
+go 1.25.0
 
-toolchain go1.24.13
+toolchain go1.25.7
 
 // required for rancher/rancher pkg/apis
 // will need to be bumped alongside the rancher/rancher/pkg/apis
