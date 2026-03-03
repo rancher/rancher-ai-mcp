@@ -237,8 +237,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		The resource usage includes CPU and memory requests, limits and actual usage, as well as the total number of pods.
 		Parameters:
 		cluster (string): The name of the cluster resource.
-		project (string): (optional) The name of the project resource.
-		namespace (string): (optional) The name of the namespace resource to.`},
+		project (string): (optional) The name of the project to filter by. If omitted, data for all projects in the cluster is returned.
+		namespace (string): (optional) The name of a specific namespace. If provided, only data for this namespace is returned.`},
 		t.getResourceUsage,
 	)
 }
