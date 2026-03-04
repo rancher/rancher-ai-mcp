@@ -17,16 +17,16 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-type ScaleNodePoolParameters struct {
+type scaleNodePoolParameters struct {
 	Cluster          string `json:"cluster" jsonschema:"the name of the provisioning cluster"`
 	Namespace        string `json:"namespace" jsonschema:"the namespace of the resource"`
 	NodePoolName     string `json:"nodePoolName" jsonschema:"the name of the node pool to scale"`
-	DesiredSize      int    `json:"desiredSize" jsonschema:"the desired size of the node pool"`
-	AmountToAdd      int    `json:"amountToAdd" jsonschema:"the amount of nodes to add to the node pool. if specified, DesiredSize will be ignored"`
-	AmountToSubtract int    `json:"AmountToSubtract" jsonschema:"the amount of nodes to remove from the node pool. if specified, DesiredSize will be ignored"`
+	DesiredSize      int    `json:"desiredSize,omitempty" jsonschema:"the desired size of the node pool"`
+	AmountToAdd      int    `json:"amountToAdd,omitempty" jsonschema:"the amount of nodes to add to the node pool. if specified, DesiredSize will be ignored"`
+	AmountToSubtract int    `json:"AmountToSubtract,omitempty" jsonschema:"the amount of nodes to remove from the node pool. if specified, DesiredSize will be ignored"`
 }
 
-func (t *Tools) ScaleClusterNodePool(ctx context.Context, toolReq *mcp.CallToolRequest, params ScaleNodePoolParameters) (*mcp.CallToolResult, any, error) {
+func (t *Tools) scaleClusterNodePool(ctx context.Context, toolReq *mcp.CallToolRequest, params scaleNodePoolParameters) (*mcp.CallToolResult, any, error) {
 	if params.Namespace == "" || params.Namespace == "default" {
 		params.Namespace = DefaultClusterResourcesNamespace
 	}
@@ -76,7 +76,7 @@ func (t *Tools) ScaleClusterNodePool(ctx context.Context, toolReq *mcp.CallToolR
 	}, nil, nil
 }
 
-func (t *Tools) scaleClusterNodePoolPatch(ctx context.Context, toolReq *mcp.CallToolRequest, params ScaleNodePoolParameters, log *zap.Logger) ([]byte, error) {
+func (t *Tools) scaleClusterNodePoolPatch(ctx context.Context, toolReq *mcp.CallToolRequest, params scaleNodePoolParameters, log *zap.Logger) ([]byte, error) {
 	desiredSize := int32(params.DesiredSize)
 	amountToAdd := int32(params.AmountToAdd)
 	amountToSubtract := int32(params.AmountToSubtract)

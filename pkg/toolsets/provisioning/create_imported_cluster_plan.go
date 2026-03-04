@@ -10,7 +10,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (t *Tools) CreateImportedClusterPlan(_ context.Context, toolReq *mcp.CallToolRequest, params CreateImportedClusterParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) createImportedClusterPlan(_ context.Context, toolReq *mcp.CallToolRequest, params createImportedClusterParams) (*mcp.CallToolResult, any, error) {
 	log := utils.NewChildLogger(toolReq, map[string]string{
 		"clusterName":              params.ClusterName,
 		"clusterDescription":       params.ClusterDescription,

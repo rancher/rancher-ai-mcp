@@ -15,13 +15,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type InspectClusterParams struct {
+type inspectClusterParams struct {
 	Cluster   string `json:"cluster" jsonschema:"the name of the provisioning cluster"`
 	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
 }
 
-// AnalyzeCluster returns a set of kubernetes resources that can be used to inspect the cluster for debugging and summary purposes.
-func (t *Tools) AnalyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params InspectClusterParams) (*mcp.CallToolResult, any, error) {
+// analyzeCluster returns a set of kubernetes resources that can be used to inspect the cluster for debugging and summary purposes.
+func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params inspectClusterParams) (*mcp.CallToolResult, any, error) {
 	ns := params.Namespace
 	if ns == "" {
 		ns = DefaultClusterResourcesNamespace

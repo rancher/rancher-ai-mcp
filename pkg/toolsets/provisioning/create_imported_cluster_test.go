@@ -23,7 +23,7 @@ func TestImportedCluster(t *testing.T) {
 		name           string
 		fakeClientset  kubernetes.Interface
 		fakeDynClient  *dynamicfake.FakeDynamicClient
-		params         CreateImportedClusterParams
+		params         createImportedClusterParams
 		expectedError  string
 		expectedResult string
 	}{
@@ -31,7 +31,7 @@ func TestImportedCluster(t *testing.T) {
 			name:          "valid parameters",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateImportedClusterParams{
+			params: createImportedClusterParams{
 				ClusterName:              "test-cluster",
 				ClusterDescription:       "A test cluster",
 				VersionManagementSetting: "true",
@@ -67,7 +67,7 @@ func TestImportedCluster(t *testing.T) {
 			name:          "false version management",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateImportedClusterParams{
+			params: createImportedClusterParams{
 				ClusterName:              "test-cluster",
 				ClusterDescription:       "A test cluster",
 				VersionManagementSetting: "false",
@@ -103,7 +103,7 @@ func TestImportedCluster(t *testing.T) {
 			name:          "missing version management, uses default",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateImportedClusterParams{
+			params: createImportedClusterParams{
 				ClusterName:              "test-cluster",
 				ClusterDescription:       "A test cluster",
 				VersionManagementSetting: "",
@@ -139,7 +139,7 @@ func TestImportedCluster(t *testing.T) {
 			name:          "missing description",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateImportedClusterParams{
+			params: createImportedClusterParams{
 				ClusterName:              "test-cluster",
 				ClusterDescription:       "",
 				VersionManagementSetting: "",
@@ -175,7 +175,7 @@ func TestImportedCluster(t *testing.T) {
 			name:          "missing cluster name",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateImportedClusterParams{
+			params: createImportedClusterParams{
 				ClusterName:              "",
 				ClusterDescription:       "whats my name again",
 				VersionManagementSetting: "",
@@ -197,7 +197,7 @@ func TestImportedCluster(t *testing.T) {
 			}
 			tools := Tools{client: c}
 
-			result, _, err := tools.CreateImportedCluster(context.Background(), &mcp.CallToolRequest{
+			result, _, err := tools.createImportedCluster(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{
 					Name: "createImportedCluster",
 				},

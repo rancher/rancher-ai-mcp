@@ -20,15 +20,15 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-type CreateCustomClusterParams struct {
+type createCustomClusterParams struct {
 	ClusterName        string `json:"clusterName" jsonschema:"The name of the provisioning cluster"`
-	ClusterDescription string `json:"clusterDescription" jsonschema:"Description of the provisioning cluster"`
+	ClusterDescription string `json:"clusterDescription,omitempty" jsonschema:"Description of the provisioning cluster"`
 	CNI                string `json:"CNI" jsonschema:"The name of the CNI (Container Networking Interface) to use"`
 	KubernetesVersion  string `json:"kubernetesVersion" jsonschema:"The Kubernetes version of the cluster"`
 	Distribution       string `json:"distribution" jsonschema:"The distribution of the provisioning cluster (rke2 or k3s)"`
 }
 
-func (t *Tools) CreateCustomCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params CreateCustomClusterParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) createCustomCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params createCustomClusterParams) (*mcp.CallToolResult, any, error) {
 	log := utils.NewChildLogger(toolReq, map[string]string{
 		"clusterName":        params.ClusterName,
 		"clusterDescription": params.ClusterDescription,
@@ -67,7 +67,7 @@ func (t *Tools) CreateCustomCluster(ctx context.Context, toolReq *mcp.CallToolRe
 	}, nil, nil
 }
 
-func (t *Tools) CreateCustomClusterObj(toolReq *mcp.CallToolRequest, params CreateCustomClusterParams, log *zap.Logger) (*unstructured.Unstructured, error) {
+func (t *Tools) CreateCustomClusterObj(toolReq *mcp.CallToolRequest, params createCustomClusterParams, log *zap.Logger) (*unstructured.Unstructured, error) {
 	if params.ClusterName == "" {
 		log.Debug("cluster name is required")
 		return nil, fmt.Errorf("ClusterName is required")

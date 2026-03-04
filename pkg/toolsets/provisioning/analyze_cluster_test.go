@@ -17,7 +17,7 @@ import (
 
 func TestAnalyzeCluster(t *testing.T) {
 	tests := map[string]struct {
-		params        InspectClusterParams
+		params        inspectClusterParams
 		fakeClientset kubernetes.Interface
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
@@ -28,7 +28,7 @@ func TestAnalyzeCluster(t *testing.T) {
 		expectedError  string
 	}{
 		"analyze cluster with all resources": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
@@ -221,7 +221,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			}`,
 		},
 		"analyze cluster without CAPI cluster": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
@@ -285,7 +285,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			}`,
 		},
 		"analyze cluster without machines": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
@@ -380,7 +380,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			}`,
 		},
 		"analyze local cluster with default namespace": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "local",
 				Namespace: "",
 			},
@@ -444,7 +444,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			}`,
 		},
 		"analyze cluster not found": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "nonexistent-cluster",
 				Namespace: "fleet-default",
 			},
@@ -454,7 +454,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			expectedError: "provisioning cluster nonexistent-cluster not found in namespace fleet-default",
 		},
 		"analyze cluster with multiple machines and sets": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "multi-cluster",
 				Namespace: "fleet-default",
 			},
@@ -778,7 +778,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			}`,
 		},
 		"analyze cluster with not-ready management cluster": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "unhealthy-cluster",
 				Namespace: "fleet-default",
 			},
@@ -842,7 +842,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			}`,
 		},
 		"analyze cluster with RKE machine pools and machine configs": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "rke-cluster",
 				Namespace: "fleet-default",
 			},
@@ -1099,7 +1099,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			}`,
 		},
 		"analyze cluster with namespace not set (defaults to fleet-default)": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "test-cluster",
 				Namespace: "",
 			},
@@ -1194,7 +1194,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			}`,
 		},
 		"analyze cluster with only provisioning and management cluster": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "minimal-cluster",
 				Namespace: "fleet-default",
 			},
@@ -1258,7 +1258,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			}`,
 		},
 		"analyze cluster with single machine and full hierarchy": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "single-machine-cluster",
 				Namespace: "fleet-default",
 			},
@@ -1451,7 +1451,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			}`,
 		},
 		"analyze cluster - no rancherURL or request URL": {
-			params: InspectClusterParams{
+			params: inspectClusterParams{
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
@@ -1478,7 +1478,7 @@ func TestAnalyzeCluster(t *testing.T) {
 			req := test.NewCallToolRequest(tt.requestURL)
 			req.Params = &mcp.CallToolParamsRaw{Name: "analyze-cluster"}
 
-			result, _, err := tools.AnalyzeCluster(middleware.WithToken(t.Context(), testToken), req, tt.params)
+			result, _, err := tools.analyzeCluster(middleware.WithToken(t.Context(), testToken), req, tt.params)
 
 			if tt.expectedError != "" {
 				assert.ErrorContains(t, err, tt.expectedError)

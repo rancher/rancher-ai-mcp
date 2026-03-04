@@ -15,25 +15,25 @@ import (
 func TestListSupportedKubernetesVersions(t *testing.T) {
 	tests := []struct {
 		name           string
-		params         ListSupportedK8sVersionsParams
+		params         listSupportedK8sVersionsParams
 		kdmOutput      string
 		expectedError  string
 		expectedResult string
 	}{
 		{
 			name:          "invalid distribution",
-			params:        ListSupportedK8sVersionsParams{Distribution: "invalid"},
+			params:        listSupportedK8sVersionsParams{Distribution: "invalid"},
 			expectedError: "unsupported distribution: invalid",
 		},
 		{
 			name:           "valid distribution rke2",
-			params:         ListSupportedK8sVersionsParams{Distribution: "rke2"},
+			params:         listSupportedK8sVersionsParams{Distribution: "rke2"},
 			kdmOutput:      createDummyKDMData("v1.32.4+rke2r1", "v1.32.3+rke2r1"),
 			expectedResult: `{"llm":[{"message":"Supported Kubernetes versions for rke2: [v1.32.4+rke2r1 v1.32.3+rke2r1]"}]}`,
 		},
 		{
 			name:           "valid distribution k3s",
-			params:         ListSupportedK8sVersionsParams{Distribution: "k3s"},
+			params:         listSupportedK8sVersionsParams{Distribution: "k3s"},
 			kdmOutput:      createDummyKDMData("v1.32.4+k3s1", "v1.32.3+k3s1"),
 			expectedResult: `{"llm":[{"message":"Supported Kubernetes versions for k3s: [v1.32.4+k3s1 v1.32.3+k3s1]"}]}`,
 		},
@@ -49,7 +49,7 @@ func TestListSupportedKubernetesVersions(t *testing.T) {
 			c := &client.Client{}
 			tools := Tools{client: c}
 
-			result, _, err := tools.ListSupportedKubernetesVersions(context.Background(), &mcp.CallToolRequest{
+			result, _, err := tools.listSupportedKubernetesVersions(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{
 					Name: "listSupportedKubernetesVersions",
 				},

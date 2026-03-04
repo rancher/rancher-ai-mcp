@@ -20,7 +20,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 		name           string
 		fakeClientset  kubernetes.Interface
 		fakeDynClient  *dynamicfake.FakeDynamicClient
-		params         ScaleNodePoolParameters
+		params         scaleNodePoolParameters
 		expectedError  string
 		expectedResult string
 	}{
@@ -37,7 +37,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(1)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:      "test-cluster",
 				Namespace:    "fleet-default",
 				NodePoolName: "test-nodepool",
@@ -83,7 +83,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(1)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:      "test-cluster",
 				Namespace:    "fleet-default",
 				NodePoolName: "test-nodepool",
@@ -112,7 +112,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(5)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:      "test-cluster",
 				Namespace:    "fleet-default",
 				NodePoolName: "test-nodepool",
@@ -151,7 +151,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(1)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
 				NodePoolName:     "test-nodepool",
@@ -175,7 +175,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(1)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
 				NodePoolName:     "test-nodepool",
@@ -199,7 +199,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(1)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
 				NodePoolName:     "test-nodepool",
@@ -240,7 +240,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(1)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
 				NodePoolName:     "test-nodepool",
@@ -281,7 +281,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(2)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
 				NodePoolName:     "test-nodepool",
@@ -322,7 +322,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(1)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
 				NodePoolName:     "test-nodepool",
@@ -346,7 +346,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(1)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
 				NodePoolName:     "test-nodepool",
@@ -370,7 +370,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(3)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
 				NodePoolName:     "test-nodepool",
@@ -394,7 +394,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(3)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
 				NodePoolName:     "fake-nodepool",
@@ -410,7 +410,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
 				NodePoolName:     "fake-nodepool",
@@ -434,7 +434,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 						Quantity:         toPtr[int32](int32(3)),
 					},
 				})),
-			params: ScaleNodePoolParameters{
+			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
 				NodePoolName:     "fake-nodepool",
@@ -459,7 +459,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
 			}
 			tools := Tools{client: c}
 
-			result, _, err := tools.ScaleClusterNodePoolPlan(context.Background(), &mcp.CallToolRequest{
+			result, _, err := tools.scaleClusterNodePoolPlan(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{
 					Name: "scaleClusterNodePoolPlan",
 				},

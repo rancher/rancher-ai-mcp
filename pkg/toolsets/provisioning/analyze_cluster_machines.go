@@ -11,13 +11,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type InspectClusterMachinesParams struct {
+type inspectClusterMachinesParams struct {
 	Cluster   string `json:"cluster" jsonschema:"the name of the provisioning cluster"`
 	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
 }
 
-// AnalyzeClusterMachines returns the cluster API machines, machine sets, and machine deployments, for a given provisioning cluster.
-func (t *Tools) AnalyzeClusterMachines(ctx context.Context, toolReq *mcp.CallToolRequest, params InspectClusterMachinesParams) (*mcp.CallToolResult, any, error) {
+// analyzeClusterMachines returns the cluster API machines, machine sets, and machine deployments, for a given provisioning cluster.
+func (t *Tools) analyzeClusterMachines(ctx context.Context, toolReq *mcp.CallToolRequest, params inspectClusterMachinesParams) (*mcp.CallToolResult, any, error) {
 	ns := params.Namespace
 	if ns == "" {
 		ns = "fleet-default"

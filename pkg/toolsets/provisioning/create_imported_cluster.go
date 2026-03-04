@@ -16,13 +16,13 @@ import (
 	utilrand "k8s.io/apimachinery/pkg/util/rand"
 )
 
-type CreateImportedClusterParams struct {
+type createImportedClusterParams struct {
 	ClusterName              string `json:"clusterName" jsonschema:"The name of the cluster to create"`
-	ClusterDescription       string `json:"clusterDescription" jsonschema:"Description for the cluster"`
-	VersionManagementSetting string `json:"VersionManagementSetting" jsonschema:"Enable version management for the cluster. If not specified the global setting will be used. Potential values are 'system-default', 'true', and 'false'."`
+	ClusterDescription       string `json:"clusterDescription,omitempty" jsonschema:"Description for the cluster"`
+	VersionManagementSetting string `json:"VersionManagementSetting,omitempty" jsonschema:"Enable version management for the cluster. If not specified the global setting will be used. Potential values are 'system-default', 'true', and 'false'."`
 }
 
-func (t *Tools) CreateImportedCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params CreateImportedClusterParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) createImportedCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params createImportedClusterParams) (*mcp.CallToolResult, any, error) {
 	log := utils.NewChildLogger(toolReq, map[string]string{
 		"clusterName":              params.ClusterName,
 		"clusterDescription":       params.ClusterDescription,
@@ -62,7 +62,7 @@ func (t *Tools) CreateImportedCluster(ctx context.Context, toolReq *mcp.CallTool
 	}, nil, nil
 }
 
-func (t *Tools) createImportedClusterObj(params CreateImportedClusterParams) (*unstructured.Unstructured, error) {
+func (t *Tools) createImportedClusterObj(params createImportedClusterParams) (*unstructured.Unstructured, error) {
 	if params.VersionManagementSetting != "" && (params.VersionManagementSetting != "true" && params.VersionManagementSetting != "false" && params.VersionManagementSetting != "system-default") {
 		return nil, fmt.Errorf("invalid value for VersionManagementSetting: %s. Valid values are 'system-default', 'true', and 'false'", params.VersionManagementSetting)
 	}

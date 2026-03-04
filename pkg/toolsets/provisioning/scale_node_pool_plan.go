@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-func (t *Tools) ScaleClusterNodePoolPlan(ctx context.Context, toolReq *mcp.CallToolRequest, params ScaleNodePoolParameters) (*mcp.CallToolResult, any, error) {
+func (t *Tools) scaleClusterNodePoolPlan(ctx context.Context, toolReq *mcp.CallToolRequest, params scaleNodePoolParameters) (*mcp.CallToolResult, any, error) {
 	if params.Namespace == "" || params.Namespace == "default" {
 		params.Namespace = DefaultClusterResourcesNamespace
 	}

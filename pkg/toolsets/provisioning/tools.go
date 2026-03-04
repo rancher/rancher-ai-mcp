@@ -60,7 +60,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		cluster (string): The name of the Kubernetes cluster
 		namespace (string): The namespace where the resource is located. The default namespace will be used if not provided.
 		`},
-		t.AnalyzeCluster)
+		t.analyzeCluster)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "analyzeClusterMachines",
@@ -74,7 +74,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		cluster (string): The name of the Kubernetes cluster
 		namespace (string): The namespace where the resource is located. The default namespace will be used if not provided.
 		`},
-		t.AnalyzeClusterMachines)
+		t.analyzeClusterMachines)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getClusterMachine",
@@ -88,7 +88,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		cluster (string): The name of the Kubernetes cluster
 		machineName (string): The name of the machine to get
 		`},
-		t.GetClusterMachine)
+		t.getClusterMachine)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "scaleClusterNodePool",
@@ -107,7 +107,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		amountToAdd (int, optional): The amount of nodes to add to the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToSubtract. If no specific amount is provided, use zero.
 		amountToSubtract (int, optional): The amount of nodes to remove from the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToAdd. If no specific amount is provided, use zero.
 		`},
-		t.ScaleClusterNodePool)
+		t.scaleClusterNodePool)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "scaleClusterNodePoolPlan",
@@ -126,7 +126,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		amountToAdd (int, optional): The amount of nodes to add to the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToSubtract. If no specific amount is provided, use zero.
 		amountToSubtract (int, optional): The amount of nodes to remove from the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToAdd. If no specific amount is provided, use zero.
 		`},
-		t.ScaleClusterNodePoolPlan)
+		t.scaleClusterNodePoolPlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listK3kClusters",
@@ -172,10 +172,10 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 	
 		Parameters:
 		clusterName (string, required): The name of the cluster to be created.
-	    description (string, optional): A short description added to the cluster.
+	    description (string, optional): A short description added to the cluster. Leave empty if not provided
 		versionManagementSetting (string, optional): Specifies the version management setting for the cluster. Potential values are 'system-default', 'true', and 'false'. If not specified, the global version management setting will be used.
 		`},
-		t.CreateImportedCluster)
+		t.createImportedCluster)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createImportedClusterPlan",
@@ -190,7 +190,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 	    description (string, optional): A short description added to the cluster.
 		versionManagementSetting (string, optional): Specifies the version management setting for the cluster. Potential values are 'system-default', 'true', and 'false'. If not specified, the global version management setting will be used.
 		`},
-		t.CreateImportedClusterPlan)
+		t.createImportedClusterPlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createCustomCluster",
@@ -207,7 +207,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		CNI (string, required): The CNI that will be used for the cluster.
 		distribution (string, required): The distribution of the cluster, either "rke2" or "k3s".
 		`},
-		t.CreateCustomCluster)
+		t.createCustomCluster)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createCustomClusterPlan",
@@ -224,7 +224,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		CNI (string, required): The CNI that will be used for the cluster.
 		distribution (string, required): The distribution of the cluster, either "rke2" or "k3s".
 		`},
-		t.CreateCustomClusterPlan)
+		t.createCustomClusterPlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listSupportedKubernetesVersions",
@@ -237,5 +237,5 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Parameters:
 		distribution (string, required): The distribution of the cluster, either "rke2" or "k3s".
 		`},
-		t.ListSupportedKubernetesVersions)
+		t.listSupportedKubernetesVersions)
 }

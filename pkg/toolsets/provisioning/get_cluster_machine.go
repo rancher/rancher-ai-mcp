@@ -11,13 +11,13 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type GetClusterMachineParams struct {
+type getClusterMachineParams struct {
 	Cluster     string `json:"cluster" jsonschema:"the name of the cluster the machines belong to"`
 	MachineName string `json:"machineName" jsonschema:"the name of the machine to retrieve"`
 }
 
-// GetClusterMachine returns the cluster API machine for a given provisioning cluster and machine name.
-func (t *Tools) GetClusterMachine(ctx context.Context, toolReq *mcp.CallToolRequest, params GetClusterMachineParams) (*mcp.CallToolResult, any, error) {
+// getClusterMachine returns the cluster API machine for a given provisioning cluster and machine name.
+func (t *Tools) getClusterMachine(ctx context.Context, toolReq *mcp.CallToolRequest, params getClusterMachineParams) (*mcp.CallToolResult, any, error) {
 	log := utils.NewChildLogger(toolReq, map[string]string{
 		"cluster":     params.Cluster,
 		"machineName": params.MachineName,

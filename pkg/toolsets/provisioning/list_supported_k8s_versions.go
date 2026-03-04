@@ -12,11 +12,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-type ListSupportedK8sVersionsParams struct {
+type listSupportedK8sVersionsParams struct {
 	Distribution string `json:"distribution" jsonschema:"the distribution of Kubernetes (rke2 or k3s)"`
 }
 
-func (t *Tools) ListSupportedKubernetesVersions(_ context.Context, toolReq *mcp.CallToolRequest, params ListSupportedK8sVersionsParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) listSupportedKubernetesVersions(_ context.Context, toolReq *mcp.CallToolRequest, params listSupportedK8sVersionsParams) (*mcp.CallToolResult, any, error) {
 	if params.Distribution != "rke2" && params.Distribution != "k3s" {
 		return nil, nil, fmt.Errorf("unsupported distribution: %s", params.Distribution)
 	}
@@ -25,7 +25,7 @@ func (t *Tools) ListSupportedKubernetesVersions(_ context.Context, toolReq *mcp.
 		"distribution": params.Distribution,
 	})
 
-	log.Debug("ListSupportedKubernetesVersions called")
+	log.Debug("listSupportedKubernetesVersions called")
 
 	versions, err := getKDMReleases(t.rancherURL(toolReq), params.Distribution)
 	if err != nil {

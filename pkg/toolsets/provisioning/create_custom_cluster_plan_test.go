@@ -22,7 +22,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 		name            string
 		fakeClientset   kubernetes.Interface
 		fakeDynClient   *dynamicfake.FakeDynamicClient
-		params          CreateCustomClusterParams
+		params          createCustomClusterParams
 		finalK8sVersion string
 		expectedError   string
 		rke2KdmOutput   string
@@ -32,7 +32,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 			name:          "Empty cluster name",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateCustomClusterParams{
+			params: createCustomClusterParams{
 				ClusterName:  "",
 				Distribution: "rke2",
 			},
@@ -42,7 +42,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 			name:          "invalid distribution",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateCustomClusterParams{
+			params: createCustomClusterParams{
 				ClusterName:  "test",
 				Distribution: "gke",
 			},
@@ -52,7 +52,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 			name:          "invalid CNI",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateCustomClusterParams{
+			params: createCustomClusterParams{
 				ClusterName:  "test",
 				Distribution: "rke2",
 				CNI:          "faker",
@@ -63,7 +63,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 			name:          "invalid rke2 version",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateCustomClusterParams{
+			params: createCustomClusterParams{
 				ClusterName:       "test",
 				Distribution:      "rke2",
 				CNI:               "calico",
@@ -76,7 +76,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 			name:          "invalid k3s version",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateCustomClusterParams{
+			params: createCustomClusterParams{
 				ClusterName:       "test",
 				Distribution:      "k3s",
 				CNI:               "calico",
@@ -89,7 +89,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 			name:          "valid rke2 cluster",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateCustomClusterParams{
+			params: createCustomClusterParams{
 				ClusterName:       "test",
 				Distribution:      "rke2",
 				CNI:               "calico",
@@ -102,7 +102,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 			name:          "valid k3s cluster",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateCustomClusterParams{
+			params: createCustomClusterParams{
 				ClusterName:       "test",
 				Distribution:      "k3s",
 				CNI:               "calico",
@@ -115,7 +115,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 			name:          "valid k3s cluster using latest release",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateCustomClusterParams{
+			params: createCustomClusterParams{
 				ClusterName:       "test",
 				Distribution:      "k3s",
 				CNI:               "calico",
@@ -128,7 +128,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 			name:          "valid rke2 cluster using latest release",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateCustomClusterParams{
+			params: createCustomClusterParams{
 				ClusterName:       "test",
 				Distribution:      "rke2",
 				CNI:               "calico",
@@ -141,7 +141,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 			name:          "valid k3s with no KDM data",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
-			params: CreateCustomClusterParams{
+			params: createCustomClusterParams{
 				ClusterName:       "test",
 				Distribution:      "k3s",
 				CNI:               "calico",
@@ -176,7 +176,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 				}
 			}))
 
-			result, _, err := tools.CreateCustomClusterPlan(context.Background(), &mcp.CallToolRequest{
+			result, _, err := tools.createCustomClusterPlan(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{
 					Name: "createCustomClusterPlan",
 				},
@@ -200,7 +200,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 	}
 }
 
-func createCustomClusterPlanOutput(params CreateCustomClusterParams, finalK8sVersion string) string {
+func createCustomClusterPlanOutput(params createCustomClusterParams, finalK8sVersion string) string {
 	return fmt.Sprintf(`[
   {
     "type": "create",
