@@ -61,7 +61,7 @@ func TestAddTools(t *testing.T) {
 	toolsResult, err := cs.ListTools(ctx, &mcp.ListToolsParams{})
 
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 15, "incorrect number of tools registered")
+	assert.Len(t, toolsResult.Tools, 16, "incorrect number of tools registered")
 	// assert that all tools have the correct toolset annotation
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
