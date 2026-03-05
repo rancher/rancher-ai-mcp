@@ -28,7 +28,7 @@ type jsonPatch struct {
 // It includes fields required to uniquely identify a resource within a cluster.
 type updateKubernetesResourceParams struct {
 	Name      string      `json:"name" jsonschema:"the name of k8s resource"`
-	Namespace string      `json:"namespace" jsonschema:"the namespace of the resource"`
+	Namespace string      `json:"namespace,omitempty" jsonschema:"the namespace of the resource"`
 	Kind      string      `json:"kind" jsonschema:"the kind of the resource"`
 	Cluster   string      `json:"cluster" jsonschema:"the cluster of the resource"`
 	Patch     []jsonPatch `json:"patch" jsonschema:"the patch of the request"`

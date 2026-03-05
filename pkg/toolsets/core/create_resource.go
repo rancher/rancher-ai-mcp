@@ -22,7 +22,7 @@ const (
 // createKubernetesResourceParams defines the structure for creating a general Kubernetes resource.
 type createKubernetesResourceParams struct {
 	Name      string `json:"name" jsonschema:"the name of k8s resource"`
-	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
+	Namespace string `json:"namespace,omitempty" jsonschema:"the namespace of the resource"`
 	Kind      string `json:"kind" jsonschema:"the kind of the resource"`
 	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
 	Resource  any    `json:"resource" jsonschema:"the resource to be created"`
