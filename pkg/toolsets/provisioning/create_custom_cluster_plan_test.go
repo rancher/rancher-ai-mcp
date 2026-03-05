@@ -112,6 +112,19 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 			k3sKdmOutput:    createDummyKDMData("v1.32.4+k3s1", "v1.32.3+k3s1"),
 		},
 		{
+			name:          "valid k3s cluster with uppercase CNI",
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
+			params: createCustomClusterParams{
+				ClusterName:       "test",
+				Distribution:      "k3s",
+				CNI:               "Calico",
+				KubernetesVersion: "v1.32.4+k3s1",
+			},
+			finalK8sVersion: "v1.32.4+k3s1",
+			k3sKdmOutput:    createDummyKDMData("v1.32.4+k3s1", "v1.32.3+k3s1"),
+		},
+		{
 			name:          "valid k3s cluster using latest release",
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),

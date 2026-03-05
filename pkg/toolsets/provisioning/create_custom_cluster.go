@@ -78,7 +78,7 @@ func (t *Tools) CreateCustomClusterObj(toolReq *mcp.CallToolRequest, params crea
 		return nil, fmt.Errorf("invalid value for Distribution: %s. Valid values are 'rke2' and 'k3s'", params.Distribution)
 	}
 
-	allCNIs, cniSupported := supportedCNI(params.CNI)
+	allCNIs, cniSupported := supportedCNI(strings.ToLower(params.CNI))
 	if !cniSupported {
 		log.Debug("invalid CNI")
 		return nil, fmt.Errorf("unsupported CNI \"%s\". Valid values are \"%v\"", params.CNI, strings.Join(allCNIs, "\", \""))
