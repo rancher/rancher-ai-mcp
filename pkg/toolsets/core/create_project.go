@@ -25,7 +25,7 @@ type createProjectParams struct {
 }
 
 func (t *Tools) createProject(ctx context.Context, toolReq *mcp.CallToolRequest, params createProjectParams) (*mcp.CallToolResult, any, error) {
-	zap.L().Info("createProject called", zap.String("cluster", params.Cluster))
+	zap.L().Debug("createProject called", zap.String("cluster", params.Cluster))
 
 	resourceInterface, err := t.client.GetResourceInterface(
 		ctx, middleware.Token(ctx), t.rancherURL(toolReq),
@@ -101,7 +101,6 @@ func (t *Tools) createProjectObj(params createProjectParams) (*unstructured.Unst
 	if err := unstructured.SetNestedField(project.Object, containerResourceQuotas, "spec", "containerDefaultResourceLimit"); err != nil {
 		return nil, fmt.Errorf("failed to set project container resource quotas: %w", err)
 	}
-	zap.L().Info("project object created successfully", zap.Any("projectObject", project))
 
 	return project, nil
 }

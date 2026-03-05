@@ -14,7 +14,7 @@ import (
 // createKubernetesResourcePlan plans the creation of a new Kubernetes resource.
 // It returns the JSON representation of the resource to be created without actually creating it.
 func (t *Tools) createKubernetesResourcePlan(_ context.Context, _ *mcp.CallToolRequest, params createKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
-	zap.L().Info("createKubernetesResource_plan called")
+	zap.L().Debug("createKubernetesResource_plan called")
 
 	objBytes, err := json.Marshal(params.Resource)
 	if err != nil {

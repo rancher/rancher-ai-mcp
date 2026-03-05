@@ -12,7 +12,7 @@ import (
 // createProjectPlan plans the creation of a new project.
 // It returns the JSON representation of the project to be created without actually creating it.
 func (t *Tools) createProjectPlan(_ context.Context, _ *mcp.CallToolRequest, params createProjectParams) (*mcp.CallToolResult, any, error) {
-	zap.L().Info("createProject_plan called", zap.String("cluster", params.Cluster))
+	zap.L().Debug("createProject_plan called", zap.String("cluster", params.Cluster))
 
 	project, err := t.createProjectObj(params)
 	if err != nil {
