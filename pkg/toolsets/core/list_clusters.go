@@ -13,11 +13,8 @@ import (
 
 var zapListClusters = zap.String("tool", "listClusters")
 
-type listClustersParams struct {
-}
-
 // listClusters retrieves a list of clusters in the management cluster.
-func (t *Tools) listClusters(ctx context.Context, toolReq *mcp.CallToolRequest, params listClustersParams) (*mcp.CallToolResult, any, error) {
+func (t *Tools) listClusters(ctx context.Context, toolReq *mcp.CallToolRequest, params struct{}) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("listClusters called")
 
 	resources, err := t.client.GetResources(ctx, client.ListParams{

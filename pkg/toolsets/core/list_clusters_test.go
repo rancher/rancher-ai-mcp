@@ -62,7 +62,7 @@ func TestListClusters(t *testing.T) {
 
 		result, _, err := tools.listClusters(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
 			Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-		}, listClustersParams{})
+		}, struct{}{})
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)
