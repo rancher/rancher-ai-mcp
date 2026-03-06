@@ -221,6 +221,12 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
+		// InputSchema explicitly includes "properties" to satisfy OpenAI's requirement
+		// that object schemas must have a "properties" field, even when there are no parameters.
+		InputSchema: map[string]any{
+			"type":       "object",
+			"properties": map[string]any{},
+		},
 		Description: `Returns a list of all Rancher clusters, including local and downstream clusters.
 		Parameters:
 		None`},
