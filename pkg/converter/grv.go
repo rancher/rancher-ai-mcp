@@ -88,6 +88,9 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 	// --- Policy Resources (Group: "policy") ---
 	"poddisruptionbudget": {Group: "policy", Version: "v1", Resource: "poddisruptionbudgets"},
 
+	// --- Scheduling Resources (Group: "scheduling.k8s.io") ---
+	"priorityclass": {Group: "scheduling.k8s.io", Version: "v1", Resource: "priorityclasses"},
+
 	// --- METRICS Resources (Group: "metrics.k8s.io") ---
 	"node.metrics.k8s.io": {Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"},
 	"pod.metrics.k8s.io":  {Group: "metrics.k8s.io", Version: "v1beta1", Resource: "pods"},
