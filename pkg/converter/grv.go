@@ -79,14 +79,33 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 	"storageclass":     {Group: "storage.k8s.io", Version: "v1", Resource: "storageclasses"},
 	"volumeattachment": {Group: "storage.k8s.io", Version: "v1", Resource: "volumeattachments"},
 
-	// --- Custom Resource Definitions (Group: "apiextensions.k8s.io") ---
-	"crd": {Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"},
+	// --- Node-Level Resources (Group: "node.k8s.io" / "storage.k8s.io") ---
+	"runtimeclass": {Group: "node.k8s.io", Version: "v1", Resource: "runtimeclasses"},
+	"csinode":      {Group: "storage.k8s.io", Version: "v1", Resource: "csinodes"},
+	"csidriver":    {Group: "storage.k8s.io", Version: "v1", Resource: "csidrivers"},
+
+	// --- Flow Control Resources (Group: "flowcontrol.apiserver.k8s.io") ---
+	"flowschema":                 {Group: "flowcontrol.apiserver.k8s.io", Version: "v1", Resource: "flowschemas"},
+	"prioritylevelconfiguration": {Group: "flowcontrol.apiserver.k8s.io", Version: "v1", Resource: "prioritylevelconfigurations"},
+
+	// --- Admission Control Resources (Group: "admissionregistration.k8s.io") ---
+	"validatingwebhookconfiguration":   {Group: "admissionregistration.k8s.io", Version: "v1", Resource: "validatingwebhookconfigurations"},
+	"mutatingwebhookconfiguration":     {Group: "admissionregistration.k8s.io", Version: "v1", Resource: "mutatingwebhookconfigurations"},
+	"validatingadmissionpolicy":        {Group: "admissionregistration.k8s.io", Version: "v1", Resource: "validatingadmissionpolicies"},
+	"validatingadmissionpolicybinding": {Group: "admissionregistration.k8s.io", Version: "v1", Resource: "validatingadmissionpolicybindings"},
+
+	// --- API Extension Resources (Group: "apiextensions.k8s.io") ---
+	"crd":                      {Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"},
+	"customresourcedefinition": {Group: "apiextensions.k8s.io", Version: "v1", Resource: "customresourcedefinitions"},
 
 	// --- Discovery/Endpoint Resources (Group: "discovery.k8s.io") ---
-	"endpointslices": {Group: "discovery.k8s.io", Version: "v1", Resource: "endpointslices"},
+	"endpointslice": {Group: "discovery.k8s.io", Version: "v1", Resource: "endpointslices"},
 
 	// --- Policy Resources (Group: "policy") ---
 	"poddisruptionbudget": {Group: "policy", Version: "v1", Resource: "poddisruptionbudgets"},
+
+	// --- Scheduling Resources (Group: "scheduling.k8s.io") ---
+	"priorityclass": {Group: "scheduling.k8s.io", Version: "v1", Resource: "priorityclasses"},
 
 	// --- METRICS Resources (Group: "metrics.k8s.io") ---
 	"node.metrics.k8s.io": {Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"},
