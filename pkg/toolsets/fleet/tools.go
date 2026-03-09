@@ -97,7 +97,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Analize Fleet resources and diagnose bundle deployment issues.
+		Description: `Analyze Fleet resources and diagnose bundle deployment issues.
 
 		This command collects diagnostic information about Fleet resources including GitRepos,
 		Bundles, BundleDeployments, and related resources. It outputs JSON containing only the
