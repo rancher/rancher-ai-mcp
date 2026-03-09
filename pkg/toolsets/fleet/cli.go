@@ -46,7 +46,7 @@ func newCLI() *cli {
 	}
 }
 
-func (c *cli) analyseFleetResources(ctx context.Context, restCfg *rest.Config, namespace string) (string, error) {
+func (c *cli) analyzeFleetResources(ctx context.Context, restCfg *rest.Config, namespace string) (string, error) {
 	k8sClient, err := c.newK8sClient(restCfg)
 	if err != nil {
 		return "", err

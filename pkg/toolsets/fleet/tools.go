@@ -20,15 +20,15 @@ type toolsClient interface {
 	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
 }
 
-type resourceAnalyser interface {
-	analiseFleetResources(ctx context.Context, restCfg *rest.Config, namespace string) (string, error)
+type resourceAnalyzer interface {
+	analyzeFleetResources(ctx context.Context, restCfg *rest.Config, namespace string) (string, error)
 }
 
 // Tools contains all tools for the MCP server
 type Tools struct {
 	client           toolsClient
 	RancherURL       string
-	resourceAnalyser resourceAnalyser
+	resourceAnalyzer resourceAnalyzer
 }
 
 // NewTools creates and returns a new Tools instance.
@@ -36,7 +36,7 @@ func NewTools(client toolsClient, rancherURL string) *Tools {
 	return &Tools{
 		client:           client,
 		RancherURL:       rancherURL,
-		resourceAnalyser: newCLI(),
+		resourceAnalyzer: newCLI(),
 	}
 }
 
@@ -93,7 +93,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		t.listGitRepos,
 	)
 	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "analyseFleetResources",
+		Name: "analyzeFleetResources",
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
@@ -112,6 +112,6 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		
 		Parameters:
 				workspace (string, required): The workspace of the fleet resources to analyze. `},
-		t.analyseFleetResources,
+		t.analyzeFleetResources,
 	)
 }

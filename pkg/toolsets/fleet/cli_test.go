@@ -32,7 +32,7 @@ func fakeK8sClientFactory(err error) k8sClientFactory {
 	}
 }
 
-func TestAnaliseFleetResources(t *testing.T) {
+func TestCLIAnalyzeFleetResources(t *testing.T) {
 	dummyRestCfg := &rest.Config{}
 
 	tests := map[string]struct {
@@ -111,7 +111,7 @@ func TestAnaliseFleetResources(t *testing.T) {
 				newK8sClient: tc.k8sFactory,
 			}
 
-			out, err := c.analiseFleetResources(context.Background(), dummyRestCfg, tc.expectedNS)
+			out, err := c.analyzeFleetResources(context.Background(), dummyRestCfg, tc.expectedNS)
 
 			if tc.expectedErr != "" {
 				require.Error(t, err)

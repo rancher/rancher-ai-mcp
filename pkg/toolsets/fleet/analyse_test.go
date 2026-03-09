@@ -13,39 +13,39 @@ import (
 	"k8s.io/client-go/rest"
 )
 
-// fakeResourceAnalyser is a test double for the resourceAnalyser interface.
-type fakeResourceAnalyser struct {
+// fakeResourceAnalyzer is a test double for the resourceAnalyzer interface.
+type fakeResourceAnalyzer struct {
 	report string
 	err    error
 }
 
-func (f *fakeResourceAnalyser) analiseFleetResources(_ context.Context, _ *rest.Config, _ string) (string, error) {
+func (f *fakeResourceAnalyzer) analyzeFleetResources(_ context.Context, _ *rest.Config, _ string) (string, error) {
 	return f.report, f.err
 }
 
-func TestAnalyseFleetResources(t *testing.T) {
+func TestAnalyzeFleetResources(t *testing.T) {
 	fakeURL := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
-		analyser       *fakeResourceAnalyser
+		analyzer       *fakeResourceAnalyzer
 		requestURL     string
 		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
 		"returns report on success using request URL": {
-			analyser:       &fakeResourceAnalyser{report: "fleet is healthy"},
+			analyzer:       &fakeResourceAnalyzer{report: "fleet is healthy"},
 			requestURL:     fakeURL,
 			expectedResult: "fleet is healthy",
 		},
 		"returns report on success using configured rancherURL": {
-			analyser:       &fakeResourceAnalyser{report: "2 bundles not ready"},
+			analyzer:       &fakeResourceAnalyzer{report: "2 bundles not ready"},
 			rancherURL:     fakeURL,
 			expectedResult: "2 bundles not ready",
 		},
-		"error from resourceAnalyser is propagated": {
-			analyser:      &fakeResourceAnalyser{err: errors.New("cluster unreachable")},
+		"error from resourceAnalyzer is propagated": {
+			analyzer:      &fakeResourceAnalyzer{err: errors.New("cluster unreachable")},
 			requestURL:    fakeURL,
 			expectedError: "cluster unreachable",
 		},
@@ -55,14 +55,14 @@ func TestAnalyseFleetResources(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tools := &Tools{
 				RancherURL:       tt.rancherURL,
-				resourceAnalyser: tt.analyser,
+				resourceAnalyzer: tt.analyzer,
 			}
 			req := test.NewCallToolRequest(tt.requestURL)
 
-			result, extra, err := tools.analyseFleetResources(
+			result, extra, err := tools.analyzeFleetResources(
 				middleware.WithToken(t.Context(), fakeToken),
 				req,
-				analyseFleetResourcesParams{},
+				analyzeFleetResourcesParams{},
 			)
 
 			if tt.expectedError != "" {
