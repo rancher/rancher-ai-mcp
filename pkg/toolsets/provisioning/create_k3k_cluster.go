@@ -43,9 +43,8 @@ type createK3kClusterParams struct {
 	Persistence   *PersistenceConfig `json:"persistence,omitempty" jsonschema:"persistence configuration for etcd"`
 }
 
-// createK3kCluster creates a new K3k cluster using structured input parameters.
-func (t *Tools) createK3kCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params createK3kClusterParams) (*mcp.CallToolResult, any, error) {
-	zap.L().Debug("createK3kCluster called")
+// createK3kClusterObj builds the unstructured K3k Cluster object from the given parameters.
+func (t *Tools) createK3kClusterObj(params createK3kClusterParams) *unstructured.Unstructured {
 	spec := map[string]interface{}{}
 
 	if params.Version != "" {
@@ -120,7 +119,7 @@ func (t *Tools) createK3kCluster(ctx context.Context, toolReq *mcp.CallToolReque
 		}
 	}
 
-	unstructuredObj := &unstructured.Unstructured{
+	return &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "k3k.io/v1beta1",
 			"kind":       "Cluster",
@@ -131,6 +130,13 @@ func (t *Tools) createK3kCluster(ctx context.Context, toolReq *mcp.CallToolReque
 			"spec": spec,
 		},
 	}
+}
+
+// createK3kCluster creates a new K3k cluster using structured input parameters.
+func (t *Tools) createK3kCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params createK3kClusterParams) (*mcp.CallToolResult, any, error) {
+	zap.L().Debug("createK3kCluster called")
+
+	unstructuredObj := t.createK3kClusterObj(params)
 
 	resourceInterface, err := t.client.GetResourceInterface(ctx, middleware.Token(ctx), toolReq.Extra.Header.Get(urlHeader), params.Namespace, params.TargetCluster, converter.K8sKindsToGVRs["k3kcluster"])
 	if err != nil {
