@@ -6,8 +6,7 @@ import (
 	"fmt"
 
 	fleetv1alpha1 "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
-	fleetcli "github.com/rancher/fleet/pkg/cli"
-	"github.com/spf13/cobra"
+	"github.com/rancher/fleet/pkg/troubleshooting"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -23,21 +22,18 @@ func (c *cli) analiseFleetResources(ctx context.Context, restCfg *rest.Config) (
 		return "", err
 	}
 
-	m := fleetcli.Monitor{
-		FleetClient: fleetcli.FleetClient{
-			Namespace: "fleet-default", //TODO check
-		},
+	col := &troubleshooting.Collector{
+		Namespace: "fleet-default", //TODO check
 	}
-	snapshot, err := m.CollectResources(ctx, k8sClient)
+	snapshot, err := col.CollectResources(ctx, k8sClient)
 	if err != nil {
 		zap.L().Error("failed to collect fleet resources", zap.Error(err))
 		return "", fmt.Errorf("failed to collect fleet resources: %w", err)
 	}
-	a := fleetcli.Analyze{}
-	cmd := &cobra.Command{}
 	var buf bytes.Buffer
-	cmd.SetOut(&buf)
-	a.OutputIssues(cmd, []*fleetcli.Snapshot{snapshot})
+	if err := troubleshooting.OutputIssues(&buf, []*troubleshooting.Snapshot{snapshot}); err != nil {
+		return "", fmt.Errorf("failed to output fleet issues: %w", err)
+	}
 
 	return buf.String(), nil
 }
