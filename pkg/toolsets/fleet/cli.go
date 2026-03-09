@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 
 	fleetv1alpha1 "github.com/rancher/fleet/pkg/apis/fleet.cattle.io/v1alpha1"
 	"github.com/rancher/fleet/pkg/troubleshooting"
@@ -14,24 +15,46 @@ import (
 	k8sclient "sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-type cli struct{}
+// resourceCollector abstracts troubleshooting.Collector to allow testing without a real cluster.
+type resourceCollector interface {
+	CollectResources(ctx context.Context, c k8sclient.Client) (*troubleshooting.Snapshot, error)
+}
+
+// issueOutputter is a function that writes Fleet issues from one or more snapshots to a writer.
+type issueOutputter func(w io.Writer, snapshots []*troubleshooting.Snapshot) error
+
+// k8sClientFactory builds a controller-runtime client from a REST config.
+type k8sClientFactory func(restCfg *rest.Config) (k8sclient.Client, error)
+
+type cli struct {
+	collector    resourceCollector
+	outputIssues issueOutputter
+	newK8sClient k8sClientFactory
+}
+
+// newCLI returns a cli wired to the real Fleet troubleshooting implementation.
+func newCLI() *cli {
+	return &cli{
+		collector:    &troubleshooting.Collector{Namespace: "fleet-default"},
+		outputIssues: troubleshooting.OutputIssues,
+		newK8sClient: newFleetK8sClient,
+	}
+}
 
 func (c *cli) analiseFleetResources(ctx context.Context, restCfg *rest.Config) (string, error) {
-	k8sClient, err := newFleetK8sClient(restCfg)
+	k8sClient, err := c.newK8sClient(restCfg)
 	if err != nil {
 		return "", err
 	}
 
-	col := &troubleshooting.Collector{
-		Namespace: "fleet-default", //TODO check
-	}
-	snapshot, err := col.CollectResources(ctx, k8sClient)
+	snapshot, err := c.collector.CollectResources(ctx, k8sClient)
 	if err != nil {
 		zap.L().Error("failed to collect fleet resources", zap.Error(err))
 		return "", fmt.Errorf("failed to collect fleet resources: %w", err)
 	}
+
 	var buf bytes.Buffer
-	if err := troubleshooting.OutputIssues(&buf, []*troubleshooting.Snapshot{snapshot}); err != nil {
+	if err := c.outputIssues(&buf, []*troubleshooting.Snapshot{snapshot}); err != nil {
 		return "", fmt.Errorf("failed to output fleet issues: %w", err)
 	}
 

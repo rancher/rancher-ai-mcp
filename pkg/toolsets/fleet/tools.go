@@ -36,7 +36,7 @@ func NewTools(client toolsClient, rancherURL string) *Tools {
 	return &Tools{
 		client:           client,
 		RancherURL:       rancherURL,
-		resourceAnalyser: &cli{},
+		resourceAnalyser: newCLI(),
 	}
 }
 
