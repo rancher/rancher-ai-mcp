@@ -163,6 +163,28 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		t.createK3kCluster)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "createK3kClusterPlan",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Plans to create a new K3k cluster in a specific downstream cluster. It returns the JSON representation of the resource to be created without actually creating it. Only used for displaying the resource when using human validation.
+
+		Parameters:
+		name (string): The name of the K3k cluster.
+		namespace (string): The namespace where the K3k cluster will be created.
+		targetCluster (string): The downstream cluster where the K3k resource will be applied.
+		version (string): Optional. The k3s/k8s version for the cluster (e.g., 'v1.33.1-k3s1'). Defaults to 'host cluster version'.
+		mode (string): Optional. Cluster mode (e.g., 'shared' or 'virtual'). Defaults to 'shared'.
+		servers (int): Optional. Number of server (control plane) nodes. Defaults to 1.
+		agents (int): Optional. Number of agent (worker) nodes. Defaults to 0.
+		sync (object): Optional. shared mode only. Resource synchronization options with boolean flags for 'priorityClasses' and 'ingresses'.
+		serverLimit (object): Optional. Resource constraints for server nodes (contains 'cpu' and 'memory' strings).
+		workerLimit (object): Optional. Resource constraints for worker nodes (contains 'cpu' and 'memory' strings).
+		persistence (object): Optional. Storage settings for etcd data (contains 'type' ('dynamic' or 'ephemeral'), 'storageClassName', 'storageRequest' strings).
+		`},
+		t.createK3kClusterPlan)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "createImportedCluster",
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
