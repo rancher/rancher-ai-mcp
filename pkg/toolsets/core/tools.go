@@ -275,9 +275,28 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		name (string): The name of the project to be created.
 		description (string, optional): An optional description for the project.
 		displayName (string, optional): An optional display name for the project.
-		cpuLimit (string, optional): The maximum amount of CPU resources (in mCPUs) that can be used by containers in the project.
-		cpuReservation (string, optional): The amount of CPU resources (in mCPUs) reserved for containers in the project.
-		memoryLimit (string, optional): The maximum amount of memory resources (in MiB) that can be used by containers in the project.
-		memoryReservation (string, optional): The amount of memory resources (in MiB) reserved for containers in the project.`},
+		containerResourceQuota (object, optional): An optional object specifying resource quotas for containers in the project. The JSON object can include the following fields:
+			cpuLimit (string, optional): The maximum amount of CPU resources (in mCPUs) that can be used by containers in the project.
+			cpuReservation (string, optional): The amount of CPU resources (in mCPUs) reserved for containers in the project.
+			memoryLimit (string, optional): The maximum amount of memory resources (in MiB) that can be used by containers in the project.
+			memoryReservation (string, optional): The amount of memory resources (in MiB) reserved for containers in the project.
+		resourceQuota (object, optional): An optional object specifying resource quotas for the project.
+		namespaceDefaultResourceQuota (object, optional): An optional object specifying default resource quotas for namespaces in the project.
+			Parameters for resourceQuota and namespaceDefaultResourceQuota JSON objects:
+				pods (int, optional): The maximum number of pods that can be created in the project or in each namespace within the project.
+				services (int, optional): The maximum number of services that can be created in the project or in each namespace within the project.
+				replicationControllers (int, optional): The maximum number of replication controllers that can be created in the project or in each namespace within the project.
+				secrets (int, optional): The maximum number of secrets that can be created in the project or in each namespace within the project.
+				configMaps (int, optional): The maximum number of config maps that can be created in the project or in each namespace within the project.
+				persistentVolumeClaims (int, optional): The maximum number of persistent volume claims that can be created in the project or in each namespace within the project.
+				servicesNodePorts (int, optional): The maximum number of service node ports that can be created in the project or in each namespace within the project.
+				servicesLoadBalancers (int, optional): The maximum number of service load balancers that can be created in the project or in each namespace within the project.
+				requestsCpu (int, optional): The amount of CPU resources (in mCPUs) that is requested by default for each namespace within the project.
+				requestsMemory (int, optional): The amount of memory resources (in MiB) that is requested by default for each namespace within the project.
+				requestsStorage (int, optional): The amount of storage resources (in MiB) that is requested by default for each namespace within the project.
+				limitsCPU (int, optional): The maximum amount of CPU resources (in mCPUs) that can be used by the project or by each namespace within the project.
+				limitsMemory (int, optional): The maximum amount of memory resources (in MiB) that can be used by the project or by each namespace within the project.
+				extended (object, optional): An optional field that can be used to specify any additional resource quotas in the format required by the Rancher API. This field is useful for specifying quotas that are not covered by the other fields, such as quotas for custom resources or for specific Kubernetes features. The value of this field should be a JSON object that represents the additional quotas to be applied to the project or namespaces within the project. The key should be the name of the quota field and the value should be the quota limit in the appropriate unit.`,
+	},
 		t.createProjectPlan)
 }
