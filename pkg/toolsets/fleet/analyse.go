@@ -24,7 +24,7 @@ func (t *Tools) analyseFleetResources(ctx context.Context, toolReq *mcp.CallTool
 		return nil, nil, fmt.Errorf("failed to create rest config: %w", err)
 	}
 
-	report, err := t.resourceAnalyser.analiseFleetResources(ctx, restCfg, params.Workspace)
+	report, err := t.resourceAnalyser.analyseFleetResources(ctx, restCfg, params.Workspace)
 	if err != nil {
 		zap.L().Error("failed to analyse fleet resources", zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to analyse fleet resources: %w", err)
