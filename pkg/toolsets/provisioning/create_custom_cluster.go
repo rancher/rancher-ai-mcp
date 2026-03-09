@@ -17,7 +17,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	provisioningV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
-	"github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
+	v1 "github.com/rancher/rancher/pkg/apis/rke.cattle.io/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
@@ -111,7 +111,7 @@ func (t *Tools) CreateCustomClusterObj(toolReq *mcp.CallToolRequest, params crea
 		Spec: provisioningV1.ClusterSpec{
 			KubernetesVersion: fullVersion,
 			RKEConfig: &provisioningV1.RKEConfig{
-				RKEClusterSpecCommon: v1.RKEClusterSpecCommon{
+				ClusterConfiguration: v1.ClusterConfiguration{
 					ETCD: &v1.ETCD{
 						SnapshotRetention:    5,
 						SnapshotScheduleCron: "0 */5 * * *",
