@@ -248,9 +248,6 @@ func createCustomClusterOutput(params createCustomClusterParams, finalK8sVersion
             "force" : false,
             "gracePeriod" : -1,
             "ignoreDaemonSets" : true,
-            "ignoreErrors" : false,
-            "postDrainHooks" : null,
-            "preDrainHooks" : null,
             "skipWaitForDeleteTimeoutSeconds" : 0,
             "timeout" : 120
           },
@@ -262,9 +259,6 @@ func createCustomClusterOutput(params createCustomClusterParams, finalK8sVersion
             "force" : false,
             "gracePeriod" : -1,
             "ignoreDaemonSets" : true,
-            "ignoreErrors" : false,
-            "postDrainHooks" : null,
-            "preDrainHooks" : null,
             "skipWaitForDeleteTimeoutSeconds" : 0,
             "timeout" : 120
           }
