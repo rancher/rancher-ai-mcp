@@ -19,7 +19,7 @@ type fakeResourceAnalyser struct {
 	err    error
 }
 
-func (f *fakeResourceAnalyser) analiseFleetResources(_ context.Context, _ *rest.Config) (string, error) {
+func (f *fakeResourceAnalyser) analiseFleetResources(_ context.Context, _ *rest.Config, _ string) (string, error) {
 	return f.report, f.err
 }
 
@@ -62,7 +62,7 @@ func TestAnalyseFleetResources(t *testing.T) {
 			result, extra, err := tools.analyseFleetResources(
 				middleware.WithToken(t.Context(), fakeToken),
 				req,
-				struct{}{},
+				analyseFleetResourcesParams{},
 			)
 
 			if tt.expectedError != "" {

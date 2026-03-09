@@ -10,7 +10,11 @@ import (
 	"go.uber.org/zap"
 )
 
-func (t *Tools) analyseFleetResources(ctx context.Context, toolReq *mcp.CallToolRequest, params struct{}) (*mcp.CallToolResult, any, error) {
+type analyseFleetResourcesParams struct {
+	Workspace string `json:"workspace"`
+}
+
+func (t *Tools) analyseFleetResources(ctx context.Context, toolReq *mcp.CallToolRequest, params analyseFleetResourcesParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("analyseFleetResources called")
 
 	c := client.Client{}
@@ -20,7 +24,7 @@ func (t *Tools) analyseFleetResources(ctx context.Context, toolReq *mcp.CallTool
 		return nil, nil, fmt.Errorf("failed to create rest config: %w", err)
 	}
 
-	report, err := t.resourceAnalyser.analiseFleetResources(ctx, restCfg)
+	report, err := t.resourceAnalyser.analiseFleetResources(ctx, restCfg, params.Workspace)
 	if err != nil {
 		zap.L().Error("failed to analyse fleet resources", zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to analyse fleet resources: %w", err)

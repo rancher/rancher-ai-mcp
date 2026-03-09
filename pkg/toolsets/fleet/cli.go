@@ -26,8 +26,11 @@ type issueOutputter func(w io.Writer, snapshots []*troubleshooting.Snapshot) err
 // k8sClientFactory builds a controller-runtime client from a REST config.
 type k8sClientFactory func(restCfg *rest.Config) (k8sclient.Client, error)
 
+// collectorFactory creates a resourceCollector scoped to the given namespace.
+type collectorFactory func(namespace string) resourceCollector
+
 type cli struct {
-	collector    resourceCollector
+	newCollector collectorFactory
 	outputIssues issueOutputter
 	newK8sClient k8sClientFactory
 }
@@ -35,19 +38,21 @@ type cli struct {
 // newCLI returns a cli wired to the real Fleet troubleshooting implementation.
 func newCLI() *cli {
 	return &cli{
-		collector:    &troubleshooting.Collector{Namespace: "fleet-default"},
+		newCollector: func(namespace string) resourceCollector {
+			return &troubleshooting.Collector{Namespace: namespace}
+		},
 		outputIssues: troubleshooting.OutputIssues,
 		newK8sClient: newFleetK8sClient,
 	}
 }
 
-func (c *cli) analiseFleetResources(ctx context.Context, restCfg *rest.Config) (string, error) {
+func (c *cli) analiseFleetResources(ctx context.Context, restCfg *rest.Config, namespace string) (string, error) {
 	k8sClient, err := c.newK8sClient(restCfg)
 	if err != nil {
 		return "", err
 	}
 
-	snapshot, err := c.collector.CollectResources(ctx, k8sClient)
+	snapshot, err := c.newCollector(namespace).CollectResources(ctx, k8sClient)
 	if err != nil {
 		zap.L().Error("failed to collect fleet resources", zap.Error(err))
 		return "", fmt.Errorf("failed to collect fleet resources: %w", err)

@@ -21,7 +21,7 @@ type toolsClient interface {
 }
 
 type resourceAnalyser interface {
-	analiseFleetResources(ctx context.Context, restCfg *rest.Config) (string, error)
+	analiseFleetResources(ctx context.Context, restCfg *rest.Config, namespace string) (string, error)
 }
 
 // Tools contains all tools for the MCP server
@@ -99,16 +99,19 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		},
 		Description: `Analize Fleet resources and diagnose bundle deployment issues.
 
-This command collects diagnostic information about Fleet resources including GitRepos,
-Bundles, BundleDeployments, and related resources. It outputs JSON containing only the
-fields relevant for troubleshooting, making it easy to identify issues like:
+		This command collects diagnostic information about Fleet resources including GitRepos,
+		Bundles, BundleDeployments, and related resources. It outputs JSON containing only the
+		fields relevant for troubleshooting, making it easy to identify issues like:
 
-  • Bundles stuck with old commits or forceSyncGeneration
-  • BundleDeployments not applying their target deploymentID
-  • Orphaned secrets with invalid owner references
-  • Resources stuck with deletion timestamps due to finalizers
-  • API server consistency issues (time travel)
-  • Missing or problematic Content resources`},
+		• Bundles stuck with old commits or forceSyncGeneration
+		• BundleDeployments not applying their target deploymentID
+		• Orphaned secrets with invalid owner references
+		• Resources stuck with deletion timestamps due to finalizers
+		• API server consistency issues (time travel)
+		• Missing or problematic Content resources
+		
+		Parameters:
+				workspace (string, required): The workspace of the fleet resources to analyze. `},
 		t.analyseFleetResources,
 	)
 }
