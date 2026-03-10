@@ -365,3 +365,43 @@ func TestCreateMcpResponseAny(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateMcpResponseWithAdditionalText(t *testing.T) {
+	tests := map[string]struct {
+		objs           []*unstructured.Unstructured
+		cluster        string
+		additionalText string
+		expected       string
+	}{
+		"single pod with note": {
+			objs: []*unstructured.Unstructured{
+				{
+					Object: map[string]any{
+						"apiVersion": "v1",
+						"kind":       "Pod",
+						"metadata": map[string]any{
+							"name":      "test-pod",
+							"namespace": "default",
+						},
+					},
+				},
+			},
+			cluster:        "local",
+			additionalText: "Results were limited to 1 items.",
+			expected:       `{"llm":{"resources":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test-pod","namespace":"default"}}],"note":"Results were limited to 1 items."},"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"test-pod","type":"pod"}]}`,
+		},
+		"no resources with note": {
+			objs:           nil,
+			cluster:        "local",
+			additionalText: "some note",
+			expected:       `{"llm":{"resources":"no resources found","note":"some note"}}`,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			resp, err := CreateMcpResponseWithAdditionalText(tt.objs, tt.cluster, tt.additionalText)
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.expected, resp)
+		})
+	}
+}

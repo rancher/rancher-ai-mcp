@@ -101,6 +101,33 @@ func CreateMcpResponseAny(data any, uiContext ...UIContext) (string, error) {
 	return string(bytes), nil
 }
 
+// CreateMcpResponseWithAdditionalText constructs an MCPResponse that wraps the resource list
+// inside an object together with an additional text note. The resulting JSON has the form:
+// {"llm": {"resources": [...], "note": "..."}, "uiContext": [...]}.
+func CreateMcpResponseWithAdditionalText(objs []*unstructured.Unstructured, cluster, additionalText string) (string, error) {
+	baseResponse, err := CreateMcpResponse(objs, cluster)
+	if err != nil {
+		return "", err
+	}
+
+	var resp map[string]any
+	if err := json.Unmarshal([]byte(baseResponse), &resp); err != nil {
+		return "", fmt.Errorf("failed to unmarshal base response: %w", err)
+	}
+
+	resp["llm"] = map[string]any{
+		"resources": resp["llm"],
+		"note":      additionalText,
+	}
+
+	bytes, err := json.Marshal(resp)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal response with additional text: %w", err)
+	}
+
+	return string(bytes), nil
+}
+
 // OperationType represents the type of operation in a plan
 type OperationType string
 
