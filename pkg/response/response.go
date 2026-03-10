@@ -31,9 +31,9 @@ type MCPResponse struct {
 	UIContext []UIContext `json:"uiContext,omitempty"`
 }
 
-// CreateMcpResponse constructs an MCPResponse object. It takes a slice of unstructured Kubernetes objects, namespace, kind, cluster,
-// and optional additional information strings. It marshals the response into a JSON string.
-func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (string, error) {
+// CreateMcpResponse constructs an MCPResponse object. It takes a slice of unstructured Kubernetes objects, cluster,
+// and optional notes. When notes are provided, the LLM field is wrapped as {"resources": ..., "note": "..."}.
+func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes ...string) (string, error) {
 	var uiContext []UIContext
 	for _, obj := range objs {
 		unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
@@ -82,6 +82,13 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (strin
 		data = objs
 	}
 
+	if note := strings.Join(notes, "\n"); note != "" {
+		data = map[string]any{
+			"resources": data,
+			"note":      note,
+		}
+	}
+
 	return CreateMcpResponseAny(data, uiContext...)
 }
 
@@ -96,33 +103,6 @@ func CreateMcpResponseAny(data any, uiContext ...UIContext) (string, error) {
 	bytes, err := json.Marshal(resp)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal response: %w", err)
-	}
-
-	return string(bytes), nil
-}
-
-// CreateMcpResponseWithAdditionalText constructs an MCPResponse that wraps the resource list
-// inside an object together with an additional text note. The resulting JSON has the form:
-// {"llm": {"resources": [...], "note": "..."}, "uiContext": [...]}.
-func CreateMcpResponseWithAdditionalText(objs []*unstructured.Unstructured, cluster, additionalText string) (string, error) {
-	baseResponse, err := CreateMcpResponse(objs, cluster)
-	if err != nil {
-		return "", err
-	}
-
-	var resp map[string]any
-	if err := json.Unmarshal([]byte(baseResponse), &resp); err != nil {
-		return "", fmt.Errorf("failed to unmarshal base response: %w", err)
-	}
-
-	resp["llm"] = map[string]any{
-		"resources": resp["llm"],
-		"note":      additionalText,
-	}
-
-	bytes, err := json.Marshal(resp)
-	if err != nil {
-		return "", fmt.Errorf("failed to marshal response with additional text: %w", err)
 	}
 
 	return string(bytes), nil

@@ -54,7 +54,7 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 	if truncated {
 		note := fmt.Sprintf("Results were limited to %d items out of %d total. There may be more resources matching the query. "+
 			"Use a namespace or label selector to narrow results, or increase the limit.", limit, total)
-		mcpResponse, err = response.CreateMcpResponseWithAdditionalText(resources, params.Cluster, note)
+		mcpResponse, err = response.CreateMcpResponse(resources, params.Cluster, note)
 	} else {
 		mcpResponse, err = response.CreateMcpResponse(resources, params.Cluster)
 	}
