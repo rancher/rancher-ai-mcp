@@ -31,9 +31,9 @@ type MCPResponse struct {
 	UIContext []UIContext `json:"uiContext,omitempty"`
 }
 
-// CreateMcpResponse constructs an MCPResponse object. It takes a slice of unstructured Kubernetes objects, namespace, kind, cluster,
-// and optional additional information strings. It marshals the response into a JSON string.
-func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (string, error) {
+// CreateMcpResponse constructs an MCPResponse object. It takes a slice of unstructured Kubernetes objects, cluster,
+// and optional notes. When notes are provided, the LLM field is wrapped as {"resources": ..., "note": "..."}.
+func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes ...string) (string, error) {
 	var uiContext []UIContext
 	for _, obj := range objs {
 		unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
@@ -80,6 +80,13 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string) (strin
 	var data any = "no resources found"
 	if len(objs) > 0 {
 		data = objs
+	}
+
+	if note := strings.Join(notes, "\n"); note != "" {
+		data = map[string]any{
+			"resources": data,
+			"note":      note,
+		}
 	}
 
 	return CreateMcpResponseAny(data, uiContext...)

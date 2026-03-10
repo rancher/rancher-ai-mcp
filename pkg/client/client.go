@@ -47,6 +47,7 @@ type ListParams struct {
 	URL           string // The base URL of the Rancher server.
 	Token         string // The authentication Token for Steve.
 	LabelSelector string // Optional LabelSelector string for the request.
+	Limit         int64  // Optional maximum number of resources to return. 0 means no limit.
 }
 
 // NewClient creates and returns a new instance of the Client struct.
@@ -185,6 +186,9 @@ func (c *Client) GetResources(ctx context.Context, params ListParams) ([]*unstru
 	if params.LabelSelector != "" {
 		opts.LabelSelector = params.LabelSelector
 	}
+	if params.Limit > 0 {
+		opts.Limit = params.Limit
+	}
 	list, err := resourceInterface.List(ctx, opts)
 	if err != nil {
 		return nil, err
@@ -225,6 +229,9 @@ func (c *Client) GetResourcesAtAnyAPIVersion(ctx context.Context, params ListPar
 		opts := metav1.ListOptions{}
 		if params.LabelSelector != "" {
 			opts.LabelSelector = params.LabelSelector
+		}
+		if params.Limit > 0 {
+			opts.Limit = params.Limit
 		}
 		list, err = resourceInterface.List(ctx, opts)
 		if err != nil {

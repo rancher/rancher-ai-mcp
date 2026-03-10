@@ -14,6 +14,7 @@ func TestCreateMCPResponse(t *testing.T) {
 		namespace      string
 		cluster        string
 		additionalInfo []string
+		notes          []string
 		expected       string
 		expectError    bool
 	}{
@@ -109,10 +110,39 @@ func TestCreateMCPResponse(t *testing.T) {
 			additionalInfo: []string{},
 			expected:       `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test-pod-1","namespace":"default"}},{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test-pod-2","namespace":"default"}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"test-pod-1","type":"pod"},{"namespace":"default","kind":"Pod","cluster":"local","name":"test-pod-2","type":"pod"}]}`,
 		},
+		"single pod with note": {
+			objs: []*unstructured.Unstructured{
+				{
+					Object: map[string]any{
+						"apiVersion": "v1",
+						"kind":       "Pod",
+						"metadata": map[string]any{
+							"name":      "test-pod",
+							"namespace": "default",
+						},
+					},
+				},
+			},
+			cluster:  "local",
+			notes:    []string{"Results were limited to 1 items."},
+			expected: `{"llm":{"resources":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test-pod","namespace":"default"}}],"note":"Results were limited to 1 items."},"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"test-pod","type":"pod"}]}`,
+		},
+		"no resources with note": {
+			objs:     nil,
+			cluster:  "local",
+			notes:    []string{"some note"},
+			expected: `{"llm":{"resources":"no resources found","note":"some note"}}`,
+		},
+		"multiple notes joined": {
+			objs:     nil,
+			cluster:  "local",
+			notes:    []string{"first note", "second note"},
+			expected: `{"llm":{"resources":"no resources found","note":"first note\nsecond note"}}`,
+		},
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			resp, err := CreateMcpResponse(test.objs, test.cluster)
+			resp, err := CreateMcpResponse(test.objs, test.cluster, test.notes...)
 			if test.expectError {
 				assert.Error(t, err)
 			} else {

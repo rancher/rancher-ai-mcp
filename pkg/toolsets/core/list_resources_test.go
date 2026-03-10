@@ -147,6 +147,30 @@ func TestListKubernetesResources(t *testing.T) {
 			}),
 			expectedError: "no URL for rancher request",
 		},
+		"list pods - with explicit limit": {
+			params: listKubernetesResourcesParams{
+				Kind:      "pod",
+				Namespace: "default",
+				Cluster:   "local",
+				Limit:     1,
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
+				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
+			}, fakePod1, fakePod2),
+			requestURL: fakeUrl,
+			expectedResult: `{
+				"llm": {
+					"resources": [
+						{
+							"metadata": {"name": "pod-1", "namespace": "default"},
+							"spec": {"containers": [{"image": "nginx:latest", "name": "nginx", "resources": {}}]},
+							"status": {"phase": "Running"}
+						}
+					],
+					"note": "Results were limited to 1 items out of 2 total. There may be more resources matching the query. Use a namespace or label selector to narrow results, or increase the limit."
+				}
+			}`,
+		},
 	}
 
 	for name, tt := range tests {
@@ -165,6 +189,7 @@ func TestListKubernetesResources(t *testing.T) {
 				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
 				require.NoError(t, err)
+				require.Len(t, result.Content, 1, "expected a single content entry with valid JSON")
 				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
 		})
