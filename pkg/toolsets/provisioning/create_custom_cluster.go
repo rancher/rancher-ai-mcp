@@ -22,11 +22,11 @@ import (
 )
 
 type createCustomClusterParams struct {
-	Name         string `json:"name" jsonschema:"The name of the provisioning cluster"`
-	Description  string `json:"description,omitempty" jsonschema:"Description of the provisioning cluster"`
-	CNI          string `json:"CNI" jsonschema:"The name of the CNI (Container Networking Interface) to use"`
-	Version      string `json:"version" jsonschema:"The Kubernetes version of the cluster"`
-	Distribution string `json:"distribution" jsonschema:"The distribution of the provisioning cluster (rke2 or k3s)"`
+	Name         string `json:"name" jsonschema:"the name of the cluster to be created"`
+	Description  string `json:"description,omitempty" jsonschema:"a short description added to the cluster"`
+	CNI          string `json:"CNI" jsonschema:"the CNI (Container Networking Interface) to use"`
+	Version      string `json:"version" jsonschema:"the rke2 or k3s version that will be used for the cluster"`
+	Distribution string `json:"distribution" jsonschema:"the distribution of the cluster, either rke2 or k3s"`
 }
 
 func (t *Tools) createCustomCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params createCustomClusterParams) (*mcp.CallToolResult, any, error) {

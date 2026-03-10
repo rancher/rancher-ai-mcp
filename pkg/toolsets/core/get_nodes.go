@@ -12,7 +12,7 @@ import (
 
 // getNodesParams specifies the parameters needed to retrieve node metrics.
 type getNodesParams struct {
-	Cluster string `json:"cluster" jsonschema:"the cluster of the resource"`
+	Cluster string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
 }
 
 // getNodes retrieves information and metrics for all nodes in a given cluster.

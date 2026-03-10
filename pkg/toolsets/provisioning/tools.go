@@ -53,13 +53,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Gets a cluster's complete configuration including provisioning and management clusters, the CAPI cluster, CAPI machines, and machine pool configs. 
-					  This should be used when a complete overview of the clusters current state and its configuration is required.'
-
-		Parameters:
-		cluster (string): The name of the Kubernetes cluster
-		namespace (string): The namespace where the resource is located. The default namespace will be used if not provided.
-		`},
+		Description: `Gets a cluster's complete configuration including provisioning and management clusters, the CAPI cluster, CAPI machines, and machine pool configs.
+This should be used when a complete overview of the clusters current state and its configuration is required.`},
 		t.analyzeCluster)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -68,12 +63,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			toolsSetAnn: toolsSet,
 		},
 		Description: `Gets all Machine related resources for a cluster including Machines, MachineSets, and MachineDeployments.
-					  This should be used when a summary or overview of just the existing machine resources is required.'
-
-		Parameters:
-		cluster (string): The name of the Kubernetes cluster
-		namespace (string): The namespace where the resource is located. The default namespace will be used if not provided.
-		`},
+This should be used when a summary or overview of just the existing machine resources is required.`},
 		t.analyzeClusterMachines)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -82,12 +72,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			toolsSetAnn: toolsSet,
 		},
 		Description: `Gets a specific machine and its parent MachineSet and MachineDeployment.
-   					  This should be used when detailed information about a specific machine is required.'
-
-		Parameters:
-		cluster (string): The name of the Kubernetes cluster
-		machineName (string): The name of the machine to get
-		`},
+This should be used when detailed information about a specific machine is required.`},
 		t.getClusterMachine)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -96,17 +81,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			toolsSetAnn: toolsSet,
 		},
 		Description: `Changes the size of an existing node pool for an rke2 or k3s cluster.
-   					  This should be used when the user wants to change the size of an existing node pool for an rke2 or k3s cluster.
-                      Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.'
-
-		Parameters:
-		cluster (string): The name of the Kubernetes cluster.
-	    namespace (string): The namespace where the resource is located. The default namespace will be used if not provided.
-		nodePoolName (string): The name of the node pool to scale.
-		desiredSize (int, optional): The desired size of the node pool. Overridden by amountToAdd and amountToSubtract if either are specified. If no specific size is provided, use zero.
-		amountToAdd (int, optional): The amount of nodes to add to the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToSubtract. If no specific amount is provided, use zero.
-		amountToSubtract (int, optional): The amount of nodes to remove from the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToAdd. If no specific amount is provided, use zero.
-		`},
+This should be used when the user wants to change the size of an existing node pool for an rke2 or k3s cluster.
+Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.`},
 		t.scaleClusterNodePool)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -114,18 +90,9 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Plans to change the size of an existing node pool for an rke2 or k3s cluster. It returns the JSON representation of the updated node pool resource without actually applying the change in the cluster. 
- 					  Only used for displaying the resource when using human validation. This should be used when the user wants to change the size of an existing node pool for an rke2 or k3s cluster.
-                      Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.'
-
-		Parameters:
-		cluster (string): The name of the Kubernetes cluster.
-	    namespace (string): The namespace where the resource is located. The default namespace will be used if not provided.
-		nodePoolName (string): The name of the node pool to scale.
-		desiredSize (int, optional): The desired size of the node pool. Overridden by amountToAdd and amountToSubtract if either are specified. If no specific size is provided, use zero.
-		amountToAdd (int, optional): The amount of nodes to add to the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToSubtract. If no specific amount is provided, use zero.
-		amountToSubtract (int, optional): The amount of nodes to remove from the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToAdd. If no specific amount is provided, use zero.
-		`},
+		Description: `Plans to change the size of an existing node pool for an rke2 or k3s cluster. It returns the JSON representation of the updated node pool resource without actually applying the change in the cluster.
+Only used for displaying the resource when using human validation. This should be used when the user wants to change the size of an existing node pool for an rke2 or k3s cluster.
+Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.`},
 		t.scaleClusterNodePoolPlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -133,11 +100,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `List K3k virtual clusters deployed across downstream clusters.
-
-		Parameters:
-		clusters (array of strings): List of clusters to get virtual clusters from. Empty for return virtual clusters for all clusters.
-		`},
+		Description: `List K3k virtual clusters deployed across downstream clusters.`},
 		t.getK3kClusters)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -145,21 +108,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Create a new K3k cluster in a specific downstream cluster.
-
-		Parameters:
-		name (string): The name of the K3k cluster.
-		namespace (string): The namespace where the K3k cluster will be created.
-		targetCluster (string): The downstream cluster where the K3k resource will be applied.
-		version (string): Optional. The k3s/k8s version for the cluster (e.g., 'v1.33.1-k3s1'). Defaults to 'host cluster version'.
-		mode (string): Optional. Cluster mode (e.g., 'shared' or 'virtual'). Defaults to 'shared'.
-		servers (int): Optional. Number of server (control plane) nodes. Defaults to 1.
-		agents (int): Optional. Number of agent (worker) nodes. Defaults to 0.
-		sync (object): Optional. shared mode only. Resource synchronization options with boolean flags for 'priorityClasses' and 'ingresses'.
-		serverLimit (object): Optional. Resource constraints for server nodes (contains 'cpu' and 'memory' strings).
-		workerLimit (object): Optional. Resource constraints for worker nodes (contains 'cpu' and 'memory' strings).
-		persistence (object): Optional. Storage settings for etcd data (contains 'type' ('dynamic' or 'ephemeral'), 'storageClassName', 'storageRequest' strings).
-		`},
+		Description: `Create a new K3k cluster in a specific downstream cluster.`},
 		t.createK3kCluster)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -167,21 +116,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Plans to create a new K3k cluster in a specific downstream cluster. It returns the JSON representation of the resource to be created without actually creating it. Only used for displaying the resource when using human validation.
-
-		Parameters:
-		name (string): The name of the K3k cluster.
-		namespace (string): The namespace where the K3k cluster will be created.
-		targetCluster (string): The downstream cluster where the K3k resource will be applied.
-		version (string): Optional. The k3s/k8s version for the cluster (e.g., 'v1.33.1-k3s1'). Defaults to 'host cluster version'.
-		mode (string): Optional. Cluster mode (e.g., 'shared' or 'virtual'). Defaults to 'shared'.
-		servers (int): Optional. Number of server (control plane) nodes. Defaults to 1.
-		agents (int): Optional. Number of agent (worker) nodes. Defaults to 0.
-		sync (object): Optional. shared mode only. Resource synchronization options with boolean flags for 'priorityClasses' and 'ingresses'.
-		serverLimit (object): Optional. Resource constraints for server nodes (contains 'cpu' and 'memory' strings).
-		workerLimit (object): Optional. Resource constraints for worker nodes (contains 'cpu' and 'memory' strings).
-		persistence (object): Optional. Storage settings for etcd data (contains 'type' ('dynamic' or 'ephemeral'), 'storageClassName', 'storageRequest' strings).
-		`},
+		Description: `Plans to create a new K3k cluster in a specific downstream cluster. It returns the JSON representation of the resource to be created without actually creating it. Only used for displaying the resource when using human validation.`},
 		t.createK3kClusterPlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -190,13 +125,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			toolsSetAnn: toolsSet,
 		},
 		Description: `Creates an imported cluster within Rancher.
-					  This should only be used when the user wants to create a new imported cluster. Do not use this tool when the user asks to create a new custom cluster.'
-	
-		Parameters:
-		name (string, required): The name of the cluster to be created.
-	    description (string, optional): A short description added to the cluster. Leave empty if not provided
-		versionManagementSetting (string, optional): Specifies the version management setting for the cluster. Potential values are 'system-default', 'true', and 'false'. If not specified, the global version management setting will be used.
-		`},
+This should only be used when the user wants to create a new imported cluster. Do not use this tool when the user asks to create a new custom cluster.`},
 		t.createImportedCluster)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -205,13 +134,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			toolsSetAnn: toolsSet,
 		},
 		Description: `Plans to create an imported cluster within Rancher. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.
-					  This should only be used when the user wants to create a new imported cluster. Do not use this tool when the user asks to create a new custom cluster.'
-	
-		Parameters:
-		name (string, required): The name of the cluster to be created.
-	    description (string, optional): A short description added to the cluster.
-		versionManagementSetting (string, optional): Specifies the version management setting for the cluster. Potential values are 'system-default', 'true', and 'false'. If not specified, the global version management setting will be used.
-		`},
+This should only be used when the user wants to create a new imported cluster. Do not use this tool when the user asks to create a new custom cluster.`},
 		t.createImportedClusterPlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -220,15 +143,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			toolsSetAnn: toolsSet,
 		},
 		Description: `Creates a custom cluster within Rancher.
-   					  This should only be used when the user wants to create a new custom cluster. Do not use this tool if a user asks to create an imported cluster.'
-
-		Parameters:
-		name (string, required): The name of the cluster to be created.
-	    description (string, optional): A short description added to the cluster.
-		version (string, required): The rke2 or k3s version that will be used for the cluster.
-		CNI (string, required): The CNI that will be used for the cluster.
-		distribution (string, required): The distribution of the cluster, either "rke2" or "k3s".
-		`},
+This should only be used when the user wants to create a new custom cluster. Do not use this tool if a user asks to create an imported cluster.`},
 		t.createCustomCluster)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -237,15 +152,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			toolsSetAnn: toolsSet,
 		},
 		Description: `Plans to create a custom cluster within Rancher. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.
-   					  This should only be used when the user wants to create a new custom cluster. Do not use this tool if a user asks to create an imported cluster.'
-
-		Parameters:
-		name (string, required): The name of the cluster to be created.
-	    description (string, optional): A short description added to the cluster.
-		version (string, required): The rke2 or k3s version that will be used for the cluster.
-		CNI (string, required): The CNI that will be used for the cluster.
-		distribution (string, required): The distribution of the cluster, either "rke2" or "k3s".
-		`},
+This should only be used when the user wants to create a new custom cluster. Do not use this tool if a user asks to create an imported cluster.`},
 		t.createCustomClusterPlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -254,10 +161,6 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			toolsSetAnn: toolsSet,
 		},
 		Description: `Returns the currently supported rke2 and k3s versions that can be provisioned.
-   					  This should only be used when information about the supported rke2 and k3s is needed. This is often required to support provisioning custom and imported clusters.'
-
-		Parameters:
-		distribution (string, required): The distribution of the cluster, either "rke2" or "k3s".
-		`},
+This should only be used when information about the supported rke2 and k3s is needed. This is often required to support provisioning custom and imported clusters.`},
 		t.listSupportedKubernetesVersions)
 }

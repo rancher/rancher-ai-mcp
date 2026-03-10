@@ -12,8 +12,8 @@ import (
 )
 
 type getClusterMachineParams struct {
-	Cluster     string `json:"cluster" jsonschema:"the name of the cluster the machines belong to"`
-	MachineName string `json:"machineName" jsonschema:"the name of the machine to retrieve"`
+	Cluster     string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
+	MachineName string `json:"machineName" jsonschema:"the name of the machine to get"`
 }
 
 // getClusterMachine returns the cluster API machine for a given provisioning cluster and machine name.

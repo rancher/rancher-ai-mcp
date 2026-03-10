@@ -56,13 +56,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Get a specific Fleet Bundle by name.
-		Parameters:
-		name (string, required): The name of the Bundle.
-		workspace (string, required): The workspace (namespace) of the Bundle.
-
-		Returns:
-		The Bundle resource matching the given name and workspace.`},
+		Description: `Get a specific Fleet Bundle by name and workspace.`},
 		t.getBundle,
 	)
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -70,13 +64,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Get a specific GitRepo by name.
-		Parameters:
-		name (string, required): The name of the GitRepo.
-		workspace (string, required): The workspace (namespace) of the GitRepo.
-
-		Returns:
-		The GitRepo resource matching the given name and workspace.`},
+		Description: `Get a specific GitRepo by name and workspace.`},
 		t.getGitRepo,
 	)
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -84,12 +72,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `List GitRepos.
-		Parameters:
-		workspace (string, required): The workspace of the GitRepos.
-		
-		Returns:
-		List of all GitRepos in the workspace.`},
+		Description: `List all GitRepos in a workspace.`},
 		t.listGitRepos,
 	)
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -99,19 +82,16 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		},
 		Description: `Analyze Fleet resources and diagnose bundle deployment issues.
 
-		This command collects diagnostic information about Fleet resources including GitRepos,
-		Bundles, BundleDeployments, and related resources. It outputs JSON containing only the
-		fields relevant for troubleshooting, making it easy to identify issues like:
+This command collects diagnostic information about Fleet resources including GitRepos,
+Bundles, BundleDeployments, and related resources. It outputs JSON containing only the
+fields relevant for troubleshooting, making it easy to identify issues like:
 
-		• Bundles stuck with old commits or forceSyncGeneration
-		• BundleDeployments not applying their target deploymentID
-		• Orphaned secrets with invalid owner references
-		• Resources stuck with deletion timestamps due to finalizers
-		• API server consistency issues (time travel)
-		• Missing or problematic Content resources
-		
-		Parameters:
-				workspace (string, required): The workspace of the fleet resources to analyze. `},
+- Bundles stuck with old commits or forceSyncGeneration
+- BundleDeployments not applying their target deploymentID
+- Orphaned secrets with invalid owner references
+- Resources stuck with deletion timestamps due to finalizers
+- API server consistency issues (time travel)
+- Missing or problematic Content resources`},
 		t.analyzeFleetResources,
 	)
 }

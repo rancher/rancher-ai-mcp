@@ -54,15 +54,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Fetches a Kubernetes resource from the cluster.
-		Parameters:
-		name (string, required): The name of the Kubernetes resource.
-		kind (string, required): The kind of the Kubernetes resource (e.g. Deployment, Service).
-		cluster (string): The name of the Kubernetes cluster managed by Rancher.
-		namespace (string, optional): The namespace of the resource. It must be empty for all namespaces or cluster-wide resources.
-		
-		Returns:
-		The JSON representation of the requested Kubernetes resource.`},
+		Description: `Fetches a Kubernetes resource from the cluster. The namespace must be empty for all namespaces or cluster-wide resources.`},
 		t.getResource,
 	)
 
@@ -71,17 +63,10 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation.
-		Parameters:
-		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
-		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
-		name (string): The name of the specific resource to patch.
-		cluster (string): The name of the Kubernetes cluster.
-		patch (json): Patch to apply. This must be a JSON object. The content type used is application/json-patch+json.
-		Returns the modified resource.
-		
-		Example of the patch parameter:
-		[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
+		Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. Returns the modified resource.
+
+Example of the patch parameter:
+[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
 		t.updateKubernetesResource,
 	)
 
@@ -90,17 +75,10 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation.
-		Parameters:
-		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
-		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
-		name (string): The name of the specific resource to patch.
-		cluster (string): The name of the Kubernetes cluster.
-		patch (json): Patch to apply. This must be a JSON object. The content type used is application/json-patch+json.
-		Returns the planned patch operation.
-		
-		Example of the patch parameter:
-		[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
+		Description: `Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json.
+
+Example of the patch parameter:
+[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
 		t.updateKubernetesResourcePlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -108,11 +86,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of kubernetes resources.
-		Parameters:
-		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
-		namespace (string): The namespace where the resource are located. It must be empty for all namespaces or cluster-wide resources.
-		cluster (string): The name of the Kubernetes cluster.`},
+		Description: `Returns a list of Kubernetes resources. The namespace must be empty for all namespaces or cluster-wide resources.`},
 		t.listKubernetesResources,
 	)
 
@@ -121,11 +95,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns all information related to a Pod. It includes its parent Deployment or StatefulSet, the CPU and memory consumption and the logs. It must be used for troubleshooting problems with pods.
-		Parameters:
-		namespace (string): The namespace where the resource are located.
-		cluster (string): The name of the Kubernetes cluster.
-		name (string): The name of the Pod.`},
+		Description: `Returns all information related to a Pod. It includes its parent Deployment or StatefulSet, the CPU and memory consumption and the logs. It must be used for troubleshooting problems with pods.`},
 		t.inspectPod,
 	)
 
@@ -134,11 +104,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a Deployment and its Pods. It must be used for troubleshooting problems with deployments.
-		Parameters:
-		namespace (string): The namespace where the resource are located.
-		cluster (string): The name of the Kubernetes cluster.
-		name (string): The name of the Deployment.`},
+		Description: `Returns a Deployment and its Pods. It must be used for troubleshooting problems with deployments.`},
 		t.getDeploymentDetails,
 	)
 
@@ -147,9 +113,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.
-		Parameters:
-		cluster (string): The name of the Kubernetes cluster.`},
+		Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.`},
 		t.getNodes,
 	)
 
@@ -158,13 +122,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Creates a resource in a kubernetes cluster.
-		Parameters:
-		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
-		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
-		name (string): The name of the specific resource to patch.
-		cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
-		resource (json): Resource to be created. This must be a JSON object.`},
+		Description: `Creates a resource in a Kubernetes cluster. The namespace must be empty for cluster-wide resources.`},
 		t.createKubernetesResource,
 	)
 
@@ -173,13 +131,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Plans to create a resource in a kubernetes cluster. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.
-		Parameters:
-		kind (string): The type of Kubernetes resource to patch (e.g., Pod, Deployment, Service).
-		namespace (string): The namespace where the resource is located. It must be empty for cluster-wide resources.
-		name (string): The name of the specific resource to patch.
-		cluster (string): The name of the Kubernetes cluster. Empty for single container pods.
-		resource (json): Resource to be created. This must be a JSON object.`},
+		Description: `Plans to create a resource in a Kubernetes cluster. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation. The namespace must be empty for cluster-wide resources.`},
 		t.createKubernetesResourcePlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -187,9 +139,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of all container images for the specified clusters.
-		Parameters:
-		clusters (array of strings): List of clusters to get images from. Empty for return images for all clusters.`},
+		Description: `Returns a list of all container images for the specified clusters. If clusters is empty, returns images for all clusters.`},
 		t.getClusterImages,
 	)
 
@@ -198,10 +148,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a project resource and its associated namespaces.
-		Parameters:
-		name (string): The name of the project resource.
-		cluster (string): The name of the cluster resource the project belongs to.`},
+		Description: `Returns a project resource and its associated namespaces.`},
 		t.getProject,
 	)
 
@@ -210,9 +157,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of project resources for a specified cluster.
-		Parameters:
-		cluster (string): The name of the cluster resource the project belongs to.`},
+		Description: `Returns a list of project resources for a specified cluster.`},
 		t.listProjects,
 	)
 
@@ -227,9 +172,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			"type":       "object",
 			"properties": map[string]any{},
 		},
-		Description: `Returns a list of all Rancher clusters, including local and downstream clusters.
-		Parameters:
-		None`},
+		Description: `Returns a list of all Rancher clusters, including local and downstream clusters.`},
 		t.listClusters,
 	)
 
@@ -239,12 +182,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			toolsSetAnn: toolsSet,
 		},
 		Description: `Returns the resource usage for a namespace, project or all projects in a cluster.
-		Usage totals are provided for the entire project as well as broken down by namespace.
-		The resource usage includes CPU and memory requests, limits and actual usage, as well as the total number of pods.
-		Parameters:
-		cluster (string): The name of the cluster resource.
-		project (string): (optional) The name of the project to filter by. If omitted, data for all projects in the cluster is returned.
-		namespace (string): (optional) The name of a specific namespace. If provided, only data for this namespace is returned.`},
+Usage totals are provided for the entire project as well as broken down by namespace.
+The resource usage includes CPU and memory requests, limits and actual usage, as well as the total number of pods.`},
 		t.getResourceUsage,
 	)
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -252,16 +191,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Creates a project resource for a specified cluster with the given containerResourceQuota.
-		Parameters:
-		cluster (string): The name of the cluster the project belongs to.
-		name (string): The name of the project to be created.
-		description (string, optional): An optional description for the project.
-		displayName (string, optional): An optional display name for the project.
-		cpuLimit (string, optional): The maximum amount of CPU resources (in mCPUs) that can be used by containers in the project.
-		cpuReservation (string, optional): The amount of CPU resources (in mCPUs) reserved for containers in the project.
-		memoryLimit (string, optional): The maximum amount of memory resources (in MiB) that can be used by containers in the project.
-		memoryReservation (string, optional): The amount of memory resources (in MiB) reserved for containers in the project.`},
+		Description: `Creates a project resource for a specified cluster with the given containerResourceQuota.`},
 		t.createProject)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -269,15 +199,6 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Plans to create a project resource for a specified cluster. It returns the JSON representation of the project to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.
-		Parameters:
-		cluster (string): The name of the cluster the project belongs to.
-		name (string): The name of the project to be created.
-		description (string, optional): An optional description for the project.
-		displayName (string, optional): An optional display name for the project.
-		cpuLimit (string, optional): The maximum amount of CPU resources (in mCPUs) that can be used by containers in the project.
-		cpuReservation (string, optional): The amount of CPU resources (in mCPUs) reserved for containers in the project.
-		memoryLimit (string, optional): The maximum amount of memory resources (in MiB) that can be used by containers in the project.
-		memoryReservation (string, optional): The amount of memory resources (in MiB) reserved for containers in the project.`},
+		Description: `Plans to create a project resource for a specified cluster. It returns the JSON representation of the project to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.`},
 		t.createProjectPlan)
 }

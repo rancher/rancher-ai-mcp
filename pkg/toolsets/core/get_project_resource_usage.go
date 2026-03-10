@@ -21,8 +21,8 @@ var zapGetResourceUsage = zap.String("tool", "getResourceUsage")
 
 type getResourceUsageParams struct {
 	Cluster   string `json:"cluster" jsonschema:"the name of the cluster resource"`
-	Project   string `json:"project,omitempty" jsonschema:"(optional) the name of the project resource"`
-	Namespace string `json:"namespace,omitempty" jsonschema:"(optional) the namespace to query for resource usage"`
+	Project   string `json:"project,omitempty" jsonschema:"(optional) the name of the project to filter by. If omitted, data for all projects in the cluster is returned"`
+	Namespace string `json:"namespace,omitempty" jsonschema:"(optional) the name of a specific namespace. If provided, only data for this namespace is returned"`
 }
 
 type sample struct {

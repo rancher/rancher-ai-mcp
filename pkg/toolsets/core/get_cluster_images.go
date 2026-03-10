@@ -14,7 +14,7 @@ import (
 )
 
 type getClusterImagesParams struct {
-	Clusters []string `json:"clusters" jsonschema:"the clusters where images are returned"`
+	Clusters []string `json:"clusters,omitempty" jsonschema:"list of clusters to get images from. Empty to return images for all clusters"`
 }
 
 // getClusterImages retrieves all container images used across specified clusters.

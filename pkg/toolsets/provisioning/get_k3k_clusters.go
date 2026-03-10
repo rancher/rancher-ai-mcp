@@ -13,7 +13,7 @@ import (
 )
 
 type getK3kClustersParams struct {
-	Clusters []string `json:"clusters" jsonschema:"the downstream clusters to query for K3k clusters"`
+	Clusters []string `json:"clusters" jsonschema:"list of clusters to get virtual clusters from. Empty to return virtual clusters for all clusters"`
 }
 
 type K3kClusterDetails struct {

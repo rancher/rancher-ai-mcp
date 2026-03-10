@@ -13,7 +13,7 @@ import (
 )
 
 type listSupportedK8sVersionsParams struct {
-	Distribution string `json:"distribution" jsonschema:"the distribution of Kubernetes (rke2 or k3s)"`
+	Distribution string `json:"distribution" jsonschema:"the distribution of the cluster, either rke2 or k3s"`
 }
 
 func (t *Tools) listSupportedKubernetesVersions(_ context.Context, toolReq *mcp.CallToolRequest, params listSupportedK8sVersionsParams) (*mcp.CallToolResult, any, error) {

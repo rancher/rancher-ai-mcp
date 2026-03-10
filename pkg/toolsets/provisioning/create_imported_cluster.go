@@ -16,9 +16,9 @@ import (
 )
 
 type createImportedClusterParams struct {
-	Name                     string `json:"name" jsonschema:"The name of the cluster to create"`
-	Description              string `json:"description,omitempty" jsonschema:"Description for the cluster"`
-	VersionManagementSetting string `json:"VersionManagementSetting,omitempty" jsonschema:"Enable version management for the cluster. If not specified the global setting will be used. Potential values are 'system-default', 'true', and 'false'."`
+	Name                     string `json:"name" jsonschema:"the name of the cluster to be created"`
+	Description              string `json:"description,omitempty" jsonschema:"a short description added to the cluster"`
+	VersionManagementSetting string `json:"VersionManagementSetting,omitempty" jsonschema:"specifies the version management setting for the cluster. Potential values are system-default, true, and false. If not specified, the global version management setting will be used"`
 }
 
 func (t *Tools) createImportedCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params createImportedClusterParams) (*mcp.CallToolResult, any, error) {
