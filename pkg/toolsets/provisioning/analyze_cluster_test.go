@@ -893,10 +893,6 @@ func TestAnalyzeCluster(t *testing.T) {
 										"enabled": false,
 										"force": false,
 										"gracePeriod": 0,
-										"ignoreDaemonSets": null,
-										"ignoreErrors": false,
-										"postDrainHooks": null,
-										"preDrainHooks": null,
 										"skipWaitForDeleteTimeoutSeconds": 0,
 										"timeout": 0
 									},
@@ -906,10 +902,6 @@ func TestAnalyzeCluster(t *testing.T) {
 										"enabled": false,
 										"force": false,
 										"gracePeriod": 0,
-										"ignoreDaemonSets": null,
-										"ignoreErrors": false,
-										"postDrainHooks": null,
-										"preDrainHooks": null,
 										"skipWaitForDeleteTimeoutSeconds": 0,
 										"timeout": 0
 									}

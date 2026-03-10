@@ -68,7 +68,7 @@ func (c *Client) CreateClientSet(ctx context.Context, token string, url string, 
 	if err != nil {
 		return nil, err
 	}
-	restConfig, err := c.createRestConfig(token, url, clusterID)
+	restConfig, err := c.CreateRestConfig(token, url, clusterID)
 	if err != nil {
 		return nil, err
 	}
@@ -82,7 +82,7 @@ func (c *Client) GetResourceInterface(ctx context.Context, token string, url str
 	if err != nil {
 		return nil, err
 	}
-	restConfig, err := c.createRestConfig(token, url, clusterID)
+	restConfig, err := c.CreateRestConfig(token, url, clusterID)
 	if err != nil {
 		return nil, err
 	}
@@ -339,9 +339,9 @@ func (c *Client) GetClusterID(ctx context.Context, token string, url string, clu
 	return clusterID, nil
 }
 
-// createRestConfig creates a new rest.Config for accessing a Kubernetes cluster through Rancher.
+// CreateRestConfig creates a new rest.Config for accessing a Kubernetes cluster through Rancher.
 // It configures the cluster URL, authentication token, and TLS settings based on environment variables.
-func (c *Client) createRestConfig(token string, url string, clusterID string) (*rest.Config, error) {
+func (c *Client) CreateRestConfig(token string, url string, clusterID string) (*rest.Config, error) {
 	clusterURL := url + "/k8s/clusters/" + clusterID
 	kubeconfig := clientcmdapi.NewConfig()
 	kubeconfig.Clusters["Cluster"] = &clientcmdapi.Cluster{
@@ -376,7 +376,7 @@ func (c *Client) getAPIVersionsForGR(ctx context.Context, token, url, cluster st
 	if err != nil {
 		return nil, err
 	}
-	restConfig, err := c.createRestConfig(token, url, clusterID)
+	restConfig, err := c.CreateRestConfig(token, url, clusterID)
 	if err != nil {
 		return nil, err
 	}
