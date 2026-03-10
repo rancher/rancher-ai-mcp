@@ -18,12 +18,12 @@ import (
 )
 
 type scaleNodePoolParameters struct {
-	Cluster          string `json:"cluster" jsonschema:"the name of the provisioning cluster"`
-	Namespace        string `json:"namespace" jsonschema:"the namespace of the resource"`
+	Cluster          string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
+	Namespace        string `json:"namespace" jsonschema:"the namespace where the resource is located. The default namespace will be used if not provided"`
 	NodePoolName     string `json:"nodePoolName" jsonschema:"the name of the node pool to scale"`
-	DesiredSize      int    `json:"desiredSize,omitempty" jsonschema:"the desired size of the node pool"`
-	AmountToAdd      int    `json:"amountToAdd,omitempty" jsonschema:"the amount of nodes to add to the node pool. if specified, DesiredSize will be ignored"`
-	AmountToSubtract int    `json:"amountToSubtract,omitempty" jsonschema:"the amount of nodes to remove from the node pool. if specified, DesiredSize will be ignored"`
+	DesiredSize      int    `json:"desiredSize,omitempty" jsonschema:"the desired size of the node pool. Overridden by amountToAdd and amountToSubtract if either are specified. If no specific size is provided, use zero"`
+	AmountToAdd      int    `json:"amountToAdd,omitempty" jsonschema:"the amount of nodes to add to the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToSubtract. If no specific amount is provided, use zero"`
+	AmountToSubtract int    `json:"amountToSubtract,omitempty" jsonschema:"the amount of nodes to remove from the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToAdd. If no specific amount is provided, use zero"`
 }
 
 func (t *Tools) scaleClusterNodePool(ctx context.Context, toolReq *mcp.CallToolRequest, params scaleNodePoolParameters) (*mcp.CallToolResult, any, error) {

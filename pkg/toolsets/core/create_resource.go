@@ -21,11 +21,11 @@ const (
 
 // createKubernetesResourceParams defines the structure for creating a general Kubernetes resource.
 type createKubernetesResourceParams struct {
-	Name      string `json:"name" jsonschema:"the name of k8s resource"`
-	Namespace string `json:"namespace,omitempty" jsonschema:"the namespace of the resource"`
-	Kind      string `json:"kind" jsonschema:"the kind of the resource"`
-	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
-	Resource  any    `json:"resource" jsonschema:"the resource to be created"`
+	Name      string `json:"name" jsonschema:"the name of the resource to create"`
+	Namespace string `json:"namespace,omitempty" jsonschema:"the namespace where the resource is located. It must be empty for cluster-wide resources"`
+	Kind      string `json:"kind" jsonschema:"the type of Kubernetes resource (e.g., Pod, Deployment, Service)"`
+	Cluster   string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
+	Resource  any    `json:"resource" jsonschema:"the resource to be created. This must be a JSON object"`
 }
 
 // createKubernetesResource creates a new Kubernetes resource.

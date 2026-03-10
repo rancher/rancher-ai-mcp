@@ -12,7 +12,7 @@ import (
 
 // listGitRepoParams specifies the parameters needed to list Fleet GitRepo resources.
 type listGitRepoParams struct {
-	Workspace string `json:"workspace" jsonschema:"the workspace of the gitrepo"`
+	Workspace string `json:"workspace" jsonschema:"the workspace of the GitRepos"`
 }
 
 // listGitRepos retrieves all Fleet GitRepo resources for a specific workspace.

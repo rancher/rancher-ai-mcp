@@ -13,8 +13,8 @@ import (
 
 // getBundleParams specifies the parameters needed to retrieve a specific Fleet Bundle resource.
 type getBundleParams struct {
-	Name      string `json:"name" jsonschema:"the name of the bundle"`
-	Workspace string `json:"workspace" jsonschema:"the workspace (namespace) of the bundle"`
+	Name      string `json:"name" jsonschema:"the name of the Bundle"`
+	Workspace string `json:"workspace" jsonschema:"the workspace (namespace) of the Bundle"`
 }
 
 // getBundle retrieves a specific Fleet Bundle resource by name and workspace.

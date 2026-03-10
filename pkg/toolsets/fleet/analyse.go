@@ -11,7 +11,7 @@ import (
 )
 
 type analyzeFleetResourcesParams struct {
-	Workspace string `json:"workspace"`
+	Workspace string `json:"workspace" jsonschema:"the workspace of the fleet resources to analyze"`
 }
 
 func (t *Tools) analyzeFleetResources(ctx context.Context, toolReq *mcp.CallToolRequest, params analyzeFleetResourcesParams) (*mcp.CallToolResult, any, error) {

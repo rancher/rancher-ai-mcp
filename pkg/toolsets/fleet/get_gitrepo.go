@@ -13,8 +13,8 @@ import (
 
 // getGitRepoParams specifies the parameters needed to retrieve a specific Fleet GitRepo resource.
 type getGitRepoParams struct {
-	Name      string `json:"name" jsonschema:"the name of the gitrepo"`
-	Workspace string `json:"workspace" jsonschema:"the workspace (namespace) of the gitrepo"`
+	Name      string `json:"name" jsonschema:"the name of the GitRepo"`
+	Workspace string `json:"workspace" jsonschema:"the workspace (namespace) of the GitRepo"`
 }
 
 // getGitRepo retrieves a specific Fleet GitRepo resource by name and workspace.

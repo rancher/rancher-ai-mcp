@@ -27,11 +27,11 @@ type jsonPatch struct {
 // updateKubernetesResourceParams defines the structure for updating a general Kubernetes resource.
 // It includes fields required to uniquely identify a resource within a cluster.
 type updateKubernetesResourceParams struct {
-	Name      string      `json:"name" jsonschema:"the name of k8s resource"`
-	Namespace string      `json:"namespace,omitempty" jsonschema:"the namespace of the resource"`
-	Kind      string      `json:"kind" jsonschema:"the kind of the resource"`
-	Cluster   string      `json:"cluster" jsonschema:"the cluster of the resource"`
-	Patch     []jsonPatch `json:"patch" jsonschema:"the patch of the request"`
+	Name      string      `json:"name" jsonschema:"the name of the specific resource to patch"`
+	Namespace string      `json:"namespace,omitempty" jsonschema:"the namespace where the resource is located. It must be empty for cluster-wide resources"`
+	Kind      string      `json:"kind" jsonschema:"the type of Kubernetes resource to patch (e.g., Pod, Deployment, Service)"`
+	Cluster   string      `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
+	Patch     []jsonPatch `json:"patch" jsonschema:"the patch to apply. The content type used is application/json-patch+json"`
 }
 
 // updateKubernetesResource updates a specific Kubernetes resource using a JSON patch.

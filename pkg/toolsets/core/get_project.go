@@ -19,7 +19,7 @@ var zapGetProject = zap.String("tool", "getProject")
 
 type getProjectParams struct {
 	Name    string `json:"name" jsonschema:"the name of the project resource"`
-	Cluster string `json:"cluster" jsonschema:"the cluster of the project resource"`
+	Cluster string `json:"cluster" jsonschema:"the name of the cluster resource the project belongs to"`
 }
 
 // getProjectID retrieves the project ID for a given project name.

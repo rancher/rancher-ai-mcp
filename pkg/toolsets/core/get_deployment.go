@@ -17,9 +17,9 @@ import (
 
 // specificResourceParams uniquely identifies a resource with a known kind within a cluster.
 type specificResourceParams struct {
-	Name      string `json:"name" jsonschema:"the name of k8s resource"`
-	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
-	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
+	Name      string `json:"name" jsonschema:"the name of the resource"`
+	Namespace string `json:"namespace" jsonschema:"the namespace where the resource is located"`
+	Cluster   string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
 }
 
 // getDeploymentDetails retrieves details about a deployment and its associated pods.

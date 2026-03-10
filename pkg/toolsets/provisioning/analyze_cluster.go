@@ -16,8 +16,8 @@ import (
 )
 
 type inspectClusterParams struct {
-	Cluster   string `json:"cluster" jsonschema:"the name of the provisioning cluster"`
-	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
+	Cluster   string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
+	Namespace string `json:"namespace,omitempty" jsonschema:"the namespace where the resource is located. The default namespace will be used if not provided"`
 }
 
 // analyzeCluster returns a set of kubernetes resources that can be used to inspect the cluster for debugging and summary purposes.

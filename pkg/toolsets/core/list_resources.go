@@ -15,9 +15,9 @@ const defaultListLimit = 10
 
 // listKubernetesResourcesParams specifies the parameters needed to list kubernetes resources.
 type listKubernetesResourcesParams struct {
-	Namespace     string `json:"namespace" jsonschema:"the namespace of the resource"`
-	Kind          string `json:"kind" jsonschema:"the kind of the resource"`
-	Cluster       string `json:"cluster" jsonschema:"the cluster of the resource"`
+	Namespace     string `json:"namespace" jsonschema:"the namespace where the resources are located. It must be empty for all namespaces or cluster-wide resources"`
+	Kind          string `json:"kind" jsonschema:"the type of Kubernetes resource (e.g., Pod, Deployment, Service)"`
+	Cluster       string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
 	Limit         int64  `json:"limit,omitempty" jsonschema:"maximum number of resources to return, defaults to 10"`
 	LabelSelector string `json:"labelSelector,omitempty" jsonschema:"optional label selector to filter resources (e.g. app=nginx)"`
 }

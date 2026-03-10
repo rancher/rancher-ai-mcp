@@ -12,8 +12,8 @@ import (
 )
 
 type inspectClusterMachinesParams struct {
-	Cluster   string `json:"cluster" jsonschema:"the name of the provisioning cluster"`
-	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
+	Cluster   string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
+	Namespace string `json:"namespace,omitempty" jsonschema:"the namespace where the resource is located. The default namespace will be used if not provided"`
 }
 
 // analyzeClusterMachines returns the cluster API machines, machine sets, and machine deployments, for a given provisioning cluster.

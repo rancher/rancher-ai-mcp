@@ -13,10 +13,10 @@ import (
 
 // resourceParams uniquely identifies a specific named resource within a cluster.
 type resourceParams struct {
-	Name      string `json:"name" jsonschema:"the name of k8s resource"`
-	Namespace string `json:"namespace" jsonschema:"the namespace of the resource"`
-	Kind      string `json:"kind" jsonschema:"the kind of the resource"`
-	Cluster   string `json:"cluster" jsonschema:"the cluster of the resource"`
+	Name      string `json:"name" jsonschema:"the name of the Kubernetes resource"`
+	Namespace string `json:"namespace" jsonschema:"the namespace of the resource. It must be empty for all namespaces or cluster-wide resources"`
+	Kind      string `json:"kind" jsonschema:"the kind of the Kubernetes resource (e.g. Deployment, Service)"`
+	Cluster   string `json:"cluster" jsonschema:"the name of the Kubernetes cluster managed by Rancher"`
 }
 
 // getResource retrieves a specific Kubernetes resource based on the provided parameters.
