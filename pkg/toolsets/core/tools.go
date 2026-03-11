@@ -28,13 +28,15 @@ type toolsClient interface {
 type Tools struct {
 	client     toolsClient
 	RancherURL string
+	ReadOnly   bool
 }
 
 // NewTools creates and returns a new Tools instance.
-func NewTools(client toolsClient, rancherURL string) *Tools {
+func NewTools(client toolsClient, rancherURL string, readOnly bool) *Tools {
 	return &Tools{
 		client:     client,
 		RancherURL: rancherURL,
+		ReadOnly:   readOnly,
 	}
 }
 
@@ -57,29 +59,6 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Description: `Fetches a Kubernetes resource from the cluster. The namespace must be empty for all namespaces or cluster-wide resources.`},
 		t.getResource,
 	)
-
-	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "patchKubernetesResource",
-		Meta: map[string]any{
-			toolsSetAnn: toolsSet,
-		},
-		Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. Returns the modified resource.
-
-Example of the patch parameter:
-[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
-		t.updateKubernetesResource,
-	)
-
-	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "patchKubernetesResourcePlan",
-		Meta: map[string]any{
-			toolsSetAnn: toolsSet,
-		},
-		Description: `Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json.
-
-Example of the patch parameter:
-[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
-		t.updateKubernetesResourcePlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listKubernetesResources",
@@ -116,23 +95,6 @@ Example of the patch parameter:
 		Description: `Returns a list of all nodes in a specified Kubernetes cluster, including their current resource utilization metrics.`},
 		t.getNodes,
 	)
-
-	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "createKubernetesResource",
-		Meta: map[string]any{
-			toolsSetAnn: toolsSet,
-		},
-		Description: `Creates a resource in a Kubernetes cluster. The namespace must be empty for cluster-wide resources.`},
-		t.createKubernetesResource,
-	)
-
-	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "createKubernetesResourcePlan",
-		Meta: map[string]any{
-			toolsSetAnn: toolsSet,
-		},
-		Description: `Plans to create a resource in a Kubernetes cluster. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation. The namespace must be empty for cluster-wide resources.`},
-		t.createKubernetesResourcePlan)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "getClusterImages",
@@ -186,19 +148,62 @@ Usage totals are provided for the entire project as well as broken down by names
 The resource usage includes CPU and memory requests, limits and actual usage, as well as the total number of pods.`},
 		t.getResourceUsage,
 	)
-	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "createProject",
-		Meta: map[string]any{
-			toolsSetAnn: toolsSet,
-		},
-		Description: `Creates a project resource for a specified cluster with the given containerResourceQuota.`},
-		t.createProject)
 
-	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "createProjectPlan",
-		Meta: map[string]any{
-			toolsSetAnn: toolsSet,
-		},
-		Description: `Plans to create a project resource for a specified cluster. It returns the JSON representation of the project to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.`},
-		t.createProjectPlan)
+	if !t.ReadOnly {
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "createKubernetesResource",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Creates a resource in a Kubernetes cluster. The namespace must be empty for cluster-wide resources.`},
+			t.createKubernetesResource,
+		)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "createKubernetesResourcePlan",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Plans to create a resource in a Kubernetes cluster. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation. The namespace must be empty for cluster-wide resources.`},
+			t.createKubernetesResourcePlan)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "patchKubernetesResource",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. Returns the modified resource.
+
+Example of the patch parameter:
+[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
+			t.updateKubernetesResource,
+		)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "patchKubernetesResourcePlan",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json.
+
+Example of the patch parameter:
+[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
+			t.updateKubernetesResourcePlan)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "createProject",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Creates a project resource for a specified cluster with the given containerResourceQuota.`},
+			t.createProject)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "createProjectPlan",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Plans to create a project resource for a specified cluster. It returns the JSON representation of the project to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.`},
+			t.createProjectPlan)
+	}
 }

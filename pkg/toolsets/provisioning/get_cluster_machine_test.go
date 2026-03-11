@@ -362,7 +362,7 @@ func TestGetClusterMachine(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, testToken, testURL), tt.rancherURL)
+			tools := NewTools(test.WrapClient(c, testToken, testURL), tt.rancherURL, false)
 			req := test.NewCallToolRequest(tt.requestURL)
 			req.Params = &mcp.CallToolParamsRaw{Name: "get-cluster-machine"}
 
