@@ -82,6 +82,8 @@ func runServe(cmd *cobra.Command, args []string) error {
 
 	toolsets.AddAllTools(client, mcpServer, rancherURL, readOnly)
 
+	zap.L().Info("read-only mode", zap.Bool("enabled", readOnly))
+
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return mcpServer
 	}, &mcp.StreamableHTTPOptions{})
