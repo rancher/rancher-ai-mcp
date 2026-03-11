@@ -54,7 +54,7 @@ func newProjectResourceUsageTools(t *testing.T, fakeToken, fakeURL, rancherURL s
 			return fakeDynClient, nil
 		},
 	}
-	return NewTools(test.WrapClient(c, fakeToken, fakeURL), rancherURL)
+	return NewTools(test.WrapClient(c, fakeToken, fakeURL), rancherURL, false)
 }
 
 func TestGetResourceUsage(t *testing.T) {

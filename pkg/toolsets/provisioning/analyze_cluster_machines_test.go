@@ -509,7 +509,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				},
 			}
 
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
+			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
 			req := test.NewCallToolRequest(tt.requestURL)
 			req.Params = &mcp.CallToolParamsRaw{
 				Name: "analyze-cluster-machines",

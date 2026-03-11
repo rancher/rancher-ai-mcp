@@ -30,6 +30,7 @@ const (
 var (
 	port           int
 	insecure       bool
+	readOnly       bool
 	authzServerURL string
 	jwksURL        string
 	resourceURL    string
@@ -47,6 +48,7 @@ func init() {
 
 	serveCmd.Flags().IntVar(&port, "port", 9092, "Port to listen on")
 	serveCmd.Flags().BoolVar(&insecure, "insecure", false, "Skip TLS verification")
+	serveCmd.Flags().BoolVar(&readOnly, "read-only", false, "Only register read-only tools")
 
 	serveCmd.Flags().StringVar(&authzServerURL, "authz-server-url", "", "Authorization Server URL - used to generate the OIDC urls")
 	serveCmd.Flags().StringVar(&jwksURL, "jwks-url", "", "JWKS URL - from the OAuth2 server")
@@ -78,7 +80,9 @@ func runServe(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("parsing authz-server-url: %w", err)
 	}
 
-	toolsets.AddAllTools(client, mcpServer, rancherURL)
+	toolsets.AddAllTools(client, mcpServer, rancherURL, readOnly)
+
+	zap.L().Info("read-only mode", zap.Bool("enabled", readOnly))
 
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return mcpServer

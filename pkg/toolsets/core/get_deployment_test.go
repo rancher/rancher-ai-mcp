@@ -228,7 +228,7 @@ func TestGetDeploymentDetails(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
+			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
 			req := test.NewCallToolRequest(tt.requestURL)
 
 			result, _, err := tools.getDeploymentDetails(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

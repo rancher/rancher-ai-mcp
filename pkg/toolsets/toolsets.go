@@ -17,16 +17,16 @@ type toolsAdder interface {
 //
 // The rancherServerURL can be empty in which case we'll fall back to the R_url
 // value.
-func AddAllTools(client *client.Client, mcpServer *mcp.Server, rancherServerURL string) {
-	for _, ta := range allToolSets(client, rancherServerURL) {
+func AddAllTools(client *client.Client, mcpServer *mcp.Server, rancherServerURL string, readOnly bool) {
+	for _, ta := range allToolSets(client, rancherServerURL, readOnly) {
 		ta.AddTools(mcpServer)
 	}
 }
 
-func allToolSets(client *client.Client, rancherURL string) []toolsAdder {
+func allToolSets(client *client.Client, rancherURL string, readOnly bool) []toolsAdder {
 	return []toolsAdder{
-		core.NewTools(client, rancherURL),
+		core.NewTools(client, rancherURL, readOnly),
 		fleet.NewTools(client, rancherURL),
-		provisioning.NewTools(client, rancherURL),
+		provisioning.NewTools(client, rancherURL, readOnly),
 	}
 }
