@@ -1,20 +1,29 @@
-KUBECTL1_VERSION := v1.30.8
-KUBECTL1_SUM_arm64 ?= $(shell curl -L "https://dl.k8s.io/release/$(KUBECTL1_VERSION)/bin/linux/arm64/kubectl.sha256")
-KUBECTL1_SUM_amd64 ?= $(shell curl -L "https://dl.k8s.io/release/$(KUBECTL1_VERSION)/bin/linux/amd64/kubectl.sha256")
+# renovate: datasource=github-release-attachments depName=rancher/helm
+HELM_VERSION := v3.20.0-rancher1
 
-KUBECTL2_VERSION := v1.31.4
-KUBECTL2_SUM_arm64 ?= $(shell curl -L "https://dl.k8s.io/release/$(KUBECTL2_VERSION)/bin/linux/arm64/kubectl.sha256")
-KUBECTL2_SUM_amd64 ?= $(shell curl -L "https://dl.k8s.io/release/$(KUBECTL2_VERSION)/bin/linux/amd64/kubectl.sha256")
+# renovate-local: kubectl-amd64
+KUBECTL_VERSION := v1.35.2
+# renovate-local: kubectl-arm64=v1.35.2
+KUBECTL_SUM_arm64 := cd859449f54ad2cb05b491c490c13bb836cdd0886ae013c0aed3dd67ff747467
+# renovate-local: kubectl-amd64=v1.35.2
+KUBECTL_SUM_amd64 := 924eb50779153f20cb668117d141440b95df2f325a64452d78dff9469145e277
 
-KUBECTL3_VERSION := v1.32.0
-KUBECTL3_SUM_arm64 ?= $(shell curl -L "https://dl.k8s.io/release/$(KUBECTL3_VERSION)/bin/linux/arm64/kubectl.sha256")
-KUBECTL3_SUM_amd64 ?= $(shell curl -L "https://dl.k8s.io/release/$(KUBECTL3_VERSION)/bin/linux/amd64/kubectl.sha256")
+# renovate-local: kustomize-amd64
+KUSTOMIZE_VERSION := v5.7.1
+# renovate-local: kustomize-arm64=v5.7.1
+KUSTOMIZE_SUM_arm64 := 4261a040217df3bd6896597c3986d1465925726e4f22a945304b5233a4dcdbda
+# renovate-local: kustomize-amd64=v5.7.1
+KUSTOMIZE_SUM_amd64 := ea375e7372f9aa029129d4b2d16c66b7750b7f1213c4f66f910d981c895818d8
 
-KUBECTL1 := "$(KUBECTL1_VERSION):$(KUBECTL1_SUM_arm64):$(KUBECTL1_SUM_amd64)"
-KUBECTL2 := "$(KUBECTL2_VERSION):$(KUBECTL2_SUM_arm64):$(KUBECTL2_SUM_amd64)"
-KUBECTL3 := "$(KUBECTL3_VERSION):$(KUBECTL3_SUM_arm64):$(KUBECTL3_SUM_amd64)"
-
-KUBECTL_VERSION_INFO := "$(KUBECTL1) $(KUBECTL2) $(KUBECTL3)"
+# renovate: datasource=github-release-attachments depName=derailed/k9s
+K9S_VERSION := v0.50.18
+# renovate: datasource=github-release-attachments depName=derailed/k9s digestVersion=v0.50.18
+K9S_SUM_arm64 := d3dcc051d6be26ee911c00f583412802ebe203a189e51bc079332cb410c83b38
+# renovate: datasource=github-release-attachments depName=derailed/k9s digestVersion=v0.50.18
+K9S_SUM_amd64 := 0b697ed4aa80997f7de4deeed6f1fba73df191b28bf691b1f28d2f45fa2a9e9b
 
 # Reduces the code duplication on Makefile by keeping all args into a single variable.
-IMAGE_ARGS := --build-arg KUBECTL_VERSION_INFO=$(KUBECTL_VERSION_INFO)
+IMAGE_ARGS := --build-arg HELM_VERSION=$(HELM_VERSION) \
+			  --build-arg KUBECTL_VERSION=$(KUBECTL_VERSION) --build-arg KUBECTL_SUM_arm64=$(KUBECTL_SUM_arm64) --build-arg KUBECTL_SUM_amd64=$(KUBECTL_SUM_amd64) \
+			  --build-arg KUSTOMIZE_VERSION=$(KUSTOMIZE_VERSION) --build-arg KUSTOMIZE_SUM_arm64=$(KUSTOMIZE_SUM_arm64) --build-arg KUSTOMIZE_SUM_amd64=$(KUSTOMIZE_SUM_amd64) \
+			  --build-arg K9S_VERSION=$(K9S_VERSION) --build-arg K9S_SUM_arm64=$(K9S_SUM_arm64) --build-arg K9S_SUM_amd64=$(K9S_SUM_amd64)

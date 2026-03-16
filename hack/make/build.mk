@@ -30,6 +30,7 @@ endif
 RUNNER := docker
 IMAGE_BUILDER := $(RUNNER) buildx
 MACHINE := rancher
+BUILDX_ARGS ?= --sbom=true --attest type=provenance,mode=max
 
 # Define the target platforms that can be used across the ecosystem.
 # Note that what would actually be used for a given project will be
