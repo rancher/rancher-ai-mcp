@@ -38,3 +38,4 @@ jobs:
           prime-repo: rancher
           prime-username: ${{ env.STAGING_PRIME_REGISTRY_USERNAME }}
           prime-password: ${{ env.STAGING_PRIME_REGISTRY_PASSWORD }}
+          prime-make-target: "push-image"
