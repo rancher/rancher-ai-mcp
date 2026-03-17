@@ -1,4 +1,4 @@
-name: Publish Docker Image
+name: Publish Docker Image to Staging Prime Registry
 
 on:
   push:
@@ -6,34 +6,33 @@ on:
       - "v*"
 
 jobs:
-  build-and-push:
+  build-and-push-prime:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write
+      id-token: write 
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        
+      - name: "Read vault secrets"
+        uses: rancher-eio/read-vault-secrets@main
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-      - name: Build and push Docker image to GHCR
-        uses: docker/build-push-action@v5
+          secrets: |
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | STAGING_PRIME_REGISTRY ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials username | STAGING_PRIME_REGISTRY_USERNAME ;
+            secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | STAGING_PRIME_REGISTRY_PASSWORD ;
+
+        # This encapsulates: login, qemu, build/push
+      - name: Build and push image to staging prime registry
+        uses: rancher/ecm-distro-tools/actions/publish-image@master
         with:
-          context: .
-          platforms: linux/amd64,linux/arm64
-          push: true
-          file: package/Dockerfile
-          tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}
-          build-args: |
-            VERSION=${{ github.ref_name }}
-            COMMIT=${{ github.sha }}
-      
+          image: rancher-ai-mcp
+          tag: ${{ github.ref_name }}
+          push-to-prime: true
+          push-to-public: false
+          prime-registry: ${{ env.STAGING_PRIME_REGISTRY }}
+          prime-repo: rancher
+          prime-username: ${{ env.STAGING_PRIME_REGISTRY_USERNAME }}
+          prime-password: ${{ env.STAGING_PRIME_REGISTRY_PASSWORD }}
