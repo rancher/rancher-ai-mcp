@@ -58,44 +58,54 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 			break
 		}
 	}
-	replicaSetResource, err := t.client.GetResource(ctx, client.GetParams{
-		Cluster:   params.Cluster,
-		Kind:      "replicaset",
-		Namespace: params.Namespace,
-		Name:      replicaSetName,
-		URL:       t.rancherURL(toolReq),
-		Token:     middleware.Token(ctx),
-	})
-	if err != nil {
-		zap.L().Error("failed to get ReplicaSet", zap.String("tool", "inspectPod"), zap.Error(err))
-		return nil, nil, err
-	}
 
-	var replicaSet appsv1.ReplicaSet
-	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(replicaSetResource.Object, &replicaSet); err != nil {
-		zap.L().Error("failed to convert unstructured object to ReplicaSet", zap.String("tool", "inspectPod"), zap.Error(err))
-		return nil, nil, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
-	}
+	var parentResource *unstructured.Unstructured
 
-	var parentName, parentKind string
-	for _, or := range replicaSet.OwnerReferences {
-		if or.Kind == "Deployment" || or.Kind == "StatefulSet" || or.Kind == "DaemonSet" {
-			parentName = or.Name
-			parentKind = or.Kind
-			break
+	// ReplicaSet may not exist
+	if replicaSetName != "" {
+		replicaSetResource, err := t.client.GetResource(ctx, client.GetParams{
+			Cluster:   params.Cluster,
+			Kind:      "replicaset",
+			Namespace: params.Namespace,
+			Name:      replicaSetName,
+			URL:       t.rancherURL(toolReq),
+			Token:     middleware.Token(ctx),
+		})
+		if err != nil {
+			zap.L().Error("failed to get ReplicaSet", zap.String("tool", "inspectPod"), zap.Error(err))
+			return nil, nil, err
 		}
-	}
-	parentResource, err := t.client.GetResource(ctx, client.GetParams{
-		Cluster:   params.Cluster,
-		Kind:      parentKind,
-		Namespace: params.Namespace,
-		Name:      parentName,
-		URL:       t.rancherURL(toolReq),
-		Token:     middleware.Token(ctx),
-	})
-	if err != nil {
-		zap.L().Error("failed to get parent resource", zap.String("tool", "inspectPod"), zap.Error(err))
-		return nil, nil, err
+
+		var replicaSet appsv1.ReplicaSet
+		if err := runtime.DefaultUnstructuredConverter.FromUnstructured(replicaSetResource.Object, &replicaSet); err != nil {
+			zap.L().Error("failed to convert unstructured object to ReplicaSet", zap.String("tool", "inspectPod"), zap.Error(err))
+			return nil, nil, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
+		}
+
+		var parentName, parentKind string
+		for _, or := range replicaSet.OwnerReferences {
+			if or.Kind == "Deployment" || or.Kind == "StatefulSet" || or.Kind == "DaemonSet" {
+				parentName = or.Name
+				parentKind = or.Kind
+				break
+			}
+		}
+
+		if parentName != "" {
+			var err error
+			parentResource, err = t.client.GetResource(ctx, client.GetParams{
+				Cluster:   params.Cluster,
+				Kind:      parentKind,
+				Namespace: params.Namespace,
+				Name:      parentName,
+				URL:       t.rancherURL(toolReq),
+				Token:     middleware.Token(ctx),
+			})
+			if err != nil {
+				zap.L().Error("failed to get parent resource", zap.String("tool", "inspectPod"), zap.Error(err))
+				return nil, nil, err
+			}
+		}
 	}
 
 	// ignore error as Metrics Server might not be installed in the cluster
@@ -114,7 +124,10 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		return nil, nil, err
 	}
 
-	resources := []*unstructured.Unstructured{podResource, parentResource, logs}
+	resources := []*unstructured.Unstructured{podResource, logs}
+	if parentResource != nil {
+		resources = append(resources, parentResource)
+	}
 	if podMetrics != nil {
 		resources = append(resources, podMetrics)
 	}
@@ -149,16 +162,30 @@ func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, toke
 		req := clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &podLogOptions)
 		podLogs, err := req.Stream(ctx)
 		if err != nil {
-			return nil, fmt.Errorf("failed to open log stream: %v", err)
+			// The container may not exist or may have terminated, so we log the error and continue with other containers instead of failing the entire function.
+			zap.L().Warn("unable to retrieve logs for container",
+				zap.String("container", container.Name),
+				zap.String("pod", pod.Name),
+				zap.Error(err))
+			logs.Logs[container.Name] = fmt.Sprintf("unable to retrieve logs: %v", err)
+			continue
 		}
 		buf := new(bytes.Buffer)
 		_, err = io.Copy(buf, podLogs)
 		if err != nil {
-			return nil, fmt.Errorf("failed to copy log stream to buffer: %v", err)
+			zap.L().Warn("failed to copy log stream",
+				zap.String("container", container.Name),
+				zap.String("pod", pod.Name),
+				zap.Error(err))
+			logs.Logs[container.Name] = fmt.Sprintf("failed to read logs: %v", err)
+			if err := podLogs.Close(); err != nil {
+				zap.L().Warn("failed to close pod logs stream", zap.Error(err))
+			}
+			continue
 		}
 		logs.Logs[container.Name] = buf.String()
 		if err := podLogs.Close(); err != nil {
-			return nil, fmt.Errorf("failed to close pod logs stream: %v", err)
+			zap.L().Warn("failed to close pod logs stream", zap.Error(err))
 		}
 	}
 
