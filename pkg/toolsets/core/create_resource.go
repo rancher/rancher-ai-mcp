@@ -29,7 +29,7 @@ func (t *Tools) createKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 	zap.L().Debug("createKubernetesResource called")
 
 	resourceInterface, err := t.client.GetResourceInterface(
-		ctx, middleware.Token(ctx), t.rancherURL(),
+		ctx, middleware.Token(ctx),
 		params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, nil, err

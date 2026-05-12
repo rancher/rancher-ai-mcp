@@ -44,7 +44,6 @@ func nodeScheme() *runtime.Scheme {
 }
 
 func TestGetNodes(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
@@ -52,7 +51,6 @@ func TestGetNodes(t *testing.T) {
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
 		// used in the creation of the Tools.
-		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -61,7 +59,6 @@ func TestGetNodes(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
 				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
 			}, fakeNode),
-			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -93,7 +90,6 @@ func TestGetNodes(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
 				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
 			}, fakeNode),
-			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -122,7 +118,6 @@ func TestGetNodes(t *testing.T) {
 		},
 		"get nodes - not found": {
 			params:     getNodesParams{Cluster: "local"},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "nodes"}:                    "NodeList",
 				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
@@ -138,7 +133,7 @@ func TestGetNodes(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest()
 
 			result, _, err := tools.getNodes(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

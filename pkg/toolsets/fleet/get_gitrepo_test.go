@@ -15,7 +15,6 @@ import (
 )
 
 func TestGetGitRepo(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
@@ -23,7 +22,6 @@ func TestGetGitRepo(t *testing.T) {
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
 		// used in the creation of the Tools.
-		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -32,7 +30,6 @@ func TestGetGitRepo(t *testing.T) {
 				Name:      "gitrepo-1",
 				Workspace: "fleet-default",
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listGitReposScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"}: "GitRepoList",
 			}, fakeGitRepo1, fakeGitRepo2),
@@ -68,7 +65,6 @@ func TestGetGitRepo(t *testing.T) {
 				Name:      "nonexistent-gitrepo",
 				Workspace: "fleet-default",
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listGitReposScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"}: "GitRepoList",
 			}),
@@ -83,7 +79,7 @@ func TestGetGitRepo(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
+			tools := NewTools(test.WrapClient(c, fakeToken))
 			req := test.NewCallToolRequest()
 
 			result, _, err := tools.getGitRepo(

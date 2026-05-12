@@ -22,7 +22,6 @@ func createProjectScheme() *runtime.Scheme {
 }
 
 func TestCreateProject(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
@@ -31,7 +30,6 @@ func TestCreateProject(t *testing.T) {
 
 		// used in the CallToolRequest
 		// used in the creation of the Tools.
-		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -42,7 +40,6 @@ func TestCreateProject(t *testing.T) {
 				DisplayName: "Test Project",
 				Description: "A test project",
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createProjectScheme(), map[schema.GroupVersionResource]string{
 				{Group: "management.cattle.io", Version: "v3", Resource: "projects"}: "ProjectList",
 			}),
@@ -75,7 +72,6 @@ func TestCreateProject(t *testing.T) {
 				MemoryLimit:       4096,
 				MemoryReservation: 2048,
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createProjectScheme(), map[schema.GroupVersionResource]string{
 				{Group: "management.cattle.io", Version: "v3", Resource: "projects"}: "ProjectList",
 			}),
@@ -107,7 +103,6 @@ func TestCreateProject(t *testing.T) {
 				Cluster: "local",
 				Name:    "configured-url-project",
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createProjectScheme(), map[schema.GroupVersionResource]string{
 				{Group: "management.cattle.io", Version: "v3", Resource: "projects"}: "ProjectList",
 			}),
@@ -137,7 +132,7 @@ func TestCreateProject(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest()
 
 			result, _, err := tools.createProject(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

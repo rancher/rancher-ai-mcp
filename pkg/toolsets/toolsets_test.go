@@ -8,8 +8,8 @@ import (
 )
 
 func TestAllToolSets(t *testing.T) {
-	client := client.NewClient(true)
-	toolsets := allToolSets(client, "https://notused.example.com", false)
+	client := client.NewClient("", true)
+	toolsets := allToolSets(client, false)
 
 	assert.NotNil(t, toolsets)
 	assert.Len(t, toolsets, 3, "should have exactly 2 toolsets (core and fleet)")

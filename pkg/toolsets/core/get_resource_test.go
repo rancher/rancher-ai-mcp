@@ -39,7 +39,6 @@ func scheme() *runtime.Scheme {
 	return scheme
 }
 func TestGetResource(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
@@ -47,26 +46,22 @@ func TestGetResource(t *testing.T) {
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
 		// used in the creation of the Tools.
-		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
 		"get pod": {
 			params:         resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClient(scheme(), fakePod),
-			rancherURL:     fakeUrl,
 			expectedResult: `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"rancher","namespace":"default"},"spec":{"containers":[{"image":"rancher:latest","name":"rancher-container","resources":{}}]},"status":{}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"}]}`,
 		},
 		"get pod when tool is configured with URL": {
 			params:         resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClient(scheme(), fakePod),
-			rancherURL:     fakeUrl,
 			expectedResult: `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"rancher","namespace":"default"},"spec":{"containers":[{"image":"rancher:latest","name":"rancher-container","resources":{}}]},"status":{}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"}]}`,
 		},
 		"get pod - not found": {
 			params:        resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),
-			rancherURL:    fakeUrl,
 			expectedError: `pods "rancher" not found`,
 		},
 	}
@@ -79,7 +74,7 @@ func TestGetResource(t *testing.T) {
 				},
 			}
 
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest()
 
 			result, _, err := tools.getResource(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

@@ -47,7 +47,6 @@ func bundleScheme() *runtime.Scheme {
 }
 
 func TestGetBundle(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
@@ -55,7 +54,6 @@ func TestGetBundle(t *testing.T) {
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
 		// used in the creation of the Tools.
-		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -64,7 +62,6 @@ func TestGetBundle(t *testing.T) {
 				Name:      "bundle-1",
 				Workspace: "fleet-default",
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(bundleScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"}: "BundleList",
 			}, fakeBundle1),
@@ -98,7 +95,6 @@ func TestGetBundle(t *testing.T) {
 				Name:      "bundle-1",
 				Workspace: "fleet-default",
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(bundleScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"}: "BundleList",
 			}, fakeBundle1),
@@ -132,7 +128,6 @@ func TestGetBundle(t *testing.T) {
 				Name:      "nonexistent-bundle",
 				Workspace: "fleet-default",
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(bundleScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"}: "BundleList",
 			}),
@@ -147,7 +142,7 @@ func TestGetBundle(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
+			tools := NewTools(test.WrapClient(c, fakeToken))
 			req := test.NewCallToolRequest()
 
 			result, _, err := tools.getBundle(

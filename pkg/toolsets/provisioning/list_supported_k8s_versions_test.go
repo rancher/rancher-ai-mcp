@@ -47,7 +47,8 @@ func TestListSupportedKubernetesVersions(t *testing.T) {
 			}))
 
 			c := &client.Client{}
-			tools := Tools{client: c, RancherURL: svr.URL}
+			c.URL = svr.URL
+			tools := Tools{client: c}
 
 			result, _, err := tools.listSupportedKubernetesVersions(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{

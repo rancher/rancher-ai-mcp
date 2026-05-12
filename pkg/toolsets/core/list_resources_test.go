@@ -61,7 +61,6 @@ func listResourcesScheme() *runtime.Scheme {
 }
 
 func TestListKubernetesResources(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
@@ -69,7 +68,6 @@ func TestListKubernetesResources(t *testing.T) {
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
 		// used in the creation of the Tools.
-		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -82,7 +80,6 @@ func TestListKubernetesResources(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePod1, fakePod2),
-			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -104,7 +101,6 @@ func TestListKubernetesResources(t *testing.T) {
 				Namespace: "kube-system",
 				Cluster:   "local",
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}),
@@ -119,7 +115,6 @@ func TestListKubernetesResources(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePod1, fakePod2),
-			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -146,7 +141,6 @@ func TestListKubernetesResources(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePod1, fakePod2),
-			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": {
 					"resources": [
@@ -169,7 +163,7 @@ func TestListKubernetesResources(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest()
 
 			result, _, err := tools.listKubernetesResources(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

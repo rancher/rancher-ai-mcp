@@ -19,7 +19,6 @@ import (
 )
 
 func TestGetProject(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	cluster := &unstructured.Unstructured{
@@ -91,7 +90,7 @@ func TestGetProject(t *testing.T) {
 				return fakeDynClient, nil
 			},
 		}
-		tools := Tools{client: newFakeToolsClient(c, fakeToken), RancherURL: fakeUrl}
+		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
 		result, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, getProjectParams{
 			Name:    "my-project",
@@ -177,7 +176,7 @@ func TestGetProject(t *testing.T) {
 				return fakeDynClient, nil
 			},
 		}
-		tools := Tools{client: newFakeToolsClient(c, fakeToken), RancherURL: fakeUrl}
+		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
 		_, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, getProjectParams{
 			Name:    "nonexistent-project",
@@ -195,7 +194,7 @@ func TestGetProject(t *testing.T) {
 				return fakeDynClient, nil
 			},
 		}
-		tools := Tools{client: newFakeToolsClient(c, fakeToken), RancherURL: fakeUrl}
+		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
 		result, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, getProjectParams{
 			Name:    "my-project",

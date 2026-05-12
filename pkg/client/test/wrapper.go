@@ -2,7 +2,6 @@ package test
 
 import (
 	"context"
-	"errors"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -11,25 +10,22 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 // clientWrapper wraps a *client.Client and validates tokens before delegating to the wrapped client.
 type clientWrapper struct {
-	client             *client.Client
-	expectedToken      string
-	expectedRequestURL string
+	client        *client.Client
+	expectedToken string
 }
 
-// WrapClient creates a new fake tools client that validates the token and
-// Rancher URL.
+// WrapClient creates a new fake tools client that validates the token.
 //
 // If expectedToken is empty, token validation is skipped.
-// If expectedURL is empty, expectedURL validation is skipped.
-func WrapClient(c *client.Client, expectedToken, expectedURL string) *clientWrapper {
+func WrapClient(c *client.Client, expectedToken string) *clientWrapper {
 	return &clientWrapper{
-		client:             c,
-		expectedToken:      expectedToken,
-		expectedRequestURL: expectedURL,
+		client:        c,
+		expectedToken: expectedToken,
 	}
 }
 
@@ -42,17 +38,9 @@ func (f *clientWrapper) validateToken(token string) error {
 	return nil
 }
 
-// validateRequestURL checks if the provided URL matches the expected URL.
-func (f *clientWrapper) validateRequestURL(requestURL string) error {
-	if f.expectedRequestURL == requestURL {
-		return nil
-	}
-
-	if requestURL == "" {
-		return errors.New("no URL for rancher request")
-	}
-
-	return fmt.Errorf("invalid requestURL: expected %q, got %q", f.expectedRequestURL, requestURL)
+// RancherURL delegates to the wrapped client.
+func (f *clientWrapper) RancherURL() string {
+	return f.client.RancherURL()
 }
 
 // GetResource validates the token and delegates to the wrapped client.
@@ -60,23 +48,17 @@ func (f *clientWrapper) GetResource(ctx context.Context, params client.GetParams
 	if err := f.validateToken(params.Token); err != nil {
 		return nil, err
 	}
-	if err := f.validateRequestURL(params.URL); err != nil {
-		return nil, err
-	}
 
 	return f.client.GetResource(ctx, params)
 }
 
 // GetResourceInterface validates the token and delegates to the wrapped client.
-func (f *clientWrapper) GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
+func (f *clientWrapper) GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
 	if err := f.validateToken(token); err != nil {
 		return nil, err
 	}
-	if err := f.validateRequestURL(url); err != nil {
-		return nil, err
-	}
 
-	return f.client.GetResourceInterface(ctx, token, url, namespace, cluster, gvr)
+	return f.client.GetResourceInterface(ctx, token, namespace, cluster, gvr)
 }
 
 // GetResources validates the token and delegates to the wrapped client.
@@ -84,30 +66,21 @@ func (f *clientWrapper) GetResources(ctx context.Context, params client.ListPara
 	if err := f.validateToken(params.Token); err != nil {
 		return nil, err
 	}
-	if err := f.validateRequestURL(params.URL); err != nil {
-		return nil, err
-	}
 
 	return f.client.GetResources(ctx, params)
 }
 
 // CreateClientSet validates the token and delegates to the wrapped client.
-func (f *clientWrapper) CreateClientSet(ctx context.Context, token string, url string, cluster string) (kubernetes.Interface, error) {
+func (f *clientWrapper) CreateClientSet(ctx context.Context, token string, cluster string) (kubernetes.Interface, error) {
 	if err := f.validateToken(token); err != nil {
 		return nil, err
 	}
-	if err := f.validateRequestURL(url); err != nil {
-		return nil, err
-	}
 
-	return f.client.CreateClientSet(ctx, token, url, cluster)
+	return f.client.CreateClientSet(ctx, token, cluster)
 }
 
 func (f *clientWrapper) GetResourceAtAnyAPIVersion(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error) {
 	if err := f.validateToken(params.Token); err != nil {
-		return nil, err
-	}
-	if err := f.validateRequestURL(params.URL); err != nil {
 		return nil, err
 	}
 
@@ -118,9 +91,6 @@ func (f *clientWrapper) GetResourceByGVR(ctx context.Context, params client.GetP
 	if err := f.validateToken(params.Token); err != nil {
 		return nil, err
 	}
-	if err := f.validateRequestURL(params.URL); err != nil {
-		return nil, err
-	}
 
 	return f.client.GetResourceByGVR(ctx, params, gvr)
 }
@@ -129,22 +99,21 @@ func (f *clientWrapper) GetResourcesAtAnyAPIVersion(ctx context.Context, params 
 	if err := f.validateToken(params.Token); err != nil {
 		return nil, err
 	}
-	if err := f.validateRequestURL(params.URL); err != nil {
-		return nil, err
-	}
 
 	return f.client.GetResourcesAtAnyAPIVersion(ctx, params)
 }
 
-func (f *clientWrapper) GetClusterID(ctx context.Context, token string, url string, clusterNameOrID string) (string, error) {
+func (f *clientWrapper) GetClusterID(ctx context.Context, token string, clusterNameOrID string) (string, error) {
 	if err := f.validateToken(token); err != nil {
 		return "", err
 	}
-	if err := f.validateRequestURL(url); err != nil {
-		return "", err
-	}
 
-	return f.client.GetClusterID(ctx, token, url, clusterNameOrID)
+	return f.client.GetClusterID(ctx, token, clusterNameOrID)
+}
+
+// CreateRestConfig delegates to the wrapped client.
+func (f *clientWrapper) CreateRestConfig(token string, clusterID string) (*rest.Config, error) {
+	return f.client.CreateRestConfig(token, clusterID)
 }
 
 // NewCallToolRequest creates and returns a CallToolRequest.

@@ -7,9 +7,11 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/rest"
 )
 
@@ -23,29 +25,38 @@ func (f *fakeResourceAnalyzer) analyzeFleetResources(_ context.Context, _ *rest.
 	return f.report, f.err
 }
 
+// fakeAnalyseClient implements toolsClient for analyse tests.
+type fakeAnalyseClient struct{}
+
+func (f *fakeAnalyseClient) RancherURL() string { return "https://localhost:8080" }
+func (f *fakeAnalyseClient) GetResource(_ context.Context, _ client.GetParams) (*unstructured.Unstructured, error) {
+	return nil, nil
+}
+func (f *fakeAnalyseClient) GetResources(_ context.Context, _ client.ListParams) ([]*unstructured.Unstructured, error) {
+	return nil, nil
+}
+func (f *fakeAnalyseClient) CreateRestConfig(_ string, _ string) (*rest.Config, error) {
+	return &rest.Config{}, nil
+}
+
 func TestAnalyzeFleetResources(t *testing.T) {
-	fakeURL := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
 		analyzer       *fakeResourceAnalyzer
-		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
 		"returns report on success": {
 			analyzer:       &fakeResourceAnalyzer{report: "fleet is healthy"},
-			rancherURL:     fakeURL,
 			expectedResult: "fleet is healthy",
 		},
 		"returns report on success using configured rancherURL": {
 			analyzer:       &fakeResourceAnalyzer{report: "2 bundles not ready"},
-			rancherURL:     fakeURL,
 			expectedResult: "2 bundles not ready",
 		},
 		"error from resourceAnalyzer is propagated": {
 			analyzer:      &fakeResourceAnalyzer{err: errors.New("cluster unreachable")},
-			rancherURL:    fakeURL,
 			expectedError: "cluster unreachable",
 		},
 	}
@@ -53,7 +64,7 @@ func TestAnalyzeFleetResources(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tools := &Tools{
-				RancherURL:       tt.rancherURL,
+				client:           &fakeAnalyseClient{},
 				resourceAnalyzer: tt.analyzer,
 			}
 			req := test.NewCallToolRequest()

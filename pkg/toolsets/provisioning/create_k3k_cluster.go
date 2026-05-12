@@ -138,7 +138,7 @@ func (t *Tools) createK3kCluster(ctx context.Context, toolReq *mcp.CallToolReque
 
 	unstructuredObj := t.createK3kClusterObj(params)
 
-	resourceInterface, err := t.client.GetResourceInterface(ctx, middleware.Token(ctx), t.rancherURL(), params.Namespace, params.TargetCluster, converter.K8sKindsToGVRs["k3kcluster"])
+	resourceInterface, err := t.client.GetResourceInterface(ctx, middleware.Token(ctx), params.Namespace, params.TargetCluster, converter.K8sKindsToGVRs["k3kcluster"])
 	if err != nil {
 		zap.L().Error("failed to get resource interface", zap.String("tool", "createK3kCluster"), zap.Error(err))
 		return nil, nil, err

@@ -83,7 +83,8 @@ func TestGetK3kClusters(t *testing.T) {
 					return test.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: c, RancherURL: fakeUrl}
+			c.URL = fakeUrl
+			tools := Tools{client: c}
 
 			result, _, err := tools.getK3kClusters(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, test.params)
 

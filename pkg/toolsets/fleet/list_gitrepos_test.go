@@ -82,7 +82,6 @@ func listGitReposScheme() *runtime.Scheme {
 }
 
 func TestListGitRepos(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
@@ -90,7 +89,6 @@ func TestListGitRepos(t *testing.T) {
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
 		// used in the creation of the Tools.
-		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -98,7 +96,6 @@ func TestListGitRepos(t *testing.T) {
 			params: listGitRepoParams{
 				Workspace: "fleet-default",
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listGitReposScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"}: "GitRepoList",
 			}, fakeGitRepo1, fakeGitRepo2),
@@ -153,7 +150,6 @@ func TestListGitRepos(t *testing.T) {
 			params: listGitRepoParams{
 				Workspace: "empty-workspace",
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listGitReposScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"}: "GitRepoList",
 			}),
@@ -163,7 +159,6 @@ func TestListGitRepos(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listGitReposScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"}: "GitRepoList",
 			}, fakeGitRepo1, fakeGitRepo2),
-			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -220,7 +215,7 @@ func TestListGitRepos(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
+			tools := NewTools(test.WrapClient(c, fakeToken))
 			req := test.NewCallToolRequest()
 
 			result, _, err := tools.listGitRepos(

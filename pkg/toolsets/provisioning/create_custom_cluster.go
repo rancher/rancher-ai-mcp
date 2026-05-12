@@ -46,7 +46,7 @@ func (t *Tools) createCustomCluster(ctx context.Context, toolReq *mcp.CallToolRe
 		return nil, nil, fmt.Errorf("failed to create custom cluster object: %w", err)
 	}
 
-	resourceInterface, err := t.client.GetResourceInterface(ctx, middleware.Token(ctx), t.rancherURL(), DefaultClusterResourcesNamespace, LocalCluster, converter.K8sKindsToGVRs[converter.ProvisioningClusterResourceKind])
+	resourceInterface, err := t.client.GetResourceInterface(ctx, middleware.Token(ctx), DefaultClusterResourcesNamespace, LocalCluster, converter.K8sKindsToGVRs[converter.ProvisioningClusterResourceKind])
 	if err != nil {
 		return nil, nil, fmt.Errorf("error getting resource interface: %w", err)
 	}
@@ -85,7 +85,7 @@ func (t *Tools) CreateCustomClusterObj(toolReq *mcp.CallToolRequest, params crea
 		return nil, fmt.Errorf("unsupported CNI \"%s\". Valid values are \"%v\"", params.CNI, strings.Join(allCNIs, "\", \""))
 	}
 
-	fullVersion, allSupportedVersions, supported, err := supportedKubernetesVersion(t.rancherURL(), params.Distribution, params.Version, log)
+	fullVersion, allSupportedVersions, supported, err := supportedKubernetesVersion(t.client.RancherURL(), params.Distribution, params.Version, log)
 	if err != nil {
 		log.Error("error getting supported Kubernetes version", zap.Error(err))
 		return nil, fmt.Errorf("error checking supported Kubernetes versions: %w", err)

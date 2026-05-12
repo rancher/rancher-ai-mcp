@@ -5,7 +5,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/defaults"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -18,35 +17,26 @@ const (
 )
 
 type toolsClient interface {
+	RancherURL() string
 	GetResource(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error)
-	GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
+	GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
 	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
-	CreateClientSet(ctx context.Context, token string, url string, cluster string) (kubernetes.Interface, error)
-	GetClusterID(ctx context.Context, token string, url string, clusterNameOrID string) (string, error)
+	CreateClientSet(ctx context.Context, token string, cluster string) (kubernetes.Interface, error)
+	GetClusterID(ctx context.Context, token string, clusterNameOrID string) (string, error)
 }
 
 // Tools contains all tools for the MCP server
 type Tools struct {
-	client     toolsClient
-	RancherURL string
-	ReadOnly   bool
+	client   toolsClient
+	ReadOnly bool
 }
 
 // NewTools creates and returns a new Tools instance.
-func NewTools(client toolsClient, rancherURL string, readOnly bool) *Tools {
+func NewTools(client toolsClient, readOnly bool) *Tools {
 	return &Tools{
-		client:     client,
-		RancherURL: rancherURL,
-		ReadOnly:   readOnly,
+		client:   client,
+		ReadOnly: readOnly,
 	}
-}
-
-func (t *Tools) rancherURL() string {
-	if t.RancherURL == "" {
-		return defaults.RancherURL()
-	}
-
-	return t.RancherURL
 }
 
 // AddTools registers all Rancher Kubernetes tools with the provided MCP server.

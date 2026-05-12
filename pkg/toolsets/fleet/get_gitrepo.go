@@ -28,7 +28,6 @@ func (t *Tools) getGitRepo(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Kind:      "gitrepo",
 		Namespace: params.Workspace,
 		Name:      params.Name,
-		URL:       t.rancherURL(),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {

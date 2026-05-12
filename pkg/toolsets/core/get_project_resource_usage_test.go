@@ -25,7 +25,7 @@ import (
 // pre-populated with the given objects. Pod metrics objects must be passed separately
 // via metricsObjects because the metrics API uses resource name "pods" under
 // metrics.k8s.io, which differs from the type-based pluralization used by the tracker.
-func newProjectResourceUsageTools(t *testing.T, fakeToken, fakeURL, rancherURL string, objects []runtime.Object, metricsObjects []runtime.Object) *Tools {
+func newProjectResourceUsageTools(t *testing.T, fakeToken string, objects []runtime.Object, metricsObjects []runtime.Object) *Tools {
 	t.Helper()
 
 	scheme := runtime.NewScheme()
@@ -54,11 +54,10 @@ func newProjectResourceUsageTools(t *testing.T, fakeToken, fakeURL, rancherURL s
 			return fakeDynClient, nil
 		},
 	}
-	return NewTools(test.WrapClient(c, fakeToken, fakeURL), rancherURL, false)
+	return NewTools(test.WrapClient(c, fakeToken), false)
 }
 
 func TestGetResourceUsage(t *testing.T) {
-	fakeURL := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	cluster := fakeMgmtCluster("test-cluster")
@@ -66,7 +65,7 @@ func TestGetResourceUsage(t *testing.T) {
 	ns1 := fakeProjectNamespace("ns-1", "my-project")
 
 	t.Run("running pod with metrics", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
+		tools := newProjectResourceUsageTools(t, fakeToken,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -126,7 +125,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("running pod without metrics server", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
+		tools := newProjectResourceUsageTools(t, fakeToken,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -181,7 +180,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("project with no namespaces", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
+		tools := newProjectResourceUsageTools(t, fakeToken,
 			[]runtime.Object{cluster, project},
 			nil,
 		)
@@ -215,7 +214,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("non-running pods are skipped", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
+		tools := newProjectResourceUsageTools(t, fakeToken,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -270,7 +269,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("init container resources are aggregated", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
+		tools := newProjectResourceUsageTools(t, fakeToken,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -337,7 +336,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("init container resources larger than app container", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
+		tools := newProjectResourceUsageTools(t, fakeToken,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -404,7 +403,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("project not found", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
+		tools := newProjectResourceUsageTools(t, fakeToken,
 			[]runtime.Object{cluster},
 			nil,
 		)
@@ -420,7 +419,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("cluster not found", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL, nil, nil)
+		tools := newProjectResourceUsageTools(t, fakeToken, nil, nil)
 
 		_, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
@@ -433,7 +432,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("usage for all projects", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
+		tools := newProjectResourceUsageTools(t, fakeToken,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -488,7 +487,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("usage for a namespace", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
+		tools := newProjectResourceUsageTools(t, fakeToken,
 			[]runtime.Object{
 				cluster,
 				ns1,

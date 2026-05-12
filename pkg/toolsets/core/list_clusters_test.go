@@ -19,7 +19,6 @@ import (
 )
 
 func TestListClusters(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	scheme := runtime.NewScheme()
@@ -58,7 +57,7 @@ func TestListClusters(t *testing.T) {
 				return fakeDynClient, nil
 			},
 		}
-		tools := Tools{client: newFakeToolsClient(c, fakeToken), RancherURL: fakeUrl}
+		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
 		result, _, err := tools.listClusters(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, struct{}{})
 

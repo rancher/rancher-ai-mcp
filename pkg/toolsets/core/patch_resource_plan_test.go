@@ -247,7 +247,7 @@ func TestUpdateKubernetesResourcePlan(t *testing.T) {
 				},
 			}
 
-			tools := NewTools(test.WrapClient(c, "test-token", "https://localhost:8080"), "https://localhost:8080", false)
+			tools := NewTools(test.WrapClient(c, "test-token"), false)
 			req := test.NewCallToolRequest()
 			ctx := middleware.WithToken(t.Context(), "test-token")
 

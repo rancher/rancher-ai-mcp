@@ -133,7 +133,6 @@ var fakeCAPIMachineDeployment = &unstructured.Unstructured{
 }
 
 func TestAnalyzeClusterMachines(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
@@ -142,7 +141,6 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
 		// used in the creation of the Tools.
-		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -151,7 +149,6 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine, fakeCAPIMachine2, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
@@ -300,7 +297,6 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "empty-cluster",
 				Namespace: "fleet-default",
 			},
-			rancherURL:     testURL,
 			fakeClientset:  newFakeClientSet(),
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
 			expectedResult: `{"llm":"no resources found"}`,
@@ -310,7 +306,6 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "",
 			},
-			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
@@ -427,7 +422,6 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine),
@@ -481,7 +475,6 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "empty-cluster",
 				Namespace: "fleet-default",
 			},
-			rancherURL:     testURL,
 			fakeClientset:  newFakeClientSet(),
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
 			expectedResult: `{"llm":"no resources found"}`,
@@ -499,7 +492,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				},
 			}
 
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest()
 			req.Params = &mcp.CallToolParamsRaw{
 				Name: "analyze-cluster-machines",

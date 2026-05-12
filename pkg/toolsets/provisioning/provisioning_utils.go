@@ -53,7 +53,6 @@ func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, toolReq *mcp.
 		Kind:      converter.CAPIMachineResourceKind,
 		Namespace: params.namespace,
 		Name:      params.machineName,
-		URL:       t.rancherURL(),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
@@ -91,7 +90,6 @@ func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, toolReq *mcp.
 			Kind:      converter.CAPIMachineSetResourceKind,
 			Namespace: params.namespace,
 			Name:      ownerRef.Name,
-			URL:       t.rancherURL(),
 			Token:     middleware.Token(ctx),
 		})
 		if err != nil {
@@ -133,7 +131,6 @@ func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, toolReq *mcp.
 			Kind:      converter.CAPIMachineDeploymentResourceKind,
 			Namespace: params.namespace,
 			Name:      ownerRef.Name,
-			URL:       t.rancherURL(),
 			Token:     middleware.Token(ctx),
 		})
 		if err != nil {
@@ -199,7 +196,6 @@ func (t *Tools) getAllCAPIMachineResources(ctx context.Context, toolReq *mcp.Cal
 		Kind:          converter.CAPIMachineDeploymentResourceKind,
 		Namespace:     params.namespace,
 		LabelSelector: clusterSelector.String(),
-		URL:           t.rancherURL(),
 		Token:         middleware.Token(ctx),
 	})
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -229,7 +225,6 @@ func (t *Tools) getAllCAPIMachineResources(ctx context.Context, toolReq *mcp.Cal
 		Kind:          converter.CAPIMachineSetResourceKind,
 		Namespace:     params.namespace,
 		LabelSelector: clusterSelector.String(),
-		URL:           t.rancherURL(),
 		Token:         middleware.Token(ctx),
 	})
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -259,7 +254,6 @@ func (t *Tools) getAllCAPIMachineResources(ctx context.Context, toolReq *mcp.Cal
 		Kind:          converter.CAPIMachineResourceKind,
 		Namespace:     params.namespace,
 		LabelSelector: clusterSelector.String(),
-		URL:           t.rancherURL(),
 		Token:         middleware.Token(ctx),
 	})
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -294,7 +288,6 @@ func (t *Tools) getProvisioningCluster(ctx context.Context, toolReq *mcp.CallToo
 		Kind:      converter.ProvisioningClusterResourceKind,
 		Namespace: ns,
 		Name:      clusterName,
-		URL:       t.rancherURL(),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
@@ -367,7 +360,6 @@ func (t *Tools) getMachinePoolConfigs(ctx context.Context, toolReq *mcp.CallTool
 			Cluster:   LocalCluster,
 			Namespace: DefaultClusterResourcesNamespace,
 			Name:      configName,
-			URL:       t.rancherURL(),
 			Token:     middleware.Token(ctx),
 		}, schema.GroupVersionResource{
 			Group:    "rke-machine-config.cattle.io",

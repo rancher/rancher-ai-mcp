@@ -97,14 +97,12 @@ func inspectPodScheme() *runtime.Scheme {
 }
 
 func TestInspectPod(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
 		params specificResourceParams
 		// used in the CallToolRequest
 		// used in the creation of the Tools.
-		rancherURL     string
 		fakeClientset  *fake.Clientset
 		fakeDynClient  *dynamicfake.FakeDynamicClient
 		expectedError  string
@@ -118,7 +116,6 @@ func TestInspectPod(t *testing.T) {
 			},
 			fakeClientset: fake.NewSimpleClientset(fakeDeploymentForInspect, fakeReplicaSet, fakePodForInspect),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme(), fakePodForInspect, fakeReplicaSet, fakeDeploymentForInspect),
-			rancherURL:    fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -212,7 +209,6 @@ func TestInspectPod(t *testing.T) {
 			},
 			fakeClientset: fake.NewSimpleClientset(fakeDeploymentForInspect, fakeReplicaSet, fakePodForInspect),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme(), fakePodForInspect, fakeReplicaSet, fakeDeploymentForInspect),
-			rancherURL:    fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -307,7 +303,6 @@ func TestInspectPod(t *testing.T) {
 			},
 			fakeClientset: fake.NewSimpleClientset(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme()),
-			rancherURL:    fakeUrl,
 			expectedError: `pods "nonexistent-pod" not found`,
 		},
 		"inspect pod - statefulset parent": {
@@ -350,7 +345,6 @@ func TestInspectPod(t *testing.T) {
 					},
 				},
 			),
-			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -467,7 +461,6 @@ func TestInspectPod(t *testing.T) {
 					},
 				},
 			),
-			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -580,7 +573,6 @@ func TestInspectPod(t *testing.T) {
 					},
 				},
 			),
-			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -632,7 +624,7 @@ func TestInspectPod(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest()
 
 			result, _, err := tools.inspectPod(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

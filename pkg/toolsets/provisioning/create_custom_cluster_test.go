@@ -189,7 +189,7 @@ func TestCreateCustomCluster(t *testing.T) {
 				}
 			}))
 
-			tools.RancherURL = svr.URL
+			c.URL = svr.URL
 
 			result, _, err := tools.createCustomCluster(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{

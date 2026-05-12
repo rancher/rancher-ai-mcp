@@ -42,7 +42,7 @@ func (t *Tools) scaleClusterNodePool(ctx context.Context, toolReq *mcp.CallToolR
 
 	log.Debug("Scaling cluster node pool")
 
-	resourceInterface, err := t.client.GetResourceInterface(ctx, middleware.Token(ctx), t.rancherURL(), params.Namespace, LocalCluster, converter.K8sKindsToGVRs[converter.ProvisioningClusterResourceKind])
+	resourceInterface, err := t.client.GetResourceInterface(ctx, middleware.Token(ctx), params.Namespace, LocalCluster, converter.K8sKindsToGVRs[converter.ProvisioningClusterResourceKind])
 	if err != nil {
 		return nil, nil, err
 	}

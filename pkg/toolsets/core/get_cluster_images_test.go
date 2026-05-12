@@ -50,7 +50,6 @@ func podScheme() *runtime.Scheme {
 }
 
 func TestGetClusterImages(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
@@ -58,14 +57,12 @@ func TestGetClusterImages(t *testing.T) {
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
 		// used in the creation of the Tools.
-		rancherURL string
 
 		expectedResult string
 		expectedError  string
 	}{
 		"get images from single cluster": {
 			params:     getClusterImagesParams{Clusters: []string{"local"}},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(podScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePodWithImage),
@@ -75,7 +72,6 @@ func TestGetClusterImages(t *testing.T) {
 		},
 		"get images from cluster with no pods": {
 			params:     getClusterImagesParams{Clusters: []string{"local"}},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(podScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}),
@@ -88,7 +84,6 @@ func TestGetClusterImages(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(podScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePodWithImage),
-			rancherURL: fakeUrl,
 			expectedResult: `{
 				"local": ["busybox:latest", "nginx:1.21", "redis:alpine"]
 			}`,
@@ -103,7 +98,7 @@ func TestGetClusterImages(t *testing.T) {
 				},
 			}
 
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest()
 
 			result, _, err := tools.getClusterImages(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

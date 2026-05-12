@@ -24,7 +24,6 @@ func createResourceScheme() *runtime.Scheme {
 }
 
 func TestCreateKubernetesResource(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	configMapResource := map[string]interface{}{
@@ -46,7 +45,6 @@ func TestCreateKubernetesResource(t *testing.T) {
 
 		// used in the CallToolRequest
 		// used in the creation of the Tools.
-		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
@@ -58,7 +56,6 @@ func TestCreateKubernetesResource(t *testing.T) {
 				Cluster:   "local",
 				Resource:  configMapResource,
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}),
@@ -84,7 +81,6 @@ func TestCreateKubernetesResource(t *testing.T) {
 				Cluster:   "local",
 				Resource:  configMapResource,
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}),
@@ -111,7 +107,6 @@ func TestCreateKubernetesResource(t *testing.T) {
 				Cluster:   "local",
 				Resource:  make(chan int),
 			},
-			rancherURL:    fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(createResourceScheme()),
 			expectedError: `failed to marshal resource`,
 		},
@@ -123,7 +118,6 @@ func TestCreateKubernetesResource(t *testing.T) {
 				Cluster:   "local",
 				Resource:  "invalid-resource-type",
 			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}),
@@ -138,7 +132,7 @@ func TestCreateKubernetesResource(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest()
 
 			result, _, err := tools.createKubernetesResource(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

@@ -28,7 +28,6 @@ func (t *Tools) getResource(ctx context.Context, toolReq *mcp.CallToolRequest, p
 		Kind:      params.Kind,
 		Namespace: params.Namespace,
 		Name:      params.Name,
-		URL:       t.rancherURL(),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {

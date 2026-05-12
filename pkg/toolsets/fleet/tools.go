@@ -5,7 +5,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/defaults"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/rest"
 )
@@ -16,8 +15,10 @@ const (
 )
 
 type toolsClient interface {
+	RancherURL() string
 	GetResource(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error)
 	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
+	CreateRestConfig(token string, clusterID string) (*rest.Config, error)
 }
 
 type resourceAnalyzer interface {
@@ -27,25 +28,15 @@ type resourceAnalyzer interface {
 // Tools contains all tools for the MCP server
 type Tools struct {
 	client           toolsClient
-	RancherURL       string
 	resourceAnalyzer resourceAnalyzer
 }
 
 // NewTools creates and returns a new Tools instance.
-func NewTools(client toolsClient, rancherURL string) *Tools {
+func NewTools(client toolsClient) *Tools {
 	return &Tools{
 		client:           client,
-		RancherURL:       rancherURL,
 		resourceAnalyzer: newCLI(),
 	}
-}
-
-func (t *Tools) rancherURL() string {
-	if t.RancherURL == "" {
-		return defaults.RancherURL()
-	}
-
-	return t.RancherURL
 }
 
 // AddTools registers all Rancher Kubernetes tools with the provided MCP server.

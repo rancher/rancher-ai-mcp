@@ -126,7 +126,7 @@ func TestGetClusterId(t *testing.T) {
 				},
 			}
 
-			clusterID, err := c.GetClusterID(context.TODO(), fakeToken, fakeUrl, test.clusterNameOrIDInput)
+			clusterID, err := c.GetClusterID(context.TODO(), fakeToken, test.clusterNameOrIDInput)
 
 			if test.expectErr != "" {
 				require.ErrorContains(t, err, test.expectErr)
@@ -184,7 +184,6 @@ func TestGetResource(t *testing.T) {
 				Kind:      "pod",
 				Namespace: "default",
 				Name:      "test-pod",
-				URL:       fakeUrl,
 				Token:     fakeToken,
 			},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme(), fakePod),
@@ -196,7 +195,6 @@ func TestGetResource(t *testing.T) {
 				Kind:      "pod",
 				Namespace: "default",
 				Name:      "nonexistent-pod",
-				URL:       fakeUrl,
 				Token:     fakeToken,
 			},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),
@@ -269,7 +267,6 @@ func TestGetResources(t *testing.T) {
 				Cluster:   "local",
 				Kind:      "pod",
 				Namespace: "default",
-				URL:       fakeUrl,
 				Token:     fakeToken,
 			},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme(), fakePod1, fakePod2, fakePod3),
@@ -281,7 +278,6 @@ func TestGetResources(t *testing.T) {
 				Cluster:       "local",
 				Kind:          "pod",
 				Namespace:     "default",
-				URL:           fakeUrl,
 				Token:         fakeToken,
 				LabelSelector: "app=nginx",
 			},
@@ -294,7 +290,6 @@ func TestGetResources(t *testing.T) {
 				Cluster:   "local",
 				Kind:      "pod",
 				Namespace: "kube-system",
-				URL:       fakeUrl,
 				Token:     fakeToken,
 			},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),

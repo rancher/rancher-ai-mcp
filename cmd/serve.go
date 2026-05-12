@@ -73,14 +73,15 @@ func rancherURLFromAuthServerURL(s string) (string, error) {
 
 func runServe(cmd *cobra.Command, args []string) error {
 	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "rancher mcp server", Version: "v1.0.0"}, nil)
-	client := client.NewClient(insecure)
 
 	rancherURL, err := rancherURLFromAuthServerURL(authzServerURL)
 	if err != nil {
 		return fmt.Errorf("parsing authz-server-url: %w", err)
 	}
 
-	toolsets.AddAllTools(client, mcpServer, rancherURL, readOnly)
+	client := client.NewClient(rancherURL, insecure)
+
+	toolsets.AddAllTools(client, mcpServer, readOnly)
 
 	zap.L().Info("read-only mode", zap.Bool("enabled", readOnly))
 
