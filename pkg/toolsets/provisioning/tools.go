@@ -5,6 +5,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/defaults"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -42,7 +43,7 @@ func NewTools(client toolsClient, rancherURL string, readOnly bool) *Tools {
 
 func (t *Tools) rancherURL() string {
 	if t.RancherURL == "" {
-		return "https://rancher.cattle-system.svc"
+		return defaults.RancherURL()
 	}
 
 	return t.RancherURL

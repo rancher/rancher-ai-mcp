@@ -15,8 +15,7 @@ type toolsAdder interface {
 
 // AddAllTools adds all available tools to the MCP server.
 //
-// The rancherServerURL can be empty in which case we'll use the default
-// https://rancher.cattle-system.svc URL.
+// The rancherServerURL can be empty in which case we'll use defaults.RancherURL().
 func AddAllTools(client *client.Client, mcpServer *mcp.Server, rancherServerURL string, readOnly bool) {
 	for _, ta := range allToolSets(client, rancherServerURL, readOnly) {
 		ta.AddTools(mcpServer)
