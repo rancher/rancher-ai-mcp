@@ -13,8 +13,6 @@ import (
 	"k8s.io/client-go/kubernetes"
 )
 
-const urlHeader string = "R_url"
-
 // clientWrapper wraps a *client.Client and validates tokens before delegating to the wrapped client.
 type clientWrapper struct {
 	client             *client.Client
@@ -150,13 +148,6 @@ func (f *clientWrapper) GetClusterID(ctx context.Context, token string, url stri
 }
 
 // NewCallToolRequest creates and returns a CallToolRequest.
-//
-// The R_url header will be set to the requestURL if requestURL is not empty.
-func NewCallToolRequest(requestURL string) *mcp.CallToolRequest {
-	req := &mcp.CallToolRequest{Extra: &mcp.RequestExtra{Header: map[string][]string{}}}
-	if requestURL != "" {
-		req.Extra.Header[urlHeader] = []string{requestURL}
-	}
-
-	return req
+func NewCallToolRequest() *mcp.CallToolRequest {
+	return &mcp.CallToolRequest{}
 }

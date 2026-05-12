@@ -28,7 +28,7 @@ func (t *Tools) createProject(ctx context.Context, toolReq *mcp.CallToolRequest,
 	zap.L().Debug("createProject called", zap.String("cluster", params.Cluster))
 
 	resourceInterface, err := t.client.GetResourceInterface(
-		ctx, middleware.Token(ctx), t.rancherURL(toolReq),
+		ctx, middleware.Token(ctx), t.rancherURL(),
 		params.Cluster, "local", converter.K8sKindsToGVRs["project"])
 	if err != nil {
 		return nil, nil, err

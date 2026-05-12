@@ -66,7 +66,7 @@ func TestGetResourceUsage(t *testing.T) {
 	ns1 := fakeProjectNamespace("ns-1", "my-project")
 
 	t.Run("running pod with metrics", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -92,7 +92,7 @@ func TestGetResourceUsage(t *testing.T) {
 
 		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
-			test.NewCallToolRequest(fakeURL),
+			test.NewCallToolRequest(),
 			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
 		)
 
@@ -126,7 +126,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("running pod without metrics server", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -147,7 +147,7 @@ func TestGetResourceUsage(t *testing.T) {
 
 		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
-			test.NewCallToolRequest(fakeURL),
+			test.NewCallToolRequest(),
 			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
 		)
 
@@ -181,14 +181,14 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("project with no namespaces", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
 			[]runtime.Object{cluster, project},
 			nil,
 		)
 
 		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
-			test.NewCallToolRequest(fakeURL),
+			test.NewCallToolRequest(),
 			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
 		)
 
@@ -215,7 +215,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("non-running pods are skipped", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -236,7 +236,7 @@ func TestGetResourceUsage(t *testing.T) {
 
 		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
-			test.NewCallToolRequest(fakeURL),
+			test.NewCallToolRequest(),
 			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
 		)
 
@@ -270,7 +270,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("init container resources are aggregated", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -303,7 +303,7 @@ func TestGetResourceUsage(t *testing.T) {
 
 		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
-			test.NewCallToolRequest(fakeURL),
+			test.NewCallToolRequest(),
 			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
 		)
 
@@ -337,7 +337,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("init container resources larger than app container", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -370,7 +370,7 @@ func TestGetResourceUsage(t *testing.T) {
 
 		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
-			test.NewCallToolRequest(fakeURL),
+			test.NewCallToolRequest(),
 			getResourceUsageParams{Project: "my-project", Cluster: "test-cluster"},
 		)
 
@@ -404,14 +404,14 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("project not found", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
 			[]runtime.Object{cluster},
 			nil,
 		)
 
 		_, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
-			test.NewCallToolRequest(fakeURL),
+			test.NewCallToolRequest(),
 			getResourceUsageParams{Project: "nonexistent-project", Cluster: "test-cluster"},
 		)
 
@@ -420,11 +420,11 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("cluster not found", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "", nil, nil)
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL, nil, nil)
 
 		_, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
-			test.NewCallToolRequest(fakeURL),
+			test.NewCallToolRequest(),
 			getResourceUsageParams{Project: "my-project", Cluster: "nonexistent-cluster"},
 		)
 
@@ -433,7 +433,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("usage for all projects", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
 			[]runtime.Object{
 				cluster,
 				project,
@@ -454,7 +454,7 @@ func TestGetResourceUsage(t *testing.T) {
 
 		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
-			test.NewCallToolRequest(fakeURL),
+			test.NewCallToolRequest(),
 			getResourceUsageParams{Cluster: "test-cluster"},
 		)
 
@@ -488,7 +488,7 @@ func TestGetResourceUsage(t *testing.T) {
 	})
 
 	t.Run("usage for a namespace", func(t *testing.T) {
-		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, "",
+		tools := newProjectResourceUsageTools(t, fakeToken, fakeURL, fakeURL,
 			[]runtime.Object{
 				cluster,
 				ns1,
@@ -513,7 +513,7 @@ func TestGetResourceUsage(t *testing.T) {
 
 		result, _, err := tools.getResourceUsage(
 			middleware.WithToken(t.Context(), fakeToken),
-			test.NewCallToolRequest(fakeURL),
+			test.NewCallToolRequest(),
 			getResourceUsageParams{Cluster: "test-cluster", Namespace: "ns-1"},
 		)
 

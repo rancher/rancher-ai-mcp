@@ -91,11 +91,9 @@ func TestGetProject(t *testing.T) {
 				return fakeDynClient, nil
 			},
 		}
-		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
+		tools := Tools{client: newFakeToolsClient(c, fakeToken), RancherURL: fakeUrl}
 
-		result, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-			Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-		}, getProjectParams{
+		result, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, getProjectParams{
 			Name:    "my-project",
 			Cluster: "test-cluster",
 		})
@@ -179,11 +177,9 @@ func TestGetProject(t *testing.T) {
 				return fakeDynClient, nil
 			},
 		}
-		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
+		tools := Tools{client: newFakeToolsClient(c, fakeToken), RancherURL: fakeUrl}
 
-		_, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-			Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-		}, getProjectParams{
+		_, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, getProjectParams{
 			Name:    "nonexistent-project",
 			Cluster: "test-cluster",
 		})
@@ -199,11 +195,9 @@ func TestGetProject(t *testing.T) {
 				return fakeDynClient, nil
 			},
 		}
-		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
+		tools := Tools{client: newFakeToolsClient(c, fakeToken), RancherURL: fakeUrl}
 
-		result, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-			Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-		}, getProjectParams{
+		result, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, getProjectParams{
 			Name:    "my-project",
 			Cluster: "test-cluster",
 		})

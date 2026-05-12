@@ -36,7 +36,7 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Kind:      "pod",
 		Namespace: params.Namespace,
 		Name:      params.Name,
-		URL:       t.rancherURL(toolReq),
+		URL:       t.rancherURL(),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
@@ -68,7 +68,7 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 			Kind:      "replicaset",
 			Namespace: params.Namespace,
 			Name:      replicaSetName,
-			URL:       t.rancherURL(toolReq),
+			URL:       t.rancherURL(),
 			Token:     middleware.Token(ctx),
 		})
 		if err != nil {
@@ -98,7 +98,7 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 				Kind:      parentKind,
 				Namespace: params.Namespace,
 				Name:      parentName,
-				URL:       t.rancherURL(toolReq),
+				URL:       t.rancherURL(),
 				Token:     middleware.Token(ctx),
 			})
 			if err != nil {
@@ -114,11 +114,11 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Kind:      "pod.metrics.k8s.io",
 		Namespace: params.Namespace,
 		Name:      params.Name,
-		URL:       t.rancherURL(toolReq),
+		URL:       t.rancherURL(),
 		Token:     middleware.Token(ctx),
 	})
 
-	logs, err := t.getPodLogs(ctx, t.rancherURL(toolReq), params.Cluster, middleware.Token(ctx), pod)
+	logs, err := t.getPodLogs(ctx, t.rancherURL(), params.Cluster, middleware.Token(ctx), pod)
 	if err != nil {
 		zap.L().Error("failed to get pod logs", zap.String("tool", "inspectPod"), zap.Error(err))
 		return nil, nil, err

@@ -12,7 +12,6 @@ import (
 const (
 	toolsSet    = "fleet"
 	toolsSetAnn = "toolset"
-	urlHeader   = "R_url"
 )
 
 type toolsClient interface {
@@ -40,9 +39,9 @@ func NewTools(client toolsClient, rancherURL string) *Tools {
 	}
 }
 
-func (t *Tools) rancherURL(toolReq *mcp.CallToolRequest) string {
+func (t *Tools) rancherURL() string {
 	if t.RancherURL == "" {
-		return toolReq.Extra.Header.Get(urlHeader)
+		return "https://rancher.cattle-system.svc"
 	}
 
 	return t.RancherURL

@@ -46,7 +46,6 @@ func TestGetResource(t *testing.T) {
 		params        resourceParams
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
-		requestURL string
 		// used in the creation of the Tools.
 		rancherURL     string
 		expectedResult string
@@ -55,7 +54,7 @@ func TestGetResource(t *testing.T) {
 		"get pod": {
 			params:         resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClient(scheme(), fakePod),
-			requestURL:     fakeUrl,
+			rancherURL:     fakeUrl,
 			expectedResult: `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"rancher","namespace":"default"},"spec":{"containers":[{"image":"rancher:latest","name":"rancher-container","resources":{}}]},"status":{}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"rancher","type":"pod"}]}`,
 		},
 		"get pod when tool is configured with URL": {
@@ -67,13 +66,8 @@ func TestGetResource(t *testing.T) {
 		"get pod - not found": {
 			params:        resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),
-			requestURL:    fakeUrl,
+			rancherURL:    fakeUrl,
 			expectedError: `pods "rancher" not found`,
-		},
-		"get pod no rancherURL or request URL": {
-			params:        resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),
-			expectedError: "no URL for rancher request",
 		},
 	}
 
@@ -86,7 +80,7 @@ func TestGetResource(t *testing.T) {
 			}
 
 			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
-			req := test.NewCallToolRequest(tt.requestURL)
+			req := test.NewCallToolRequest()
 
 			result, _, err := tools.getResource(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
 			if tt.expectedError != "" {

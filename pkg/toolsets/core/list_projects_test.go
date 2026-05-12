@@ -80,11 +80,9 @@ func TestListProjects(t *testing.T) {
 				return fakeDynClient, nil
 			},
 		}
-		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
+		tools := Tools{client: newFakeToolsClient(c, fakeToken), RancherURL: fakeUrl}
 
-		result, _, err := tools.listProjects(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-			Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-		}, listProjectsParams{
+		result, _, err := tools.listProjects(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, listProjectsParams{
 			Cluster: "test-cluster",
 		})
 

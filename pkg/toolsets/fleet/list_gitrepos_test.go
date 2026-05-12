@@ -89,7 +89,6 @@ func TestListGitRepos(t *testing.T) {
 		params        listGitRepoParams
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
-		requestURL string
 		// used in the creation of the Tools.
 		rancherURL     string
 		expectedResult string
@@ -99,7 +98,7 @@ func TestListGitRepos(t *testing.T) {
 			params: listGitRepoParams{
 				Workspace: "fleet-default",
 			},
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listGitReposScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"}: "GitRepoList",
 			}, fakeGitRepo1, fakeGitRepo2),
@@ -154,7 +153,7 @@ func TestListGitRepos(t *testing.T) {
 			params: listGitRepoParams{
 				Workspace: "empty-workspace",
 			},
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listGitReposScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"}: "GitRepoList",
 			}),
@@ -212,15 +211,6 @@ func TestListGitRepos(t *testing.T) {
 				]
 			}`,
 		},
-		"list gitrepos - no rancherURL or request URL": {
-			params: listGitRepoParams{
-				Workspace: "empty-workspace",
-			},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listGitReposScheme(), map[schema.GroupVersionResource]string{
-				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"}: "GitRepoList",
-			}),
-			expectedError: "no URL for rancher request",
-		},
 	}
 
 	for name, tt := range tests {
@@ -231,7 +221,7 @@ func TestListGitRepos(t *testing.T) {
 				},
 			}
 			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
-			req := test.NewCallToolRequest(tt.requestURL)
+			req := test.NewCallToolRequest()
 
 			result, _, err := tools.listGitRepos(
 				middleware.WithToken(t.Context(), fakeToken),

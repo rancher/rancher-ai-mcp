@@ -58,11 +58,9 @@ func TestListClusters(t *testing.T) {
 				return fakeDynClient, nil
 			},
 		}
-		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
+		tools := Tools{client: newFakeToolsClient(c, fakeToken), RancherURL: fakeUrl}
 
-		result, _, err := tools.listClusters(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-			Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-		}, struct{}{})
+		result, _, err := tools.listClusters(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, struct{}{})
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)

@@ -602,13 +602,12 @@ func TestScaleNodePool(t *testing.T) {
 					return test.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: c}
+			tools := Tools{client: c, RancherURL: testURL}
 
 			result, _, err := tools.scaleClusterNodePool(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{
 					Name: "scaleClusterNodePool",
 				},
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {testURL}}},
 			}, test.params)
 
 			if test.expectedError != "" {

@@ -20,7 +20,7 @@ func (t *Tools) listClusters(ctx context.Context, toolReq *mcp.CallToolRequest, 
 	resources, err := t.client.GetResources(ctx, client.ListParams{
 		Cluster: LocalCluster,
 		Kind:    converter.ManagementClusterResourceKind,
-		URL:     t.rancherURL(toolReq),
+		URL:     t.rancherURL(),
 		Token:   middleware.Token(ctx),
 	})
 	if err != nil {

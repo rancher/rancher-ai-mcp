@@ -66,7 +66,7 @@ func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 		// Unlike provisioning clusters, management cluster objects are cluster scoped.
 		Namespace: "",
 		Name:      provCluster.Status.ClusterName,
-		URL:       t.rancherURL(toolReq),
+		URL:       t.rancherURL(),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil && !apierrors.IsNotFound(err) {
@@ -90,7 +90,7 @@ func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 		Kind:      converter.CAPIClusterResourceKind,
 		Namespace: DefaultClusterResourcesNamespace,
 		Name:      provCluster.Name,
-		URL:       t.rancherURL(toolReq),
+		URL:       t.rancherURL(),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil && !apierrors.IsNotFound(err) {

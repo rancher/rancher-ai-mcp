@@ -28,7 +28,7 @@ func (t *Tools) getBundle(ctx context.Context, toolReq *mcp.CallToolRequest, par
 		Kind:      "bundle",
 		Namespace: params.Workspace,
 		Name:      params.Name,
-		URL:       t.rancherURL(toolReq),
+		URL:       t.rancherURL(),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {

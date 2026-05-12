@@ -69,13 +69,13 @@ func (t *Tools) getProjectID(ctx context.Context, token, url, clusterID, project
 func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, params getProjectParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("getProject called")
 
-	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), params.Cluster)
+	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), t.rancherURL(), params.Cluster)
 	if err != nil {
 		zap.L().Error("failed to get cluster ID", zapGetProject, zap.Error(err))
 		return nil, nil, err
 	}
 
-	projectID, projectResource, err := t.getProjectID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), clusterID, params.Name)
+	projectID, projectResource, err := t.getProjectID(ctx, middleware.Token(ctx), t.rancherURL(), clusterID, params.Name)
 	if err != nil {
 		zap.L().Error("failed to get project", zapGetProject, zap.Error(err))
 		return nil, nil, err
@@ -95,7 +95,7 @@ func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Cluster:       clusterID,
 		Kind:          "namespace",
 		LabelSelector: projectLabel.String(),
-		URL:           t.rancherURL(toolReq),
+		URL:           t.rancherURL(),
 		Token:         middleware.Token(ctx),
 	})
 	if err != nil {

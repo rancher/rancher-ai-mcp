@@ -21,7 +21,6 @@ func TestAnalyzeCluster(t *testing.T) {
 		fakeClientset kubernetes.Interface
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
-		requestURL string
 		// used in the creation of the Tools.
 		rancherURL     string
 		expectedResult string
@@ -32,7 +31,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
@@ -225,7 +224,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
@@ -289,7 +288,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
@@ -384,7 +383,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "local",
 				Namespace: "",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				newProvisioningCluster("local", "fleet-local", "local"),
@@ -448,7 +447,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "nonexistent-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
 			expectedError: "provisioning cluster nonexistent-cluster not found in namespace fleet-default",
@@ -458,7 +457,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "multi-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				newProvisioningCluster("multi-cluster", "fleet-default", "c-m-multi123"),
@@ -782,7 +781,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "unhealthy-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				newProvisioningCluster("unhealthy-cluster", "fleet-default", "c-m-unhealthy"),
@@ -846,7 +845,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "rke-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				newProvisioningClusterWithRKEConfig("rke-cluster", "fleet-default", "c-m-rke123", []provisioningV1.RKEMachinePool{
@@ -1095,7 +1094,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
@@ -1190,7 +1189,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "minimal-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				newProvisioningCluster("minimal-cluster", "fleet-default", "c-m-minimal"),
@@ -1254,7 +1253,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "single-machine-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				newProvisioningCluster("single-machine-cluster", "fleet-default", "c-m-single"),
@@ -1442,18 +1441,6 @@ func TestAnalyzeCluster(t *testing.T) {
 				]
 			}`,
 		},
-		"analyze cluster - no rancherURL or request URL": {
-			params: inspectClusterParams{
-				Cluster:   "test-cluster",
-				Namespace: "fleet-default",
-			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
-				newManagementCluster("c-m-abc123", true),
-			),
-			expectedError: "no URL for rancher request",
-		},
 	}
 
 	for name, tt := range tests {
@@ -1467,7 +1454,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				},
 			}
 			tools := NewTools(test.WrapClient(c, testToken, testURL), tt.rancherURL, false)
-			req := test.NewCallToolRequest(tt.requestURL)
+			req := test.NewCallToolRequest()
 			req.Params = &mcp.CallToolParamsRaw{Name: "analyze-cluster"}
 
 			result, _, err := tools.analyzeCluster(middleware.WithToken(t.Context(), testToken), req, tt.params)

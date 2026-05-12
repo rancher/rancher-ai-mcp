@@ -33,7 +33,7 @@ func (t *Tools) getK3kClusters(ctx context.Context, toolReq *mcp.CallToolRequest
 		clusterList, err := t.client.GetResources(ctx, client.ListParams{
 			Cluster: "local",
 			Kind:    "managementcluster",
-			URL:     toolReq.Extra.Header.Get(urlHeader),
+			URL:     t.rancherURL(),
 			Token:   middleware.Token(ctx),
 		})
 		if err != nil {
@@ -51,7 +51,7 @@ func (t *Tools) getK3kClusters(ctx context.Context, toolReq *mcp.CallToolRequest
 		k3kClusters, err := t.client.GetResources(ctx, client.ListParams{
 			Cluster: cluster,
 			Kind:    "k3kcluster",
-			URL:     toolReq.Extra.Header.Get(urlHeader),
+			URL:     t.rancherURL(),
 			Token:   middleware.Token(ctx),
 		})
 

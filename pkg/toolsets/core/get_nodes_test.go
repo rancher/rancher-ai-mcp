@@ -51,7 +51,6 @@ func TestGetNodes(t *testing.T) {
 		params        getNodesParams
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
-		requestURL string
 		// used in the creation of the Tools.
 		rancherURL     string
 		expectedResult string
@@ -62,7 +61,7 @@ func TestGetNodes(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
 				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
 			}, fakeNode),
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -123,20 +122,12 @@ func TestGetNodes(t *testing.T) {
 		},
 		"get nodes - not found": {
 			params:     getNodesParams{Cluster: "local"},
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "nodes"}:                    "NodeList",
 				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
 			}),
 			expectedResult: `{"llm":"no resources found"}`,
-		},
-		"get nodes no rancherURL or request URL": {
-			params: getNodesParams{Cluster: "local"},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
-				{Group: "", Version: "v1", Resource: "nodes"}:                    "NodeList",
-				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
-			}),
-			expectedError: "no URL for rancher request",
 		},
 	}
 
@@ -148,7 +139,7 @@ func TestGetNodes(t *testing.T) {
 				},
 			}
 			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
-			req := test.NewCallToolRequest(tt.requestURL)
+			req := test.NewCallToolRequest()
 
 			result, _, err := tools.getNodes(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
 			if tt.expectedError != "" {

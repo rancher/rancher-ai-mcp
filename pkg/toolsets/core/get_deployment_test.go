@@ -96,7 +96,6 @@ func TestGetDeploymentDetails(t *testing.T) {
 		params        specificResourceParams
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
-		requestURL string
 		// used in the creation of the Tools.
 		rancherURL     string
 		expectedResult string
@@ -108,7 +107,7 @@ func TestGetDeploymentDetails(t *testing.T) {
 				Namespace: "default",
 				Cluster:   "local",
 			},
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(deploymentScheme(), map[schema.GroupVersionResource]string{
 				{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
 				{Group: "", Version: "v1", Resource: "pods"}:            "PodList",
@@ -154,7 +153,7 @@ func TestGetDeploymentDetails(t *testing.T) {
 				Namespace: "default",
 				Cluster:   "local",
 			},
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(deploymentScheme(), map[schema.GroupVersionResource]string{
 				{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
 				{Group: "", Version: "v1", Resource: "pods"}:            "PodList",
@@ -207,18 +206,6 @@ func TestGetDeploymentDetails(t *testing.T) {
 				]
 			}`,
 		},
-		"get deployment from cluster - no rancherURL or request URL": {
-			params: specificResourceParams{
-				Name:      "nonexistent-deployment",
-				Namespace: "default",
-				Cluster:   "local",
-			},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(deploymentScheme(), map[schema.GroupVersionResource]string{
-				{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
-				{Group: "", Version: "v1", Resource: "pods"}:            "PodList",
-			}),
-			expectedError: "no URL for rancher request",
-		},
 	}
 
 	for name, tt := range tests {
@@ -229,7 +216,7 @@ func TestGetDeploymentDetails(t *testing.T) {
 				},
 			}
 			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
-			req := test.NewCallToolRequest(tt.requestURL)
+			req := test.NewCallToolRequest()
 
 			result, _, err := tools.getDeploymentDetails(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
 			if tt.expectedError != "" {

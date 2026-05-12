@@ -25,7 +25,7 @@ func (t *Tools) listGitRepos(ctx context.Context, toolReq *mcp.CallToolRequest, 
 		Cluster:   "local",
 		Kind:      "gitrepo",
 		Namespace: params.Workspace,
-		URL:       t.rancherURL(toolReq),
+		URL:       t.rancherURL(),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {

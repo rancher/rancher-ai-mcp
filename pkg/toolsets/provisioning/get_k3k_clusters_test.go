@@ -83,11 +83,9 @@ func TestGetK3kClusters(t *testing.T) {
 					return test.fakeDynClient, nil
 				},
 			}
-			tools := Tools{client: c}
+			tools := Tools{client: c, RancherURL: fakeUrl}
 
-			result, _, err := tools.getK3kClusters(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-			}, test.params)
+			result, _, err := tools.getK3kClusters(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, test.params)
 
 			if test.expectedError != "" {
 				assert.ErrorContains(t, err, test.expectedError)

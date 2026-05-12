@@ -43,7 +43,6 @@ func TestUpdateKubernetesResource(t *testing.T) {
 		params        updateKubernetesResourceParams
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
-		requestURL string
 		// used in the creation of the Tools.
 		rancherURL     string
 		expectedResult string
@@ -66,7 +65,7 @@ func TestUpdateKubernetesResource(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(patchResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}, fakeConfigMapForPatch),
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -98,7 +97,7 @@ func TestUpdateKubernetesResource(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(patchResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}, fakeConfigMapForPatch),
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -129,7 +128,7 @@ func TestUpdateKubernetesResource(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(patchResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}, fakeConfigMapForPatch),
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -193,27 +192,8 @@ func TestUpdateKubernetesResource(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(patchResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}),
-			requestURL:    fakeUrl,
+			rancherURL:    fakeUrl,
 			expectedError: `configmaps "nonexistent-config" not found`,
-		},
-		"update configmap - no rancherURL or request URL": {
-			params: updateKubernetesResourceParams{
-				Name:      "nonexistent-config",
-				Namespace: "default",
-				Kind:      "configmap",
-				Cluster:   "local",
-				Patch: []jsonPatch{
-					{
-						Op:    "replace",
-						Path:  "/data/key1",
-						Value: "value",
-					},
-				},
-			},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(patchResourceScheme(), map[schema.GroupVersionResource]string{
-				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
-			}),
-			expectedError: "no URL for rancher request",
 		},
 	}
 
@@ -225,7 +205,7 @@ func TestUpdateKubernetesResource(t *testing.T) {
 				},
 			}
 			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
-			req := test.NewCallToolRequest(tt.requestURL)
+			req := test.NewCallToolRequest()
 
 			result, _, err := tools.updateKubernetesResource(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
 

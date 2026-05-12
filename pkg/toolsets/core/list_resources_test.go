@@ -68,7 +68,6 @@ func TestListKubernetesResources(t *testing.T) {
 		params        listKubernetesResourcesParams
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
-		requestURL string
 		// used in the creation of the Tools.
 		rancherURL     string
 		expectedResult string
@@ -83,7 +82,7 @@ func TestListKubernetesResources(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePod1, fakePod2),
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": [
 					{
@@ -105,7 +104,7 @@ func TestListKubernetesResources(t *testing.T) {
 				Namespace: "kube-system",
 				Cluster:   "local",
 			},
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}),
@@ -136,17 +135,7 @@ func TestListKubernetesResources(t *testing.T) {
 				]
 			}`,
 		},
-		"list pods - no rancherURL or request URL": {
-			params: listKubernetesResourcesParams{
-				Kind:      "pod",
-				Namespace: "kube-system",
-				Cluster:   "local",
-			},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
-				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
-			}),
-			expectedError: "no URL for rancher request",
-		},
+
 		"list pods - with explicit limit": {
 			params: listKubernetesResourcesParams{
 				Kind:      "pod",
@@ -157,7 +146,7 @@ func TestListKubernetesResources(t *testing.T) {
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePod1, fakePod2),
-			requestURL: fakeUrl,
+			rancherURL: fakeUrl,
 			expectedResult: `{
 				"llm": {
 					"resources": [
@@ -181,7 +170,7 @@ func TestListKubernetesResources(t *testing.T) {
 				},
 			}
 			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
-			req := test.NewCallToolRequest(tt.requestURL)
+			req := test.NewCallToolRequest()
 
 			result, _, err := tools.listKubernetesResources(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
 

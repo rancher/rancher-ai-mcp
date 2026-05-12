@@ -117,11 +117,12 @@ func TestCreateImportedCluster(t *testing.T) {
 				defer svr.Close()
 			}
 
+			tools.RancherURL = svr.URL
+
 			result, _, err := tools.createImportedCluster(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{
 					Name: "createImportedCluster",
 				},
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {svr.URL}}},
 			}, test.params)
 
 			if test.expectedError != "" {

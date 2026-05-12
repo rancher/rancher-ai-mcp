@@ -141,7 +141,6 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 		fakeClientset kubernetes.Interface
 		fakeDynClient *dynamicfake.FakeDynamicClient
 		// used in the CallToolRequest
-		requestURL string
 		// used in the creation of the Tools.
 		rancherURL     string
 		expectedResult string
@@ -152,7 +151,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine, fakeCAPIMachine2, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
@@ -301,7 +300,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "empty-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:     testURL,
+			rancherURL:     testURL,
 			fakeClientset:  newFakeClientSet(),
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
 			expectedResult: `{"llm":"no resources found"}`,
@@ -311,7 +310,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
@@ -428,7 +427,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
+			rancherURL:    testURL,
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
 				fakeCAPIMachine),
@@ -487,15 +486,6 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
 			expectedResult: `{"llm":"no resources found"}`,
 		},
-		"analyze cluster machines - no rancherURL or request URL": {
-			params: inspectClusterMachinesParams{
-				Cluster:   "empty-cluster",
-				Namespace: "fleet-default",
-			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
-			expectedError: "no URL for rancher request",
-		},
 	}
 
 	for name, tt := range tests {
@@ -510,7 +500,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 			}
 
 			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
-			req := test.NewCallToolRequest(tt.requestURL)
+			req := test.NewCallToolRequest()
 			req.Params = &mcp.CallToolParamsRaw{
 				Name: "analyze-cluster-machines",
 			}

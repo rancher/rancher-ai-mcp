@@ -29,14 +29,13 @@ func TestAnalyzeFleetResources(t *testing.T) {
 
 	tests := map[string]struct {
 		analyzer       *fakeResourceAnalyzer
-		requestURL     string
 		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
-		"returns report on success using request URL": {
+		"returns report on success": {
 			analyzer:       &fakeResourceAnalyzer{report: "fleet is healthy"},
-			requestURL:     fakeURL,
+			rancherURL:     fakeURL,
 			expectedResult: "fleet is healthy",
 		},
 		"returns report on success using configured rancherURL": {
@@ -46,7 +45,7 @@ func TestAnalyzeFleetResources(t *testing.T) {
 		},
 		"error from resourceAnalyzer is propagated": {
 			analyzer:      &fakeResourceAnalyzer{err: errors.New("cluster unreachable")},
-			requestURL:    fakeURL,
+			rancherURL:    fakeURL,
 			expectedError: "cluster unreachable",
 		},
 	}
@@ -57,7 +56,7 @@ func TestAnalyzeFleetResources(t *testing.T) {
 				RancherURL:       tt.rancherURL,
 				resourceAnalyzer: tt.analyzer,
 			}
-			req := test.NewCallToolRequest(tt.requestURL)
+			req := test.NewCallToolRequest()
 
 			result, extra, err := tools.analyzeFleetResources(
 				middleware.WithToken(t.Context(), fakeToken),

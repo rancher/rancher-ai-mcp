@@ -18,7 +18,7 @@ func (t *Tools) analyzeFleetResources(ctx context.Context, toolReq *mcp.CallTool
 	zap.L().Debug("analyzeFleetResources called")
 
 	c := client.Client{}
-	restCfg, err := c.CreateRestConfig(middleware.Token(ctx), t.rancherURL(toolReq), "local")
+	restCfg, err := c.CreateRestConfig(middleware.Token(ctx), t.rancherURL(), "local")
 	if err != nil {
 		zap.L().Error("failed to create rest config", zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to create rest config: %w", err)

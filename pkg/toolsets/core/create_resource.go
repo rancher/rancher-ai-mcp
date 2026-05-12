@@ -15,10 +15,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-const (
-	urlHeader = "R_url"
-)
-
 // createKubernetesResourceParams defines the structure for creating a general Kubernetes resource.
 type createKubernetesResourceParams struct {
 	Name      string `json:"name" jsonschema:"the name of the resource to create"`
@@ -33,7 +29,7 @@ func (t *Tools) createKubernetesResource(ctx context.Context, toolReq *mcp.CallT
 	zap.L().Debug("createKubernetesResource called")
 
 	resourceInterface, err := t.client.GetResourceInterface(
-		ctx, middleware.Token(ctx), t.rancherURL(toolReq),
+		ctx, middleware.Token(ctx), t.rancherURL(),
 		params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, nil, err

@@ -189,11 +189,12 @@ func TestCreateCustomCluster(t *testing.T) {
 				}
 			}))
 
+			tools.RancherURL = svr.URL
+
 			result, _, err := tools.createCustomCluster(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{
 					Name: "createCustomCluster",
 				},
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {svr.URL}}},
 			}, test.params)
 
 			if test.expectedError != "" {
