@@ -5,17 +5,25 @@ on:
     branches: ["main", "master", "release/**"]
   workflow_dispatch:
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   fossa-scanning:
+    name: Run FOSSA License Scan
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write  # for rancher-eio/read-vault-secrets
     steps:
     - name: Checkout
       uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6
+      with:
+        persist-credentials: false
 
     # The FOSSA token is shared between all repos in Rancher's GH org. It can be
     # used directly and there is no need to request specific access to EIO.
