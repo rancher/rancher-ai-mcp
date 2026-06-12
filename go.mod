@@ -1,8 +1,6 @@
 module github.com/rancher/rancher-ai-mcp
 
-go 1.25.6
-
-toolchain go1.25.7
+go 1.25.8
 
 // required for rancher/rancher pkg/apis
 // will need to be bumped alongside the rancher/rancher/pkg/apis
@@ -15,6 +13,7 @@ replace (
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.7.0
+	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/modelcontextprotocol/go-sdk v1.1.0
 	github.com/rancher/dynamiclistener v1.27.5
@@ -63,7 +62,6 @@ require (
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
-	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/extism/go-sdk v1.7.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
