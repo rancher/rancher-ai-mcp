@@ -16,7 +16,7 @@ COPY main.go ./
 
 RUN CGO_ENABLED=0 go build -ldflags "${LDFLAGS}" -o mcp
 
-FROM registry.suse.com/bci/bci-micro:15.7
+FROM registry.suse.com/bci/bci-micro:16.1
 ARG VERSION=dev
 ARG UID=1000
 ARG GID=1000
