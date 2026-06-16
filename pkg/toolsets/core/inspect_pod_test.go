@@ -157,6 +157,12 @@ func TestInspectPod(t *testing.T) {
 						}
 					},
 					{
+						"pod-logs": {
+							"nginx": "fake logs",
+							"sidecar": "fake logs"
+						}
+					},
+					{
 						"apiVersion": "apps/v1",
 						"kind": "Deployment",
 						"metadata": {
@@ -179,12 +185,6 @@ func TestInspectPod(t *testing.T) {
 							}
 						},
 						"status": {}
-					},
-					{
-						"pod-logs": {
-							"nginx": "fake logs",
-							"sidecar": "fake logs"
-						}
 					}
 				],
 				"uiContext": [
@@ -251,6 +251,12 @@ func TestInspectPod(t *testing.T) {
 						}
 					},
 					{
+						"pod-logs": {
+							"nginx": "fake logs",
+							"sidecar": "fake logs"
+						}
+					},
+					{
 						"apiVersion": "apps/v1",
 						"kind": "Deployment",
 						"metadata": {
@@ -273,12 +279,6 @@ func TestInspectPod(t *testing.T) {
 							}
 						},
 						"status": {}
-					},
-					{
-						"pod-logs": {
-							"nginx": "fake logs",
-							"sidecar": "fake logs"
-						}
 					}
 				],
 				"uiContext": [
@@ -382,6 +382,11 @@ func TestInspectPod(t *testing.T) {
 						"status": {}
 					},
 					{
+						"pod-logs": {
+							"app": "fake logs"
+						}
+					},
+					{
 						"apiVersion": "apps/v1",
 						"kind": "StatefulSet",
 						"metadata": {
@@ -402,11 +407,6 @@ func TestInspectPod(t *testing.T) {
 						"status": {
 							"availableReplicas": 0,
 							"replicas": 0
-						}
-					},
-					{
-						"pod-logs": {
-							"app": "fake logs"
 						}
 					}
 				],
@@ -499,6 +499,11 @@ func TestInspectPod(t *testing.T) {
 						"status": {}
 					},
 					{
+						"pod-logs": {
+							"daemon": "fake logs"
+						}
+					},
+					{
 						"apiVersion": "apps/v1",
 						"kind": "DaemonSet",
 						"metadata": {
@@ -521,11 +526,6 @@ func TestInspectPod(t *testing.T) {
 							"numberMisscheduled": 0,
 							"numberReady": 0
 						}
-					},
-					{
-						"pod-logs": {
-							"daemon": "fake logs"
-						}
 					}
 				],
 				"uiContext": [
@@ -542,6 +542,81 @@ func TestInspectPod(t *testing.T) {
 						"name": "my-daemonset",
 						"namespace": "default",
 						"type": "apps.daemonset"
+					}
+				]
+			}`,
+		},
+		"inspect pod - no replicaset parent": {
+			params: specificResourceParams{
+				Name:      "standalone-pod",
+				Namespace: "default",
+				Cluster:   "local",
+			},
+			fakeClientset: fake.NewSimpleClientset(
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "standalone-pod",
+						Namespace: "default",
+						// No OwnerReferences - standalone pod
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "app", Image: "app:latest"}},
+					},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+					},
+				},
+			),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme(),
+				&corev1.Pod{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      "standalone-pod",
+						Namespace: "default",
+					},
+					Spec: corev1.PodSpec{
+						Containers: []corev1.Container{{Name: "app", Image: "app:latest"}},
+					},
+					Status: corev1.PodStatus{
+						Phase: corev1.PodRunning,
+					},
+				},
+			),
+			requestURL: fakeUrl,
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "v1",
+						"kind": "Pod",
+						"metadata": {
+							"name": "standalone-pod",
+							"namespace": "default"
+						},
+						"spec": {
+							"containers": [
+								{
+									"image": "app:latest",
+									"name": "app",
+									"resources": {}
+								}
+							]
+						},
+						"status": {
+							"phase": "Running"
+						}
+					},
+					{
+						"pod-logs": {
+							"app": "fake logs"
+						}
+					}
+				],
+				"uiContext": [
+					{
+						"cluster": "local",
+						"kind": "Pod",
+						"name": "standalone-pod",
+						"namespace": "default",
+						"type": "pod"
 					}
 				]
 			}`,
