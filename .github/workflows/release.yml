@@ -5,19 +5,28 @@ on:
     tags:
       - "v*"
 
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-and-push-prime:
+    name: Build and push Docker image to staging prime registry
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write 
+      id-token: write  # for rancher-eio/read-vault-secrets
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
         
       - name: "Read vault secrets"
-        uses: rancher-eio/read-vault-secrets@0da85151ad1f19ed7986c41587e45aac1ace74b6 # main
+        uses: rancher-eio/read-vault-secrets@7282bf97898cd1c16c89f837e0bb442e6d384c89 # main
         with:
           secrets: |
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials registry | STAGING_PRIME_REGISTRY ;
@@ -26,7 +35,7 @@ jobs:
 
         # This encapsulates: login, qemu, build/push
       - name: Build and push image to staging prime registry
-        uses: rancher/ecm-distro-tools/actions/publish-image@575bb831c67edd950bfedb59d41dd127bd0005d6 # master
+        uses: rancher/ecm-distro-tools/actions/publish-image@c7c07fc1b7ca15c3a8fca06899a6a5657d34ac35 # master
         with:
           image: rancher-ai-mcp
           tag: ${{ github.ref_name }}

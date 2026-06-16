@@ -309,6 +309,57 @@ func TestOAuthMiddlewareInvalidIssuerCases(t *testing.T) {
 	}
 }
 
+func TestOAuthMiddlewareIssuerWithAuthorizeSuffix(t *testing.T) {
+	srv := createFakeJWKSServer(t, privateKey)
+	config := &OAuthConfig{
+		AuthorizationServerURL: testAuthServerURL + "/authorize",
+		JwksURL:                srv.URL,
+		ResourceURL:            testResourceURL,
+		SupportedScopes:        []string{testScope},
+	}
+	err := config.LoadJWKS(t.Context())
+	if err != nil {
+		t.Fatalf("Failed to initialize JWKS: %v", err)
+	}
+
+	tests := map[string]struct {
+		issuer   string
+		wantCode int
+	}{
+		"Issuer without /authorize suffix is accepted": {
+			issuer:   testAuthServerURL,
+			wantCode: http.StatusOK,
+		},
+		"Issuer with /authorize suffix is rejected": {
+			issuer:   testAuthServerURL + "/authorize",
+			wantCode: http.StatusUnauthorized,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			claims := jwt.MapClaims{
+				"iss":   tt.issuer,
+				"aud":   config.ResourceURL,
+				"scope": []any{testScope},
+				"exp":   time.Now().Add(1 * time.Hour).Unix(),
+				"iat":   time.Now().Unix(),
+			}
+			token := createTestToken(t, privateKey, claims)
+			handler := config.OAuthMiddleware(testHandler())
+
+			req := httptest.NewRequest(http.MethodGet, "/test", nil)
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+			rr := httptest.NewRecorder()
+			handler.ServeHTTP(rr, req)
+
+			if rr.Code != tt.wantCode {
+				t.Errorf("Expected status %d, got %d", tt.wantCode, rr.Code)
+			}
+		})
+	}
+}
+
 func TestOAuthMiddlewareInvalidScope(t *testing.T) {
 	config := setupTestConfig(t, privateKey)
 	// Create token with wrong scope

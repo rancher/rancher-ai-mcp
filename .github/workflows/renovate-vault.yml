@@ -12,18 +12,19 @@ on:
         required: false
         default: "false"
         type: string
+
   # Run twice in the early morning (UTC) for initial and follow up steps (create pull request and merge)
   schedule:
     - cron: '30 4,6 * * *'
 
-permissions:
-  contents: read
-  id-token: write
+permissions: {}
 
 jobs:
   call-workflow:
-    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@a473c746b8bbf3a03efaa0b14670c3d8699d6558 # release
+    permissions:
+      contents: read
+      id-token: write # for rancher-eio/read-vault-secrets
+    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@206454e9db716874cfd0a44a2a64d13b4a48bdaa # release
     with:
       logLevel: ${{ inputs.logLevel || 'info' }}
       overrideSchedule: ${{ github.event.inputs.overrideSchedule == 'true' && '{''schedule'':null}' || '' }}
-    secrets: inherit
