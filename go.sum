@@ -332,8 +332,8 @@ github.com/rancher/dynamiclistener v1.27.5 h1:FA/s9vbQzGz1Au3BuFvdbBfBBUmHGXGR3x
 github.com/rancher/dynamiclistener v1.27.5/go.mod h1:VqBaJNi+bZmre0+gi+2Jb6jbn7ovHzRueW+M7QhVKsk=
 github.com/rancher/fleet v0.15.0-rc.1.0.20260309094116-5553b4101a80 h1:LL85NZSnCKAjGFkOUT1laKCPpaopBBCZ3H6Kl6X3JZA=
 github.com/rancher/fleet v0.15.0-rc.1.0.20260309094116-5553b4101a80/go.mod h1:z4fO2qTfd5Veg0Ne86PUlu2kSlVtuATsftY4Y9pUQAE=
-github.com/rancher/fleet/pkg/apis v0.15.0-beta.4 h1:AogMaC49Bz2DXZ6ve09+A1m2ae1msv0slj+GOmtVeMY=
-github.com/rancher/fleet/pkg/apis v0.15.0-beta.4/go.mod h1:rpQ28vD81DN0Dz6QDakZlgtsOYOKBZSRJJ/LbFVHsA0=
+github.com/rancher/fleet/pkg/apis v0.15.2 h1:GCDunBfbYo8dIYS1LX3EbMe4rG+S/J/sAo6bV6SVEI0=
+github.com/rancher/fleet/pkg/apis v0.15.2/go.mod h1:xlutsZssgWWL4OdJG2yvxxW1h8hKP+NZXwpcfT5ajFI=
 github.com/rancher/lasso v0.2.6 h1:/QNO491vWlTNYgwOOopRlILcTv+pI/wBHYdPFD2Pk5E=
 github.com/rancher/lasso v0.2.6/go.mod h1:L3ol8PdO21KoMhNa3RWjpR3ZBnE70JCAod1nJuOvT1E=
 github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894 h1:zMfb+Wn4Ckh4PyXKFNRPiz3Q87an8Zm8GqrXHvWSMGA=

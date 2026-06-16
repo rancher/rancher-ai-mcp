@@ -20,14 +20,14 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.4.1
 	github.com/rancher/dynamiclistener v1.27.5
 	github.com/rancher/fleet v0.15.0-rc.1.0.20260309094116-5553b4101a80
-	github.com/rancher/fleet/pkg/apis v0.15.0-beta.4
+	github.com/rancher/fleet/pkg/apis v0.15.2
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894
 	github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.27.1
-	k8s.io/api v0.35.2
-	k8s.io/apimachinery v0.35.2
+	k8s.io/api v0.35.4
+	k8s.io/apimachinery v0.35.4
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/metrics v0.35.2
 	k8s.io/utils v0.0.0-20260108192941-914a6e750570
