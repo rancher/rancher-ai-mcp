@@ -152,10 +152,11 @@ func (c *OAuthConfig) extractToken(r *http.Request) (string, error) {
 }
 
 func (c *OAuthConfig) validateJWT(tokenString string) error {
+	issuer := strings.TrimSuffix(c.AuthorizationServerURL, "/authorize")
 	token, err := jwt.Parse(tokenString, c.jwks.Keyfunc,
 		jwt.WithValidMethods([]string{signingMethod}),
 		jwt.WithLeeway(expirationLeeway),
-		jwt.WithIssuer(c.AuthorizationServerURL),
+		jwt.WithIssuer(issuer),
 	)
 	if err != nil {
 		zap.L().Error("Failed to parse token", zap.Error(err))
