@@ -2,7 +2,7 @@ module github.com/rancher/rancher-ai-mcp
 
 go 1.25.6
 
-toolchain go1.25.7
+toolchain go1.25.11
 
 // required for rancher/rancher pkg/apis
 // will need to be bumped alongside the rancher/rancher/pkg/apis
@@ -17,17 +17,17 @@ require (
 	github.com/MicahParks/keyfunc/v3 v3.7.0
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/golang-jwt/jwt/v5 v5.3.1
-	github.com/modelcontextprotocol/go-sdk v1.1.0
+	github.com/modelcontextprotocol/go-sdk v1.4.1
 	github.com/rancher/dynamiclistener v1.27.5
 	github.com/rancher/fleet v0.15.0-rc.1.0.20260309094116-5553b4101a80
-	github.com/rancher/fleet/pkg/apis v0.15.0-beta.4
+	github.com/rancher/fleet/pkg/apis v0.15.2
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894
 	github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.27.1
-	k8s.io/api v0.35.2
-	k8s.io/apimachinery v0.35.2
+	k8s.io/api v0.35.4
+	k8s.io/apimachinery v0.35.4
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/metrics v0.35.2
 	k8s.io/utils v0.0.0-20260108192941-914a6e750570
@@ -100,7 +100,7 @@ require (
 	github.com/google/go-containerregistry v0.21.2 // indirect
 	github.com/google/go-github/v72 v72.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/google/jsonschema-go v0.3.0 // indirect
+	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect
@@ -152,6 +152,8 @@ require (
 	github.com/rubenv/sql-migrate v1.8.1 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v6 v6.0.2 // indirect
+	github.com/segmentio/asm v1.1.3 // indirect
+	github.com/segmentio/encoding v0.5.4 // indirect
 	github.com/sergi/go-diff v1.4.0 // indirect
 	github.com/shopspring/decimal v1.4.0 // indirect
 	github.com/sirupsen/logrus v1.9.4 // indirect
