@@ -15,13 +15,14 @@ replace (
 
 require (
 	github.com/MicahParks/keyfunc/v3 v3.7.0
+	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/modelcontextprotocol/go-sdk v1.1.0
 	github.com/rancher/dynamiclistener v1.27.5
 	github.com/rancher/fleet v0.15.0-rc.1.0.20260309094116-5553b4101a80
 	github.com/rancher/fleet/pkg/apis v0.15.0-beta.4
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894
-	github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
+	github.com/rancher/wrangler v1.1.2
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.27.1
@@ -63,7 +64,6 @@ require (
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/emirpasic/gods v1.18.1 // indirect
 	github.com/evanphx/json-patch v5.9.11+incompatible // indirect
-	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/exponent-io/jsonpath v0.0.0-20210407135951-1de76d718b3f // indirect
 	github.com/extism/go-sdk v1.7.1 // indirect
 	github.com/fatih/color v1.18.0 // indirect
