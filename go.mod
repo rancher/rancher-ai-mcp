@@ -14,7 +14,7 @@ replace (
 )
 
 require (
-	github.com/MicahParks/keyfunc/v3 v3.7.0
+	github.com/MicahParks/keyfunc/v3 v3.8.0
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/modelcontextprotocol/go-sdk v1.4.1
