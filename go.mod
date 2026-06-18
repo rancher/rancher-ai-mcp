@@ -22,7 +22,7 @@ require (
 	github.com/rancher/fleet v0.15.0-rc.1.0.20260309094116-5553b4101a80
 	github.com/rancher/fleet/pkg/apis v0.15.2
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894
-	github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
+	github.com/rancher/wrangler v1.1.2
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.27.1
