@@ -15,16 +15,11 @@ import (
 )
 
 func TestGetGitRepo(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
-		params        getGitRepoParams
-		fakeDynClient *dynamicfake.FakeDynamicClient
-		// used in the CallToolRequest
-		requestURL string
-		// used in the creation of the Tools.
-		rancherURL     string
+		params         getGitRepoParams
+		fakeDynClient  *dynamicfake.FakeDynamicClient
 		expectedResult string
 		expectedError  string
 	}{
@@ -33,7 +28,6 @@ func TestGetGitRepo(t *testing.T) {
 				Name:      "gitrepo-1",
 				Workspace: "fleet-default",
 			},
-			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listGitReposScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"}: "GitRepoList",
 			}, fakeGitRepo1, fakeGitRepo2),
@@ -69,21 +63,10 @@ func TestGetGitRepo(t *testing.T) {
 				Name:      "nonexistent-gitrepo",
 				Workspace: "fleet-default",
 			},
-			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listGitReposScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"}: "GitRepoList",
 			}),
 			expectedError: `nonexistent-gitrepo" not found`,
-		},
-		"get gitrepo - no rancherURL or request URL": {
-			params: getGitRepoParams{
-				Name:      "gitrepo-1",
-				Workspace: "fleet-default",
-			},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listGitReposScheme(), map[schema.GroupVersionResource]string{
-				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"}: "GitRepoList",
-			}),
-			expectedError: "no URL for rancher request",
 		},
 	}
 
@@ -94,8 +77,8 @@ func TestGetGitRepo(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
-			req := test.NewCallToolRequest(tt.requestURL)
+			tools := NewTools(test.WrapClient(c, fakeToken))
+			req := &mcp.CallToolRequest{}
 
 			result, _, err := tools.getGitRepo(
 				middleware.WithToken(t.Context(), fakeToken),

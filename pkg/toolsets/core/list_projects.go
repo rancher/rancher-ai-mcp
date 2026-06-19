@@ -20,7 +20,7 @@ type listProjectsParams struct {
 func (t *Tools) listProjects(ctx context.Context, toolReq *mcp.CallToolRequest, params listProjectsParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("listProjects called")
 
-	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), params.Cluster)
+	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), params.Cluster)
 	if err != nil {
 		zap.L().Error("failed to get cluster ID", zapListProjects, zap.Error(err))
 		return nil, nil, err
@@ -30,7 +30,6 @@ func (t *Tools) listProjects(ctx context.Context, toolReq *mcp.CallToolRequest, 
 		Cluster:   LocalCluster,
 		Kind:      "project",
 		Namespace: clusterID,
-		URL:       t.rancherURL(toolReq),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {

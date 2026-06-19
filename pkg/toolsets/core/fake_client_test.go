@@ -43,11 +43,11 @@ func (f *fakeToolsClient) GetResource(ctx context.Context, params client.GetPara
 }
 
 // GetResourceInterface validates the token and delegates to the wrapped client.
-func (f *fakeToolsClient) GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
+func (f *fakeToolsClient) GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
 	if err := f.validateToken(token); err != nil {
 		return nil, err
 	}
-	return f.client.GetResourceInterface(ctx, token, url, namespace, cluster, gvr)
+	return f.client.GetResourceInterface(ctx, token, namespace, cluster, gvr)
 }
 
 // GetResources validates the token and delegates to the wrapped client.
@@ -59,16 +59,16 @@ func (f *fakeToolsClient) GetResources(ctx context.Context, params client.ListPa
 }
 
 // CreateClientSet validates the token and delegates to the wrapped client.
-func (f *fakeToolsClient) CreateClientSet(ctx context.Context, token string, url string, cluster string) (kubernetes.Interface, error) {
+func (f *fakeToolsClient) CreateClientSet(ctx context.Context, token string, cluster string) (kubernetes.Interface, error) {
 	if err := f.validateToken(token); err != nil {
 		return nil, err
 	}
-	return f.client.CreateClientSet(ctx, token, url, cluster)
+	return f.client.CreateClientSet(ctx, token, cluster)
 }
 
-func (f *fakeToolsClient) GetClusterID(ctx context.Context, token string, url string, clusterNameOrID string) (string, error) {
+func (f *fakeToolsClient) GetClusterID(ctx context.Context, token string, clusterNameOrID string) (string, error) {
 	if err := f.validateToken(token); err != nil {
 		return "", err
 	}
-	return f.client.GetClusterID(ctx, token, url, clusterNameOrID)
+	return f.client.GetClusterID(ctx, token, clusterNameOrID)
 }

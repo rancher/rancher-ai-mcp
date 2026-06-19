@@ -50,7 +50,7 @@ func newSample() sample {
 func (t *Tools) getResourceUsage(ctx context.Context, toolReq *mcp.CallToolRequest, params getResourceUsageParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("getResourceUsage called")
 
-	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), params.Cluster)
+	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), params.Cluster)
 	if err != nil {
 		zap.L().Error("failed to get cluster ID", zapGetResourceUsage, zap.Error(err))
 		return nil, nil, err
@@ -67,7 +67,6 @@ func (t *Tools) getResourceUsage(ctx context.Context, toolReq *mcp.CallToolReque
 			Cluster: clusterID,
 			Kind:    "namespace",
 			Name:    params.Namespace,
-			URL:     t.rancherURL(toolReq),
 			Token:   middleware.Token(ctx),
 		})
 		if err != nil {
@@ -85,7 +84,7 @@ func (t *Tools) getResourceUsage(ctx context.Context, toolReq *mcp.CallToolReque
 	} else {
 		var projectResources []*unstructured.Unstructured
 		if params.Project != "" {
-			_, projectResource, err := t.getProjectID(ctx, middleware.Token(ctx), t.rancherURL(toolReq), clusterID, params.Project)
+			_, projectResource, err := t.getProjectID(ctx, middleware.Token(ctx), clusterID, params.Project)
 			if err != nil {
 				zap.L().Error("failed to get project", zapGetResourceUsage, zap.Error(err))
 				return nil, nil, err
@@ -97,7 +96,6 @@ func (t *Tools) getResourceUsage(ctx context.Context, toolReq *mcp.CallToolReque
 				Cluster:   LocalCluster,
 				Kind:      "project",
 				Namespace: clusterID,
-				URL:       t.rancherURL(toolReq),
 				Token:     middleware.Token(ctx),
 			})
 			if err != nil {
@@ -128,7 +126,6 @@ func (t *Tools) getResourceUsage(ctx context.Context, toolReq *mcp.CallToolReque
 				Cluster:       clusterID,
 				Kind:          "namespace",
 				LabelSelector: projectLabel.String(),
-				URL:           t.rancherURL(toolReq),
 				Token:         middleware.Token(ctx),
 			})
 			if err != nil {
@@ -205,7 +202,6 @@ func (t *Tools) getNamespaceResourceUsage(ctx context.Context, toolReq *mcp.Call
 		Cluster:   clusterID,
 		Kind:      "pod",
 		Namespace: namespace,
-		URL:       t.rancherURL(toolReq),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
@@ -217,7 +213,6 @@ func (t *Tools) getNamespaceResourceUsage(ctx context.Context, toolReq *mcp.Call
 		Cluster:   clusterID,
 		Kind:      "pod.metrics.k8s.io",
 		Namespace: namespace,
-		URL:       t.rancherURL(toolReq),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {

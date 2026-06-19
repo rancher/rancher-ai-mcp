@@ -18,34 +18,24 @@ const (
 
 type toolsClient interface {
 	GetResource(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error)
-	GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
+	GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
 	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
-	CreateClientSet(ctx context.Context, token string, url string, cluster string) (kubernetes.Interface, error)
-	GetClusterID(ctx context.Context, token string, url string, clusterNameOrID string) (string, error)
+	CreateClientSet(ctx context.Context, token string, cluster string) (kubernetes.Interface, error)
+	GetClusterID(ctx context.Context, token string, clusterNameOrID string) (string, error)
 }
 
 // Tools contains all tools for the MCP server
 type Tools struct {
-	client     toolsClient
-	RancherURL string
-	ReadOnly   bool
+	client   toolsClient
+	ReadOnly bool
 }
 
 // NewTools creates and returns a new Tools instance.
-func NewTools(client toolsClient, rancherURL string, readOnly bool) *Tools {
+func NewTools(client toolsClient, readOnly bool) *Tools {
 	return &Tools{
-		client:     client,
-		RancherURL: rancherURL,
-		ReadOnly:   readOnly,
+		client:   client,
+		ReadOnly: readOnly,
 	}
-}
-
-func (t *Tools) rancherURL(toolReq *mcp.CallToolRequest) string {
-	if t.RancherURL == "" {
-		return toolReq.Extra.Header.Get(urlHeader)
-	}
-
-	return t.RancherURL
 }
 
 // AddTools registers all Rancher Kubernetes tools with the provided MCP server.

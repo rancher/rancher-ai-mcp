@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 
@@ -24,6 +25,7 @@ var clustersDisplayNameToIDCache = sync.Map{}
 // Client is a struct that provides methods for interacting with Kubernetes clusters.
 type Client struct {
 	insecure         bool
+	rancherURL       string
 	DynClientCreator func(*rest.Config) (dynamic.Interface, error)
 	ClientSetCreator func(*rest.Config) (kubernetes.Interface, error)
 }
@@ -34,7 +36,6 @@ type GetParams struct {
 	Kind      string // The Kind of the Kubernetes resource (e.g., "pod", "deployment").
 	Namespace string // The Namespace of the resource (optional).
 	Name      string // The Name of the resource (optional).
-	URL       string // The base URL of the Rancher server.
 	Token     string // The authentication Token for Steve.
 }
 
@@ -44,32 +45,46 @@ type ListParams struct {
 	Kind          string // The Kind of the Kubernetes resource (e.g., "pod", "deployment").
 	Namespace     string // The Namespace of the resource (optional).
 	Name          string // The Name of the resource (optional).
-	URL           string // The base URL of the Rancher server.
 	Token         string // The authentication Token for Steve.
 	LabelSelector string // Optional LabelSelector string for the request.
 	Limit         int64  // Optional maximum number of resources to return. 0 means no limit.
 }
 
 // NewClient creates and returns a new instance of the Client struct.
-func NewClient(insecure bool) *Client {
+func NewClient(insecure bool, authzServerURL string) (*Client, error) {
+	rancherURL, err := rancherURLFromAuthServerURL(authzServerURL)
+	if err != nil {
+		return nil, fmt.Errorf("parsing authz-server-url: %w", err)
+	}
+	if rancherURL == "" {
+		rancherURL = "https://rancher.cattle-system"
+		if insecure {
+			rancherURL = "http://rancher.cattle-system"
+		}
+	}
 	return &Client{
-		insecure: insecure,
+		insecure:   insecure,
+		rancherURL: rancherURL,
 		DynClientCreator: func(cfg *rest.Config) (dynamic.Interface, error) {
 			return dynamic.NewForConfig(cfg)
 		},
 		ClientSetCreator: func(cfg *rest.Config) (kubernetes.Interface, error) {
 			return kubernetes.NewForConfig(cfg)
 		},
-	}
+	}, nil
+}
+
+func (c *Client) RancherURL() string {
+	return c.rancherURL
 }
 
 // CreateClientSet creates a new Kubernetes clientset for the given Token and URL.
-func (c *Client) CreateClientSet(ctx context.Context, token string, url string, cluster string) (kubernetes.Interface, error) {
-	clusterID, err := c.GetClusterID(ctx, token, url, cluster)
+func (c *Client) CreateClientSet(ctx context.Context, token string, cluster string) (kubernetes.Interface, error) {
+	clusterID, err := c.GetClusterID(ctx, token, cluster)
 	if err != nil {
 		return nil, err
 	}
-	restConfig, err := c.CreateRestConfig(token, url, clusterID)
+	restConfig, err := c.CreateRestConfig(token, clusterID)
 	if err != nil {
 		return nil, err
 	}
@@ -78,12 +93,12 @@ func (c *Client) CreateClientSet(ctx context.Context, token string, url string, 
 }
 
 // GetResourceInterface returns a dynamic resource interface for the given Token, URL, Namespace, and GroupVersionResource.
-func (c *Client) GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
-	clusterID, err := c.GetClusterID(ctx, token, url, cluster)
+func (c *Client) GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
+	clusterID, err := c.GetClusterID(ctx, token, cluster)
 	if err != nil {
 		return nil, err
 	}
-	restConfig, err := c.CreateRestConfig(token, url, clusterID)
+	restConfig, err := c.CreateRestConfig(token, clusterID)
 	if err != nil {
 		return nil, err
 	}
@@ -102,7 +117,7 @@ func (c *Client) GetResourceInterface(ctx context.Context, token string, url str
 // GetResource retrieves a single Kubernetes resource by name.
 // It returns the resource as an unstructured object or an error if the resource is not found.
 func (c *Client) GetResource(ctx context.Context, params GetParams) (*unstructured.Unstructured, error) {
-	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
+	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, err
 	}
@@ -116,7 +131,7 @@ func (c *Client) GetResource(ctx context.Context, params GetParams) (*unstructur
 }
 
 func (c *Client) GetResourceByGVR(ctx context.Context, params GetParams, gvr schema.GroupVersionResource) (*unstructured.Unstructured, error) {
-	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, gvr)
+	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.Namespace, params.Cluster, gvr)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +153,7 @@ func (c *Client) GetResourceAtAnyAPIVersion(ctx context.Context, params GetParam
 		return nil, fmt.Errorf("unknown kind: %s", params.Kind)
 	}
 
-	versions, err := c.getAPIVersionsForGR(ctx, params.Token, params.URL, params.Cluster, schema.GroupResource{
+	versions, err := c.getAPIVersionsForGR(ctx, params.Token, params.Cluster, schema.GroupResource{
 		Group:    currentGVK.Group,
 		Resource: currentGVK.Resource,
 	})
@@ -149,7 +164,7 @@ func (c *Client) GetResourceAtAnyAPIVersion(ctx context.Context, params GetParam
 	var item *unstructured.Unstructured
 	for _, version := range versions {
 		currentGVK.Version = version
-		resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, currentGVK)
+		resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.Namespace, params.Cluster, currentGVK)
 		if err != nil {
 			return nil, err
 		}
@@ -177,7 +192,7 @@ func (c *Client) GetResourceAtAnyAPIVersion(ctx context.Context, params GetParam
 // GetResources lists Kubernetes resources matching the provided parameters.
 // It supports optional label selectors for filtering and returns a slice of unstructured objects.
 func (c *Client) GetResources(ctx context.Context, params ListParams) ([]*unstructured.Unstructured, error) {
-	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
+	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +226,7 @@ func (c *Client) GetResourcesAtAnyAPIVersion(ctx context.Context, params ListPar
 		return nil, fmt.Errorf("unknown kind: %s", params.Kind)
 	}
 
-	versions, err := c.getAPIVersionsForGR(ctx, params.Token, params.URL, params.Cluster, schema.GroupResource{
+	versions, err := c.getAPIVersionsForGR(ctx, params.Token, params.Cluster, schema.GroupResource{
 		Group:    currentGVK.Group,
 		Resource: currentGVK.Resource,
 	})
@@ -222,7 +237,7 @@ func (c *Client) GetResourcesAtAnyAPIVersion(ctx context.Context, params ListPar
 	var list *unstructured.UnstructuredList
 	for _, version := range versions {
 		currentGVK.Version = version
-		resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.URL, params.Namespace, params.Cluster, currentGVK)
+		resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.Namespace, params.Cluster, currentGVK)
 		if err != nil {
 			return nil, err
 		}
@@ -268,7 +283,7 @@ func (c *Client) GetResourcesAtAnyAPIVersion(ctx context.Context, params ListPar
 //  4. If not found, fall back to listing all clusters and matching by display name.
 //
 // both cluster ID and display name are cached for future lookups.
-func (c *Client) GetClusterID(ctx context.Context, token string, url string, clusterNameOrID string) (string, error) {
+func (c *Client) GetClusterID(ctx context.Context, token string, clusterNameOrID string) (string, error) {
 	// handle the special case for the local cluster, it always exists and is known by ID and displayName "local"
 	if clusterNameOrID == "local" {
 		return "local", nil
@@ -285,7 +300,7 @@ func (c *Client) GetClusterID(ctx context.Context, token string, url string, clu
 	}
 
 	// try to fetch the cluster directly by its ID
-	clusterInterface, err := c.GetResourceInterface(ctx, token, url, "", "local", converter.K8sKindsToGVRs["managementcluster"])
+	clusterInterface, err := c.GetResourceInterface(ctx, token, "", "local", converter.K8sKindsToGVRs["managementcluster"])
 	if err != nil {
 		return "", err
 	}
@@ -348,8 +363,8 @@ func (c *Client) GetClusterID(ctx context.Context, token string, url string, clu
 
 // CreateRestConfig creates a new rest.Config for accessing a Kubernetes cluster through Rancher.
 // It configures the cluster URL, authentication token, and TLS settings based on environment variables.
-func (c *Client) CreateRestConfig(token string, url string, clusterID string) (*rest.Config, error) {
-	clusterURL := url + "/k8s/clusters/" + clusterID
+func (c *Client) CreateRestConfig(token string, clusterID string) (*rest.Config, error) {
+	clusterURL := c.rancherURL + "/k8s/clusters/" + clusterID
 	kubeconfig := clientcmdapi.NewConfig()
 	kubeconfig.Clusters["Cluster"] = &clientcmdapi.Cluster{
 		Server:                clusterURL,
@@ -378,12 +393,12 @@ func (c *Client) CreateRestConfig(token string, url string, clusterID string) (*
 
 // getAPIVersionsForGR queries the API server for all supported versions of the specified GroupResource.
 // It returns a slice of version strings or an error if the query fails.
-func (c *Client) getAPIVersionsForGR(ctx context.Context, token, url, cluster string, groupResource schema.GroupResource) ([]string, error) {
-	clusterID, err := c.GetClusterID(ctx, token, url, cluster)
+func (c *Client) getAPIVersionsForGR(ctx context.Context, token, cluster string, groupResource schema.GroupResource) ([]string, error) {
+	clusterID, err := c.GetClusterID(ctx, token, cluster)
 	if err != nil {
 		return nil, err
 	}
-	restConfig, err := c.CreateRestConfig(token, url, clusterID)
+	restConfig, err := c.CreateRestConfig(token, clusterID)
 	if err != nil {
 		return nil, err
 	}
@@ -405,4 +420,20 @@ func (c *Client) getAPIVersionsForGR(ctx context.Context, token, url, cluster st
 		}
 	}
 	return versions, nil
+}
+
+func rancherURLFromAuthServerURL(s string) (string, error) {
+	if s == "" {
+		return "", nil
+	}
+	parsed, err := url.Parse(s)
+	if err != nil {
+		return "", err
+	}
+
+	parsed.Path = ""
+	parsed.RawQuery = ""
+	parsed.Fragment = ""
+
+	return parsed.String(), nil
 }

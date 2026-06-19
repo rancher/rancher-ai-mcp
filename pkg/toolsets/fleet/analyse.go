@@ -6,7 +6,6 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"go.uber.org/zap"
 )
 
@@ -17,8 +16,7 @@ type analyzeFleetResourcesParams struct {
 func (t *Tools) analyzeFleetResources(ctx context.Context, toolReq *mcp.CallToolRequest, params analyzeFleetResourcesParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("analyzeFleetResources called")
 
-	c := client.Client{}
-	restCfg, err := c.CreateRestConfig(middleware.Token(ctx), t.rancherURL(toolReq), "local")
+	restCfg, err := t.client.CreateRestConfig(middleware.Token(ctx), "local")
 	if err != nil {
 		zap.L().Error("failed to create rest config", zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to create rest config: %w", err)
