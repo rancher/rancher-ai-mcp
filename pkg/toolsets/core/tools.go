@@ -96,24 +96,6 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 	)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "getProject",
-		Meta: map[string]any{
-			toolsSetAnn: toolsSet,
-		},
-		Description: `Returns a project resource and its associated namespaces.`},
-		t.getProject,
-	)
-
-	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "listProjects",
-		Meta: map[string]any{
-			toolsSetAnn: toolsSet,
-		},
-		Description: `Returns a list of project resources for a specified cluster.`},
-		t.listProjects,
-	)
-
-	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listClusters",
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
@@ -126,17 +108,6 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		},
 		Description: `Returns a list of all Rancher clusters, including local and downstream clusters.`},
 		t.listClusters,
-	)
-
-	mcp.AddTool(mcpServer, &mcp.Tool{
-		Name: "getResourceUsage",
-		Meta: map[string]any{
-			toolsSetAnn: toolsSet,
-		},
-		Description: `Returns the resource usage for a namespace, project or all projects in a cluster.
-Usage totals are provided for the entire project as well as broken down by namespace.
-The resource usage includes CPU and memory requests, limits and actual usage, as well as the total number of pods.`},
-		t.getResourceUsage,
 	)
 
 	if !t.ReadOnly {
@@ -179,21 +150,5 @@ Example of the patch parameter:
 Example of the patch parameter:
 [{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
 			t.updateKubernetesResourcePlan)
-
-		mcp.AddTool(mcpServer, &mcp.Tool{
-			Name: "createProject",
-			Meta: map[string]any{
-				toolsSetAnn: toolsSet,
-			},
-			Description: `Creates a project resource for a specified cluster with the given containerResourceQuota.`},
-			t.createProject)
-
-		mcp.AddTool(mcpServer, &mcp.Tool{
-			Name: "createProjectPlan",
-			Meta: map[string]any{
-				toolsSetAnn: toolsSet,
-			},
-			Description: `Plans to create a project resource for a specified cluster. It returns the JSON representation of the project to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.`},
-			t.createProjectPlan)
 	}
 }
