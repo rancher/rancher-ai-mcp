@@ -21,7 +21,7 @@ type resourceParams struct {
 
 // getResource retrieves a specific Kubernetes resource based on the provided parameters.
 func (t *Tools) getResource(ctx context.Context, toolReq *mcp.CallToolRequest, params resourceParams) (*mcp.CallToolResult, any, error) {
-	zap.L().Debug("getKubernetesResource called")
+	zap.L().Debug("getKubernetesResource called", zap.String("resourceKind", params.Kind), zap.String("resourceName", params.Name))
 
 	resource, err := t.client.GetResource(ctx, client.GetParams{
 		Cluster:   params.Cluster,
@@ -37,7 +37,7 @@ func (t *Tools) getResource(ctx context.Context, toolReq *mcp.CallToolRequest, p
 
 	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{resource}, params.Cluster)
 	if err != nil {
-		zap.L().Error("failed to create mcp response", zap.String("tool", "listKubernetesResource"), zap.Error(err))
+		zap.L().Error("failed to create mcp response", zap.String("tool", "getKubernetesResource"), zap.Error(err))
 		return nil, nil, err
 	}
 
