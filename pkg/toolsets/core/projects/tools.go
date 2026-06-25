@@ -13,39 +13,28 @@ import (
 const (
 	toolsSet     = "rancher"
 	toolsSetAnn  = "toolset"
-	urlHeader    = "R_url"
 	LocalCluster = "local"
 )
 
 type toolsClient interface {
-	GetClusterID(ctx context.Context, token string, url string, clusterNameOrID string) (string, error)
+	GetClusterID(ctx context.Context, token string, clusterNameOrID string) (string, error)
 	GetResource(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error)
 	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
-	GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
+	GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
 }
 
 // Tools contains tools for accessing project information.
 type Tools struct {
-	client     toolsClient
-	RancherURL string
-	ReadOnly   bool
+	client   toolsClient
+	ReadOnly bool
 }
 
 // NewTools creates and returns a new Tools instance.
-func NewTools(client toolsClient, rancherURL string, readOnly bool) *Tools {
+func NewTools(client toolsClient, readOnly bool) *Tools {
 	return &Tools{
-		client:     client,
-		RancherURL: rancherURL,
-		ReadOnly:   readOnly,
+		client:   client,
+		ReadOnly: readOnly,
 	}
-}
-
-func (t *Tools) rancherURL(toolReq *mcp.CallToolRequest) string {
-	if t.RancherURL == "" {
-		return toolReq.Extra.Header.Get(urlHeader)
-	}
-
-	return t.RancherURL
 }
 
 // AddTools registers all project tools with the provided MCP server.

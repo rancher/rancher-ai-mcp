@@ -5,6 +5,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/core/projects"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -109,6 +110,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Description: `Returns a list of all Rancher clusters, including local and downstream clusters.`},
 		t.listClusters,
 	)
+
+	projects.NewTools(t.client, t.ReadOnly).AddTools(mcpServer)
 
 	if !t.ReadOnly {
 		mcp.AddTool(mcpServer, &mcp.Tool{

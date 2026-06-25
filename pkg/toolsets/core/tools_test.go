@@ -62,7 +62,7 @@ func TestAddTools(t *testing.T) {
 	toolsResult, err := cs.ListTools(ctx, &mcp.ListToolsParams{})
 
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 11, "incorrect number of tools registered")
+	assert.Len(t, toolsResult.Tools, 16, "incorrect number of tools registered")
 	// assert that all tools have the correct toolset annotation
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
@@ -116,7 +116,7 @@ func TestAddToolsReadOnly(t *testing.T) {
 	toolsResult, err := cs.ListTools(ctx, &mcp.ListToolsParams{})
 
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 7, "read-only mode should not register mutating tools")
+	assert.Len(t, toolsResult.Tools, 10, "read-only mode should not register mutating tools")
 
 	toolNames := make(map[string]bool)
 	for _, tool := range toolsResult.Tools {
@@ -127,4 +127,6 @@ func TestAddToolsReadOnly(t *testing.T) {
 	assert.False(t, toolNames["patchKubernetesResourcePlan"], "patchKubernetesResourcePlan should not be registered in read-only mode")
 	assert.False(t, toolNames["createKubernetesResource"], "createKubernetesResource should not be registered in read-only mode")
 	assert.False(t, toolNames["createKubernetesResourcePlan"], "createKubernetesResourcePlan should not be registered in read-only mode")
+	assert.False(t, toolNames["createProject"], "createProject should not be registered in read-only mode")
+	assert.False(t, toolNames["createProjectPlan"], "createProjectPlan should not be registered in read-only mode")
 }

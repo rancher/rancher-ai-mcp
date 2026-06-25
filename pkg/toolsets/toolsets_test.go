@@ -14,5 +14,5 @@ func TestAllToolSets(t *testing.T) {
 	toolsets := allToolSets(c, false)
 
 	assert.NotNil(t, toolsets)
-	assert.Len(t, toolsets, 4, "should have exactly 4 toolsets (core, fleet, provisioning, and projects)")
+	assert.Len(t, toolsets, 3, "should have exactly 3 toolsets (core, fleet, and provisioning)")
 }

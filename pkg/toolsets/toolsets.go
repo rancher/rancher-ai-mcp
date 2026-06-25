@@ -5,7 +5,6 @@ import (
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/core"
 	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/fleet"
-	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/projects"
 	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/provisioning"
 )
 
