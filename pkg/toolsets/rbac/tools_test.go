@@ -1,4 +1,4 @@
-package core
+package rbac
 
 import (
 	"context"
@@ -15,7 +15,6 @@ import (
 func TestAddTools(t *testing.T) {
 	tools := NewTools(client.NewClient(true), "not-used-in-test", false)
 
-	// Create a test MCP server
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    "test-server",
 		Version: "v1.0.0",
@@ -28,7 +27,6 @@ func TestAddTools(t *testing.T) {
 		return mcpServer
 	}, &mcp.StreamableHTTPOptions{})
 
-	// Start server on a random available port
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	assert.NoError(t, err)
 	defer listener.Close()
@@ -41,17 +39,16 @@ func TestAddTools(t *testing.T) {
 	}()
 	defer server.Shutdown(context.Background())
 
-	// Wait for server to be ready by attempting to connect with retries
 	ctx := context.Background()
 	transport := &mcp.StreamableClientTransport{
 		Endpoint: serverAddr,
 	}
-	client := mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
+	mcpClient := mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
 
 	var cs *mcp.ClientSession
 	assert.Eventually(t, func() bool {
 		var err error
-		cs, err = client.Connect(ctx, transport, nil)
+		cs, err = mcpClient.Connect(ctx, transport, nil)
 		return err == nil
 	}, 2*time.Second, 100*time.Millisecond, "Server should start within 2 seconds")
 
@@ -61,11 +58,7 @@ func TestAddTools(t *testing.T) {
 	toolsResult, err := cs.ListTools(ctx, &mcp.ListToolsParams{})
 
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 17, "incorrect number of tools registered")
-	// assert that all tools have the correct toolset annotation
-	for _, tool := range toolsResult.Tools {
-		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
-	}
+	assert.Empty(t, toolsResult.Tools, "no RBAC tools registered yet")
 }
 
 func TestAddToolsReadOnly(t *testing.T) {
@@ -114,17 +107,5 @@ func TestAddToolsReadOnly(t *testing.T) {
 	toolsResult, err := cs.ListTools(ctx, &mcp.ListToolsParams{})
 
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 11, "read-only mode should not register mutating tools")
-
-	toolNames := make(map[string]bool)
-	for _, tool := range toolsResult.Tools {
-		toolNames[tool.Name] = true
-		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
-	}
-	assert.False(t, toolNames["patchKubernetesResource"], "patchKubernetesResource should not be registered in read-only mode")
-	assert.False(t, toolNames["patchKubernetesResourcePlan"], "patchKubernetesResourcePlan should not be registered in read-only mode")
-	assert.False(t, toolNames["createKubernetesResource"], "createKubernetesResource should not be registered in read-only mode")
-	assert.False(t, toolNames["createKubernetesResourcePlan"], "createKubernetesResourcePlan should not be registered in read-only mode")
-	assert.False(t, toolNames["createProject"], "createProject should not be registered in read-only mode")
-	assert.False(t, toolNames["createProjectPlan"], "createProjectPlan should not be registered in read-only mode")
+	assert.Empty(t, toolsResult.Tools, "no RBAC tools registered yet")
 }

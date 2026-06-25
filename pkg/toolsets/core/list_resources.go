@@ -24,7 +24,7 @@ type listKubernetesResourcesParams struct {
 
 // listKubernetesResources lists Kubernetes resources of a specific kind and namespace.
 func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallToolRequest, params listKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
-	zap.L().Debug("listKubernetesResource called")
+	zap.L().Debug("listKubernetesResource called", zap.String("resourceKind", params.Kind))
 
 	limit := params.Limit
 	if limit <= 0 {

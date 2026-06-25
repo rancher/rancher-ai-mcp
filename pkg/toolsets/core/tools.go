@@ -5,6 +5,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/core/rbac"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -148,6 +149,8 @@ Usage totals are provided for the entire project as well as broken down by names
 The resource usage includes CPU and memory requests, limits and actual usage, as well as the total number of pods.`},
 		t.getResourceUsage,
 	)
+
+	rbac.NewTools(t.client, t.RancherURL, t.ReadOnly).AddTools(mcpServer)
 
 	if !t.ReadOnly {
 		mcp.AddTool(mcpServer, &mcp.Tool{
