@@ -58,9 +58,6 @@ func NewClient(insecure bool, authzServerURL string) (*Client, error) {
 	}
 	if rancherURL == "" {
 		rancherURL = "https://rancher.cattle-system"
-		if insecure {
-			rancherURL = "http://rancher.cattle-system"
-		}
 	}
 	return &Client{
 		insecure:   insecure,
