@@ -1442,18 +1442,6 @@ func TestAnalyzeCluster(t *testing.T) {
 				]
 			}`,
 		},
-		"analyze cluster - no rancherURL or request URL": {
-			params: inspectClusterParams{
-				Cluster:   "test-cluster",
-				Namespace: "fleet-default",
-			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
-				newManagementCluster("c-m-abc123", true),
-			),
-			expectedError: "no URL for rancher request",
-		},
 	}
 
 	for name, tt := range tests {
@@ -1466,8 +1454,8 @@ func TestAnalyzeCluster(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, testToken, testURL), tt.rancherURL, false)
-			req := test.NewCallToolRequest(tt.requestURL)
+			tools := NewTools(test.WrapClient(c, testToken), false)
+			req := &mcp.CallToolRequest{}
 			req.Params = &mcp.CallToolParamsRaw{Name: "analyze-cluster"}
 
 			result, _, err := tools.analyzeCluster(middleware.WithToken(t.Context(), testToken), req, tt.params)

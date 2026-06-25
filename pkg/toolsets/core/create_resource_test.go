@@ -130,19 +130,6 @@ func TestCreateKubernetesResource(t *testing.T) {
 			}),
 			expectedError: "failed to create unstructured object",
 		},
-		"create configmap - no rancherURL or request URL": {
-			// fails because requestURL and rancherURL are not configured (no
-			// R_Url or configured Rancher URL.
-			params: createKubernetesResourceParams{
-				Name:      "test-config",
-				Namespace: "default",
-				Kind:      "configmap",
-				Cluster:   "local",
-				Resource:  make(chan int),
-			},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClient(createResourceScheme()),
-			expectedError: "no URL for rancher request",
-		},
 	}
 
 	for name, tt := range tests {
@@ -152,8 +139,8 @@ func TestCreateKubernetesResource(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
-			req := test.NewCallToolRequest(tt.requestURL)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
+			req := &mcp.CallToolRequest{}
 
 			result, _, err := tools.createKubernetesResource(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
 

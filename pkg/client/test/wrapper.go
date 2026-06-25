@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,6 +27,12 @@ func WrapClient(c *client.Client, expectedToken string) *clientWrapper {
 		client:        c,
 		expectedToken: expectedToken,
 	}
+}
+
+// NewCallToolRequest creates a new empty *mcp.CallToolRequest.
+// The url parameter is accepted for backward compatibility but is ignored.
+func NewCallToolRequest(_ string) *mcp.CallToolRequest {
+	return &mcp.CallToolRequest{}
 }
 
 // validateToken checks if the provided token matches the expected token.

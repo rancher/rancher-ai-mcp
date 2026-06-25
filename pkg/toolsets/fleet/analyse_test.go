@@ -7,10 +7,27 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/rest"
 )
+
+// fakeFleetClient is a minimal toolsClient implementation for tests.
+type fakeFleetClient struct{}
+
+func (f *fakeFleetClient) GetResource(_ context.Context, _ client.GetParams) (*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (f *fakeFleetClient) GetResources(_ context.Context, _ client.ListParams) ([]*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (f *fakeFleetClient) CreateRestConfig(_ string, _ string) (*rest.Config, error) {
+	return &rest.Config{}, nil
+}
 
 // fakeResourceAnalyzer is a test double for the resourceAnalyzer interface.
 type fakeResourceAnalyzer struct {
@@ -44,6 +61,7 @@ func TestAnalyzeFleetResources(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tools := &Tools{
 				resourceAnalyzer: tt.analyzer,
+				client:           &fakeFleetClient{},
 			}
 			req := &mcp.CallToolRequest{}
 

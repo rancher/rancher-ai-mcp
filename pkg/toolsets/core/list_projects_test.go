@@ -19,7 +19,6 @@ import (
 )
 
 func TestListProjects(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	cluster := &unstructured.Unstructured{
@@ -82,9 +81,7 @@ func TestListProjects(t *testing.T) {
 		}
 		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
-		result, _, err := tools.listProjects(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-			Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-		}, listProjectsParams{
+		result, _, err := tools.listProjects(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, listProjectsParams{
 			Cluster: "test-cluster",
 		})
 

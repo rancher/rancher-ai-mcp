@@ -621,16 +621,6 @@ func TestInspectPod(t *testing.T) {
 				]
 			}`,
 		},
-		"inspect pod - no rancherURL or request URL": {
-			params: specificResourceParams{
-				Name:      "nonexistent-pod",
-				Namespace: "default",
-				Cluster:   "local",
-			},
-			fakeClientset: fake.NewSimpleClientset(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClient(inspectPodScheme()),
-			expectedError: "no URL for rancher request",
-		},
 	}
 
 	for name, tt := range tests {
@@ -643,7 +633,7 @@ func TestInspectPod(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest(tt.requestURL)
 
 			result, _, err := tools.inspectPod(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

@@ -341,15 +341,6 @@ func TestGetClusterMachine(t *testing.T) {
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
 			expectedResult: `{"llm":"no resources found"}`,
 		},
-		"get machines from cluster - no rancherURL or request URL": {
-			params: getClusterMachineParams{
-				Cluster:     "empty-cluster",
-				MachineName: "",
-			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
-			expectedError: "no URL for rancher request",
-		},
 	}
 
 	for name, tt := range tests {
@@ -362,8 +353,8 @@ func TestGetClusterMachine(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, testToken, testURL), tt.rancherURL, false)
-			req := test.NewCallToolRequest(tt.requestURL)
+			tools := NewTools(test.WrapClient(c, testToken), false)
+			req := &mcp.CallToolRequest{}
 			req.Params = &mcp.CallToolParamsRaw{Name: "get-cluster-machine"}
 
 			result, _, err := tools.getClusterMachine(middleware.WithToken(t.Context(), testToken), req, tt.params)

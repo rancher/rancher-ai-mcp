@@ -15,7 +15,6 @@ import (
 )
 
 func TestCreateK3kCluster(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 	scheme := runtime.NewScheme()
 
@@ -135,9 +134,7 @@ func TestCreateK3kCluster(t *testing.T) {
 			}
 			tools := Tools{client: c}
 
-			result, _, err := tools.createK3kCluster(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-			}, test.params)
+			result, _, err := tools.createK3kCluster(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, test.params)
 
 			if test.expectedError != "" {
 				assert.ErrorContains(t, err, test.expectedError)
