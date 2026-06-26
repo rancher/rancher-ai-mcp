@@ -72,11 +72,3 @@ func (f *fakeToolsClient) GetClusterID(ctx context.Context, token string, cluste
 	}
 	return f.client.GetClusterID(ctx, token, clusterNameOrID)
 }
-
-// GetClusterID validates the token and delegates to the wrapped client.
-func (f *fakeToolsClient) GetClusterID(ctx context.Context, token string, url string, clusterNameOrID string) (string, error) {
-	if err := f.validateToken(token); err != nil {
-		return "", err
-	}
-	return f.client.GetClusterID(ctx, token, url, clusterNameOrID)
-}
