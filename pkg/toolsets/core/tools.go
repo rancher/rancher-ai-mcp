@@ -92,7 +92,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of all container images for the specified clusters. If clusters is empty, returns images for all clusters.`},
+		Description: `Returns all container images running across the specified clusters, along with the pods (name and namespace) using each image. Use in priority this tool to audit clusters for container registry or image usage, or to find which pods are running a specific container image. If clusters is empty, returns data for all clusters.`},
 		t.getClusterImages,
 	)
 
