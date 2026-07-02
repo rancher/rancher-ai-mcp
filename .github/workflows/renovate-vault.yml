@@ -24,7 +24,7 @@ jobs:
     permissions:
       contents: read
       id-token: write # for rancher-eio/read-vault-secrets
-    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@206454e9db716874cfd0a44a2a64d13b4a48bdaa # release
+    uses: rancher/renovate-config/.github/workflows/renovate-vault.yml@95aecdf5e3ff8468adc8ab734e6793cb4ea64b0d # release
     with:
       logLevel: ${{ inputs.logLevel || 'info' }}
       overrideSchedule: ${{ github.event.inputs.overrideSchedule == 'true' && '{''schedule'':null}' || '' }}
