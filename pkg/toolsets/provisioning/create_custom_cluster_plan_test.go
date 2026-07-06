@@ -179,7 +179,7 @@ func TestCreateCustomClusterPlan(t *testing.T) {
 				}
 			}))
 
-			c, err := client.NewClient(false, svr.URL)
+			c, err := client.NewClient(true, svr.URL)
 			if err != nil {
 				t.Fatalf("failed to create client: %v", err)
 			}

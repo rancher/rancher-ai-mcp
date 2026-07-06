@@ -9,7 +9,7 @@ import (
 )
 
 func TestAllToolSets(t *testing.T) {
-	c, err := client.NewClient(true, "")
+	c, err := client.NewClient(true, "https://fake-url")
 	require.NoError(t, err)
 	toolsets := allToolSets(c, false)
 

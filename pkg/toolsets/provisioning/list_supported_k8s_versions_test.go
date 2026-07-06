@@ -46,7 +46,7 @@ func TestListSupportedKubernetesVersions(t *testing.T) {
 				w.Write([]byte(test.kdmOutput))
 			}))
 
-			c, err := client.NewClient(false, svr.URL)
+			c, err := client.NewClient(true, svr.URL)
 			if err != nil {
 				t.Fatalf("failed to create client: %v", err)
 			}

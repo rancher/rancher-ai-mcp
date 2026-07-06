@@ -59,17 +59,20 @@ func NewClient(insecure bool, authzServerURL string) (*Client, error) {
 		return nil, fmt.Errorf("parsing authz-server-url: %w", err)
 	}
 	if rancherURL == "" {
-		if envURL := os.Getenv("RANCHER_API_TOKEN"); envURL != "" {
+		if envURL := os.Getenv("RANCHER_URL"); envURL != "" {
 			rancherURL = envURL
 		} else {
-			rancherURL = "https://rancher.cattle-system"
+			rancherURL, err = fetchRancherURL()
+			if err != nil {
+				return nil, fmt.Errorf("fetching internal-server-url from rancher: %w", err)
+			}
 		}
 	}
 	var caBundle []byte
 	if !insecure {
 		caBundle, err = fetchCABundle()
 		if err != nil {
-			return nil, fmt.Errorf("fetching cacerts from rancher: %w", err)
+			return nil, fmt.Errorf("fetching internal-cacerts from rancher: %w", err)
 		}
 	}
 	return &Client{
@@ -438,7 +441,35 @@ func (c *Client) getAPIVersionsForGR(ctx context.Context, token, cluster string,
 	return versions, nil
 }
 
-// fetchCABundle fetches the CA certificate from the Rancher cacerts Setting
+// fetchRancherURL fetches the Rancher server URL from the internal-server-url Setting
+// resource via the Kubernetes API using in-cluster config.
+func fetchRancherURL() (string, error) {
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		return "", fmt.Errorf("creating in-cluster config: %w", err)
+	}
+
+	dynClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return "", fmt.Errorf("creating dynamic client: %w", err)
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "management.cattle.io",
+		Version:  "v3",
+		Resource: "settings",
+	}
+
+	obj, err := dynClient.Resource(gvr).Get(context.Background(), "internal-server-url", metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("getting internal-server-url setting: %w", err)
+	}
+
+	value, _, _ := unstructured.NestedString(obj.Object, "value")
+	return value, nil
+}
+
+// fetchCABundle fetches the CA certificate from the Rancher internal-cacerts Setting
 // resource via the Kubernetes API using in-cluster config.
 func fetchCABundle() ([]byte, error) {
 	cfg, err := rest.InClusterConfig()
@@ -457,9 +488,9 @@ func fetchCABundle() ([]byte, error) {
 		Resource: "settings",
 	}
 
-	obj, err := dynClient.Resource(gvr).Get(context.Background(), "cacerts", metav1.GetOptions{})
+	obj, err := dynClient.Resource(gvr).Get(context.Background(), "internal-cacerts", metav1.GetOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("getting cacerts setting: %w", err)
+		return nil, fmt.Errorf("getting internal-cacerts setting: %w", err)
 	}
 
 	value, _, _ := unstructured.NestedString(obj.Object, "value")

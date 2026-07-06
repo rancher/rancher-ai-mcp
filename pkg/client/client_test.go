@@ -442,27 +442,21 @@ func TestNewClient_RancherURL(t *testing.T) {
 			authzServerURL: "https://rancher.example.com/v3-public/auth",
 			expectedURL:    "https://rancher.example.com",
 		},
-		"falls back to RANCHER_API_TOKEN env var": {
+		"falls back to RANCHER_URL env var": {
 			authzServerURL: "",
 			envVar:         "https://my-rancher.internal",
 			expectedURL:    "https://my-rancher.internal",
-		},
-		"falls back to default when no authz URL and no env var": {
-			authzServerURL: "",
-			envVar:         "",
-			expectedURL:    "https://rancher.cattle-system",
 		},
 	}
 
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
 			if test.envVar != "" {
-				t.Setenv("RANCHER_API_TOKEN", test.envVar)
+				t.Setenv("RANCHER_URL", test.envVar)
 			} else {
-				os.Unsetenv("RANCHER_API_TOKEN")
+				os.Unsetenv("RANCHER_URL")
 			}
 
-			// Use insecure=true to avoid fetchCABundle (requires in-cluster config)
 			c, err := NewClient(true, test.authzServerURL)
 			require.NoError(t, err)
 			assert.Equal(t, test.expectedURL, c.RancherURL())
