@@ -493,13 +493,14 @@ func fetchCABundle() ([]byte, error) {
 		return nil, fmt.Errorf("getting internal-cacerts setting: %w", err)
 	}
 
-	value, _, _ := unstructured.NestedString(obj.Object, "value")
-	if value == "" {
+	value, found, err := unstructured.NestedString(obj.Object, "value")
+	if err != nil {
+		return nil, fmt.Errorf("reading internal-cacerts value: %w", err)
+	}
+	if !found || strings.TrimSpace(value) == "" {
 		return nil, nil
 	}
-
 	return []byte(value), nil
-}
 
 func rancherURLFromAuthServerURL(s string) (string, error) {
 	if s == "" {
