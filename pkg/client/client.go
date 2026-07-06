@@ -501,6 +501,7 @@ func fetchCABundle() ([]byte, error) {
 		return nil, nil
 	}
 	return []byte(value), nil
+}
 
 func rancherURLFromAuthServerURL(s string) (string, error) {
 	if s == "" {
