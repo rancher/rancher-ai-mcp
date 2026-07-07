@@ -16,11 +16,11 @@ require (
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/modelcontextprotocol/go-sdk v1.4.1
-	github.com/rancher/dynamiclistener v1.27.5
+	github.com/rancher/dynamiclistener v0.9.0
 	github.com/rancher/fleet v0.16.0-rc.4.0.20260713044520-84ff7effd8f5
 	github.com/rancher/fleet/pkg/apis v0.16.0-rc.2.0.20260713044520-84ff7effd8f5
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894
-	github.com/rancher/wrangler v1.1.2
+	github.com/rancher/wrangler/v3 v3.7.0
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.28.0
@@ -134,7 +134,6 @@ require (
 	github.com/prometheus/procfs v0.20.1 // indirect
 	github.com/rancher/fleet/pkg/helmvalues v0.0.0-20260713044520-84ff7effd8f5 // indirect
 	github.com/rancher/lasso v0.2.9 // indirect
-	github.com/rancher/wrangler/v3 v3.7.0 // indirect
 	github.com/reugn/go-quartz v0.15.2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/rubenv/sql-migrate v1.8.1 // indirect
