@@ -136,10 +136,8 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,
 			},
-			Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. Returns the modified resource.
-
-Example of the patch parameter:
-[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
+			InputSchema: patchResourceInputSchema(),
+			Description: `Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. Returns the modified resource.`},
 			t.updateKubernetesResource,
 		)
 
@@ -148,10 +146,8 @@ Example of the patch parameter:
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,
 			},
-			Description: `Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json.
-
-Example of the patch parameter:
-[{"op": "replace", "path": "/spec/replicas", "value": 3}]`},
+			InputSchema: patchResourceInputSchema(),
+			Description: `Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. `},
 			t.updateKubernetesResourcePlan)
 	}
 }

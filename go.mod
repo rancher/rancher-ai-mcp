@@ -17,6 +17,7 @@ require (
 	github.com/MicahParks/keyfunc/v3 v3.7.0
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/google/jsonschema-go v0.4.2
 	github.com/modelcontextprotocol/go-sdk v1.4.1
 	github.com/rancher/dynamiclistener v1.27.5
 	github.com/rancher/fleet v0.15.0-rc.1.0.20260309094116-5553b4101a80
@@ -100,7 +101,6 @@ require (
 	github.com/google/go-containerregistry v0.21.2 // indirect
 	github.com/google/go-github/v72 v72.0.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
-	github.com/google/jsonschema-go v0.4.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/gregjones/httpcache v0.0.0-20190611155906-901d90724c79 // indirect

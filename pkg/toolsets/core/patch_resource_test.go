@@ -1,6 +1,7 @@
 package core
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -216,6 +217,33 @@ func TestUpdateKubernetesResource(t *testing.T) {
 				require.NoError(t, err)
 				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
+		})
+	}
+}
+
+func TestJsonPatchListUnmarshalJSON(t *testing.T) {
+	expected := jsonPatchList{
+		{Op: "replace", Path: "/spec/replicas", Value: float64(3)},
+		{Op: "add", Path: "/metadata/labels/env", Value: "prod"},
+	}
+
+	tests := map[string]struct {
+		input string
+	}{
+		"normal JSON array": {
+			input: `[{"op":"replace","path":"/spec/replicas","value":3},{"op":"add","path":"/metadata/labels/env","value":"prod"}]`,
+		},
+		"JSON string containing stringified array": {
+			input: `"[{\"op\":\"replace\",\"path\":\"/spec/replicas\",\"value\":3},{\"op\":\"add\",\"path\":\"/metadata/labels/env\",\"value\":\"prod\"}]"`,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			var got jsonPatchList
+			err := json.Unmarshal([]byte(tt.input), &got)
+			require.NoError(t, err)
+			assert.Equal(t, expected, got)
 		})
 	}
 }
