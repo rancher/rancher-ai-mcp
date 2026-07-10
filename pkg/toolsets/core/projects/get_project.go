@@ -100,7 +100,19 @@ func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		return nil, nil, err
 	}
 
+	projectMembers, err := t.client.GetResources(ctx, client.ListParams{
+		Cluster:   LocalCluster,
+		Kind:      "projectroletemplatebinding",
+		Namespace: projectID,
+		Token:     middleware.Token(ctx),
+	})
+	if err != nil {
+		zap.L().Error("failed to get members for project", zapGetProject, zap.Error(err))
+		return nil, nil, err
+	}
+
 	resources := append([]*unstructured.Unstructured{projectResource}, projectNamespaces...)
+	resources = append(resources, projectMembers...)
 
 	mcpResponse, err := response.CreateMcpResponse(resources, clusterID)
 	if err != nil {

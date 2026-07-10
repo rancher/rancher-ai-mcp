@@ -52,8 +52,9 @@ func TestGetProject(t *testing.T) {
 	_ = metav1.AddMetaToScheme(scheme)
 
 	customListKinds := map[schema.GroupVersionResource]string{
-		{Group: "management.cattle.io", Version: "v3", Resource: "clusters"}: "ClusterList",
-		{Group: "management.cattle.io", Version: "v3", Resource: "projects"}: "ProjectList",
+		{Group: "management.cattle.io", Version: "v3", Resource: "clusters"}:                    "ClusterList",
+		{Group: "management.cattle.io", Version: "v3", Resource: "projects"}:                    "ProjectList",
+		{Group: "management.cattle.io", Version: "v3", Resource: "projectroletemplatebindings"}: "ProjectRoleTemplateBindingList",
 	}
 
 	t.Run("get project with namespaces", func(t *testing.T) {
@@ -83,7 +84,21 @@ func TestGetProject(t *testing.T) {
 			},
 		}
 
-		fakeDynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, customListKinds, cluster, project, namespace1, namespace2)
+		member := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion":       "management.cattle.io/v3",
+				"kind":             "ProjectRoleTemplateBinding",
+				"userName":         "u-abc123",
+				"roleTemplateName": "project-owner",
+				"projectName":      "test-cluster:my-project",
+				"metadata": map[string]any{
+					"name":      "prtb-1",
+					"namespace": "my-project",
+				},
+			},
+		}
+
+		fakeDynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, customListKinds, cluster, project, namespace1, namespace2, member)
 
 		c := &client.Client{
 			DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
@@ -137,6 +152,17 @@ func TestGetProject(t *testing.T) {
             },
             "spec": {},
             "status": {}
+        },
+        {
+            "apiVersion": "management.cattle.io/v3",
+            "kind": "ProjectRoleTemplateBinding",
+            "metadata": {
+                "name": "prtb-1",
+                "namespace": "my-project"
+            },
+            "userName": "u-abc123",
+            "roleTemplateName": "project-owner",
+            "projectName": "test-cluster:my-project"
         }
     ],
     "uiContext": [
@@ -160,6 +186,13 @@ func TestGetProject(t *testing.T) {
             "name": "ns-2",
             "namespace": "",
             "type": "namespace"
+        },
+        {
+            "cluster": "test-cluster",
+            "kind": "ProjectRoleTemplateBinding",
+            "name": "prtb-1",
+            "namespace": "my-project",
+            "type": "projectroletemplatebinding"
         }
     ]
 }`
