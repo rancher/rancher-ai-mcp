@@ -161,8 +161,7 @@ func TestGetProject(t *testing.T) {
                 "namespace": "my-project"
             },
             "userName": "u-abc123",
-            "roleTemplateName": "project-owner",
-            "projectName": "test-cluster:my-project"
+            "roleTemplateName": "project-owner"
         }
     ],
     "uiContext": [
@@ -191,6 +190,88 @@ func TestGetProject(t *testing.T) {
             "cluster": "test-cluster",
             "kind": "ProjectRoleTemplateBinding",
             "name": "prtb-1",
+            "namespace": "my-project",
+            "type": "projectroletemplatebinding"
+        }
+    ]
+}`
+		text := result.Content[0].(*mcp.TextContent).Text
+		t.Logf("got result: %s", text)
+		assert.JSONEq(t, expectedResult, text)
+	})
+
+	t.Run("get project with group member", func(t *testing.T) {
+		t.Parallel()
+		groupMember := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion":         "management.cattle.io/v3",
+				"kind":               "ProjectRoleTemplateBinding",
+				"groupName":          "g-xyz789",
+				"groupPrincipalName": "ldap://cn=devs,dc=example,dc=com",
+				"roleTemplateName":   "project-member",
+				"projectName":        "test-cluster:my-project",
+				"metadata": map[string]any{
+					"name":      "prtb-2",
+					"namespace": "my-project",
+				},
+			},
+		}
+
+		fakeDynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, customListKinds, cluster, project, groupMember)
+
+		c := &client.Client{
+			DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
+				return fakeDynClient, nil
+			},
+		}
+		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
+
+		result, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, getProjectParams{
+			Name:    "my-project",
+			Cluster: "test-cluster",
+		})
+
+		require.NoError(t, err)
+		assert.NotNil(t, result)
+		assert.Len(t, result.Content, 1)
+
+		expectedResult := `{
+    "llm": [
+        {
+            "apiVersion": "management.cattle.io/v3",
+            "kind": "Project",
+            "metadata": {
+                "name": "my-project",
+                "namespace": "test-cluster"
+            },
+            "spec": {
+                "displayName": "My Project"
+            }
+        },
+        {
+            "apiVersion": "management.cattle.io/v3",
+            "kind": "ProjectRoleTemplateBinding",
+            "metadata": {
+                "name": "prtb-2",
+                "namespace": "my-project"
+            },
+            "groupName": "g-xyz789",
+            "groupPrincipalName": "ldap://cn=devs,dc=example,dc=com",
+            "roleTemplateName": "project-member"
+        }
+    ],
+    "uiContext": [
+        {
+            "cluster": "test-cluster",
+            "kind": "Project",
+            "name": "my-project",
+            "namespace": "test-cluster",
+            "type": "project"
+        },
+        {
+            "cluster": "test-cluster",
+            "kind": "ProjectRoleTemplateBinding",
+            "name": "prtb-2",
             "namespace": "my-project",
             "type": "projectroletemplatebinding"
         }
