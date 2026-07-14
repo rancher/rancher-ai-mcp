@@ -12,7 +12,7 @@ replace (
 )
 
 require (
-	github.com/MicahParks/keyfunc/v3 v3.7.0
+	github.com/MicahParks/keyfunc/v3 v3.8.0
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/modelcontextprotocol/go-sdk v1.4.1
@@ -20,7 +20,7 @@ require (
 	github.com/rancher/fleet v0.16.0-rc.4.0.20260713044520-84ff7effd8f5
 	github.com/rancher/fleet/pkg/apis v0.15.4
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894
-	github.com/rancher/wrangler v1.1.1-0.20230831050635-df1bd5aae9df
+	github.com/rancher/wrangler v1.1.2
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.11.1
 	go.uber.org/zap v1.28.0
