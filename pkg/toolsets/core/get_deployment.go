@@ -31,7 +31,6 @@ func (t *Tools) getDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolR
 		Kind:      "deployment",
 		Namespace: params.Namespace,
 		Name:      params.Name,
-		URL:       t.rancherURL(toolReq),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
@@ -56,7 +55,6 @@ func (t *Tools) getDeploymentDetails(ctx context.Context, toolReq *mcp.CallToolR
 		Kind:          "pod",
 		Namespace:     params.Namespace,
 		Name:          params.Name,
-		URL:           t.rancherURL(toolReq),
 		Token:         middleware.Token(ctx),
 		LabelSelector: selector.String(),
 	})

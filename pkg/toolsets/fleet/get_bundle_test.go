@@ -47,16 +47,11 @@ func bundleScheme() *runtime.Scheme {
 }
 
 func TestGetBundle(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
-		params        getBundleParams
-		fakeDynClient *dynamicfake.FakeDynamicClient
-		// used in the CallToolRequest
-		requestURL string
-		// used in the creation of the Tools.
-		rancherURL     string
+		params         getBundleParams
+		fakeDynClient  *dynamicfake.FakeDynamicClient
 		expectedResult string
 		expectedError  string
 	}{
@@ -65,41 +60,6 @@ func TestGetBundle(t *testing.T) {
 				Name:      "bundle-1",
 				Workspace: "fleet-default",
 			},
-			requestURL: fakeUrl,
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(bundleScheme(), map[schema.GroupVersionResource]string{
-				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"}: "BundleList",
-			}, fakeBundle1),
-			expectedResult: `{
-				"llm": [
-					{
-						"apiVersion": "fleet.cattle.io/v1alpha1",
-						"kind": "Bundle",
-						"metadata": {"name": "bundle-1", "namespace": "fleet-default"},
-						"spec": {
-							"targets": [{"clusterName": "cluster-1"}]
-						},
-						"status": {
-							"conditions": [{"type": "Ready", "status": "True"}]
-						}
-					}
-				],
-				"uiContext": [
-					{
-						"cluster": "local",
-						"kind": "Bundle",
-						"name": "bundle-1",
-						"namespace": "fleet-default",
-						"type": "fleet.cattle.io.bundle"
-					}
-				]
-			}`,
-		},
-		"get bundle when tool is configured with URL": {
-			params: getBundleParams{
-				Name:      "bundle-1",
-				Workspace: "fleet-default",
-			},
-			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(bundleScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"}: "BundleList",
 			}, fakeBundle1),
@@ -133,21 +93,10 @@ func TestGetBundle(t *testing.T) {
 				Name:      "nonexistent-bundle",
 				Workspace: "fleet-default",
 			},
-			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(bundleScheme(), map[schema.GroupVersionResource]string{
 				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"}: "BundleList",
 			}),
 			expectedError: `nonexistent-bundle" not found`,
-		},
-		"get bundle - no rancherURL or request URL": {
-			params: getBundleParams{
-				Name:      "bundle-1",
-				Workspace: "fleet-default",
-			},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(bundleScheme(), map[schema.GroupVersionResource]string{
-				{Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"}: "BundleList",
-			}),
-			expectedError: "no URL for rancher request",
 		},
 	}
 
@@ -158,8 +107,8 @@ func TestGetBundle(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL)
-			req := test.NewCallToolRequest(tt.requestURL)
+			tools := NewTools(test.WrapClient(c, fakeToken))
+			req := &mcp.CallToolRequest{}
 
 			result, _, err := tools.getBundle(
 				middleware.WithToken(t.Context(), fakeToken),

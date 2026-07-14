@@ -13,7 +13,8 @@ import (
 )
 
 func TestAddTools(t *testing.T) {
-	tools := NewTools(client.NewClient(true), "not-used-in-test", false)
+	c, _ := client.NewClient(true, "")
+	tools := NewTools(c, false)
 
 	// Create a test MCP server
 	mcpServer := mcp.NewServer(&mcp.Implementation{
@@ -69,7 +70,8 @@ func TestAddTools(t *testing.T) {
 }
 
 func TestAddToolsReadOnly(t *testing.T) {
-	tools := NewTools(client.NewClient(true), "not-used-in-test", true)
+	c, _ := client.NewClient(true, "")
+	tools := NewTools(c, true)
 
 	mcpServer := mcp.NewServer(&mcp.Implementation{
 		Name:    "test-server",

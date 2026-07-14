@@ -46,14 +46,16 @@ func TestListSupportedKubernetesVersions(t *testing.T) {
 				w.Write([]byte(test.kdmOutput))
 			}))
 
-			c := &client.Client{}
+			c, err := client.NewClient(false, svr.URL)
+			if err != nil {
+				t.Fatalf("failed to create client: %v", err)
+			}
 			tools := Tools{client: c}
 
 			result, _, err := tools.listSupportedKubernetesVersions(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{
 					Name: "listSupportedKubernetesVersions",
 				},
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {svr.URL}}},
 			}, test.params)
 
 			if test.expectedError != "" {

@@ -510,7 +510,6 @@ func TestScaleNodePoolPlan(t *testing.T) {
 				Params: &mcp.CallToolParamsRaw{
 					Name: "scaleClusterNodePoolPlan",
 				},
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {testURL}}},
 			}, test.params)
 
 			if test.expectedError != "" {

@@ -36,7 +36,6 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Kind:      "pod",
 		Namespace: params.Namespace,
 		Name:      params.Name,
-		URL:       t.rancherURL(toolReq),
 		Token:     middleware.Token(ctx),
 	})
 	if err != nil {
@@ -68,7 +67,6 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 			Kind:      "replicaset",
 			Namespace: params.Namespace,
 			Name:      replicaSetName,
-			URL:       t.rancherURL(toolReq),
 			Token:     middleware.Token(ctx),
 		})
 		if err != nil {
@@ -98,7 +96,6 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 				Kind:      parentKind,
 				Namespace: params.Namespace,
 				Name:      parentName,
-				URL:       t.rancherURL(toolReq),
 				Token:     middleware.Token(ctx),
 			})
 			if err != nil {
@@ -114,11 +111,10 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		Kind:      "pod.metrics.k8s.io",
 		Namespace: params.Namespace,
 		Name:      params.Name,
-		URL:       t.rancherURL(toolReq),
 		Token:     middleware.Token(ctx),
 	})
 
-	logs, err := t.getPodLogs(ctx, t.rancherURL(toolReq), params.Cluster, middleware.Token(ctx), pod)
+	logs, err := t.getPodLogs(ctx, params.Cluster, middleware.Token(ctx), pod)
 	if err != nil {
 		zap.L().Error("failed to get pod logs", zap.String("tool", "inspectPod"), zap.Error(err))
 		return nil, nil, err
@@ -146,8 +142,8 @@ func (t *Tools) inspectPod(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 // getPodLogs retrieves the logs for all containers in a pod.
 // It returns the logs as an unstructured object with container names as keys.
 // Only the last 50 lines of logs are retrieved per container to limit payload size.
-func (t *Tools) getPodLogs(ctx context.Context, url string, cluster string, token string, pod corev1.Pod) (*unstructured.Unstructured, error) {
-	clientset, err := t.client.CreateClientSet(ctx, token, url, cluster)
+func (t *Tools) getPodLogs(ctx context.Context, cluster string, token string, pod corev1.Pod) (*unstructured.Unstructured, error) {
+	clientset, err := t.client.CreateClientSet(ctx, token, cluster)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create clientset: %w", err)
 	}

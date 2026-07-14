@@ -1,4 +1,4 @@
-package core
+package projects
 
 import (
 	"testing"
@@ -19,7 +19,6 @@ import (
 )
 
 func TestGetProject(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	cluster := &unstructured.Unstructured{
@@ -93,9 +92,7 @@ func TestGetProject(t *testing.T) {
 		}
 		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
-		result, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-			Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-		}, getProjectParams{
+		result, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, getProjectParams{
 			Name:    "my-project",
 			Cluster: "test-cluster",
 		})
@@ -181,9 +178,7 @@ func TestGetProject(t *testing.T) {
 		}
 		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
-		_, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-			Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-		}, getProjectParams{
+		_, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, getProjectParams{
 			Name:    "nonexistent-project",
 			Cluster: "test-cluster",
 		})
@@ -201,9 +196,7 @@ func TestGetProject(t *testing.T) {
 		}
 		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
-		result, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-			Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-		}, getProjectParams{
+		result, _, err := tools.getProject(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, getProjectParams{
 			Name:    "my-project",
 			Cluster: "test-cluster",
 		})

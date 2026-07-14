@@ -96,16 +96,6 @@ func TestCreateImportedCluster(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c := &client.Client{
-				ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
-					return newFakeClientSet(), nil
-				},
-				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return dynamicfake.NewSimpleDynamicClient(provisioningSchemes()), nil
-				},
-			}
-			tools := Tools{client: c}
-
 			svr := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				w.WriteHeader(test.serverStatus)
 				w.Write([]byte(test.serverBody))
@@ -117,11 +107,22 @@ func TestCreateImportedCluster(t *testing.T) {
 				defer svr.Close()
 			}
 
+			c, err := client.NewClient(false, svr.URL)
+			if err != nil {
+				t.Fatalf("failed to create client: %v", err)
+			}
+			c.ClientSetCreator = func(inConfig *rest.Config) (kubernetes.Interface, error) {
+				return newFakeClientSet(), nil
+			}
+			c.DynClientCreator = func(inConfig *rest.Config) (dynamic.Interface, error) {
+				return dynamicfake.NewSimpleDynamicClient(provisioningSchemes()), nil
+			}
+			tools := Tools{client: c}
+
 			result, _, err := tools.createImportedCluster(context.Background(), &mcp.CallToolRequest{
 				Params: &mcp.CallToolParamsRaw{
 					Name: "createImportedCluster",
 				},
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {svr.URL}}},
 			}, test.params)
 
 			if test.expectedError != "" {
