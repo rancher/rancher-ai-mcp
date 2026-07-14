@@ -23,7 +23,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
         with:
           persist-credentials: false
         
@@ -38,7 +38,7 @@ jobs:
         # This encapsulates: login, qemu, build/push
       - name: Build and push image
         if: ${{ github.ref_type == 'tag' }}
-        uses: rancher/ecm-distro-tools/actions/publish-image@e72982e61644408c47b5c181e7ea331532d180d1 # master
+        uses: rancher/ecm-distro-tools/actions/publish-image@e9b6789032dbe9e289ccc6f7532da8fd349922b3 # master
         with:
           image: rancher-ai-mcp
           tag: ${{ github.ref_name }}
@@ -51,7 +51,7 @@ jobs:
 
       - name: Build and push head image
         if: ${{ github.ref_name == 'main' }}
-        uses: rancher/ecm-distro-tools/actions/publish-image@e72982e61644408c47b5c181e7ea331532d180d1 # master
+        uses: rancher/ecm-distro-tools/actions/publish-image@e9b6789032dbe9e289ccc6f7532da8fd349922b3 # master
         with:
           image: rancher-ai-mcp
           tag: head
