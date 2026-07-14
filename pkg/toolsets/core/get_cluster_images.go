@@ -17,9 +17,20 @@ type getClusterImagesParams struct {
 	Clusters []string `json:"clusters,omitempty" jsonschema:"list of clusters to get images from. Empty to return images for all clusters"`
 }
 
-// getClusterImages retrieves all container images used across specified clusters.
+type podReference struct {
+	Name      string `json:"name"`
+	Namespace string `json:"namespace"`
+}
+
+type imageUsage struct {
+	Image string         `json:"image"`
+	Pods  []podReference `json:"pods"`
+}
+
+// getClusterImages retrieves all container images used across specified clusters,
+// along with the pods (name and namespace) using each image.
 // If no clusters are provided, it fetches images from all available clusters.
-// Returns a JSON map of cluster names to lists of container images.
+// Returns a JSON map of cluster names to lists of image usage entries.
 func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolRequest, params getClusterImagesParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("getClusterImages called")
 
@@ -28,7 +39,6 @@ func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 		clusterList, err := t.client.GetResources(ctx, client.ListParams{
 			Cluster: "local",
 			Kind:    "managementcluster",
-			URL:     t.rancherURL(toolReq),
 			Token:   middleware.Token(ctx),
 		})
 
@@ -43,14 +53,15 @@ func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 		clusters = params.Clusters
 	}
 
-	imagesInClusters := map[string][]string{}
+	imagesInClusters := map[string][]imageUsage{}
 
 	for _, cluster := range clusters {
-		images := []string{}
+		imageIndex := map[string]int{} // image name → index in slice
+		var usages []imageUsage
+
 		unstructuredPods, err := t.client.GetResources(ctx, client.ListParams{
 			Cluster: cluster,
 			Kind:    "pod",
-			URL:     t.rancherURL(toolReq),
 			Token:   middleware.Token(ctx),
 		})
 		if err != nil {
@@ -63,15 +74,28 @@ func (t *Tools) getClusterImages(ctx context.Context, toolReq *mcp.CallToolReque
 				zap.L().Error("failed convert unstructured object to Pod", zap.String("tool", "getClusterImages"), zap.Error(err))
 				return nil, nil, fmt.Errorf("failed to convert unstructured object to Pod: %w", err)
 			}
-			for _, container := range pod.Spec.InitContainers {
-				images = append(images, container.Image)
+			ref := podReference{Name: pod.Name, Namespace: pod.Namespace}
+			var containerImages []string
+			for _, c := range pod.Spec.InitContainers {
+				containerImages = append(containerImages, c.Image)
 			}
-			for _, container := range pod.Spec.Containers {
-				images = append(images, container.Image)
+			for _, c := range pod.Spec.Containers {
+				containerImages = append(containerImages, c.Image)
+			}
+			for _, image := range containerImages {
+				if idx, ok := imageIndex[image]; ok {
+					usages[idx].Pods = append(usages[idx].Pods, ref)
+				} else {
+					imageIndex[image] = len(usages)
+					usages = append(usages, imageUsage{Image: image, Pods: []podReference{ref}})
+				}
 			}
 		}
 
-		imagesInClusters[cluster] = images
+		if usages == nil {
+			usages = []imageUsage{}
+		}
+		imagesInClusters[cluster] = usages
 	}
 
 	response, err := json.Marshal(imagesInClusters)

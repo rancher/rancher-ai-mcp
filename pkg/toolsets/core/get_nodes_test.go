@@ -130,14 +130,6 @@ func TestGetNodes(t *testing.T) {
 			}),
 			expectedResult: `{"llm":"no resources found"}`,
 		},
-		"get nodes no rancherURL or request URL": {
-			params: getNodesParams{Cluster: "local"},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(nodeScheme(), map[schema.GroupVersionResource]string{
-				{Group: "", Version: "v1", Resource: "nodes"}:                    "NodeList",
-				{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
-			}),
-			expectedError: "no URL for rancher request",
-		},
 	}
 
 	for name, tt := range tests {
@@ -147,7 +139,7 @@ func TestGetNodes(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest(tt.requestURL)
 
 			result, _, err := tools.getNodes(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

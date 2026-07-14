@@ -70,11 +70,6 @@ func TestGetResource(t *testing.T) {
 			requestURL:    fakeUrl,
 			expectedError: `pods "rancher" not found`,
 		},
-		"get pod no rancherURL or request URL": {
-			params:        resourceParams{Name: "rancher", Kind: "pod", Namespace: "default", Cluster: "local"},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),
-			expectedError: "no URL for rancher request",
-		},
 	}
 
 	for name, tt := range tests {
@@ -85,7 +80,7 @@ func TestGetResource(t *testing.T) {
 				},
 			}
 
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest(tt.requestURL)
 
 			result, _, err := tools.getResource(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

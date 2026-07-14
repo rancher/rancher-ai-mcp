@@ -71,7 +71,11 @@ func TestGetClusterImages(t *testing.T) {
 				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
 			}, fakePodWithImage),
 			expectedResult: `{
-				"local": ["busybox:latest", "nginx:1.21", "redis:alpine"]
+				"local": [
+					{"image": "busybox:latest", "pods": [{"name": "test-pod", "namespace": "default"}]},
+					{"image": "nginx:1.21",     "pods": [{"name": "test-pod", "namespace": "default"}]},
+					{"image": "redis:alpine",   "pods": [{"name": "test-pod", "namespace": "default"}]}
+				]
 			}`,
 		},
 		"get images from cluster with no pods": {
@@ -91,17 +95,12 @@ func TestGetClusterImages(t *testing.T) {
 			}, fakePodWithImage),
 			rancherURL: fakeUrl,
 			expectedResult: `{
-				"local": ["busybox:latest", "nginx:1.21", "redis:alpine"]
+				"local": [
+					{"image": "busybox:latest", "pods": [{"name": "test-pod", "namespace": "default"}]},
+					{"image": "nginx:1.21",     "pods": [{"name": "test-pod", "namespace": "default"}]},
+					{"image": "redis:alpine",   "pods": [{"name": "test-pod", "namespace": "default"}]}
+				]
 			}`,
-		},
-		"get images from cluster - no rancherURL or request URL": {
-			// fails because requestURL and rancherURL are not configured (no
-			// R_Url or configured Rancher URL.
-			params: getClusterImagesParams{Clusters: []string{"local"}},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(podScheme(), map[schema.GroupVersionResource]string{
-				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
-			}, fakePodWithImage),
-			expectedError: "no URL for rancher request",
 		},
 	}
 
@@ -113,8 +112,8 @@ func TestGetClusterImages(t *testing.T) {
 				},
 			}
 
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
-			req := test.NewCallToolRequest(tt.requestURL)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
+			req := &mcp.CallToolRequest{}
 
 			result, _, err := tools.getClusterImages(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
 

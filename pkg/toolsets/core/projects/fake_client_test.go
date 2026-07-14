@@ -1,4 +1,4 @@
-package core
+package projects
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/kubernetes"
 )
 
 // fakeToolsClient wraps a *client.Client and validates tokens before delegating to the wrapped client.
@@ -34,20 +33,20 @@ func (f *fakeToolsClient) validateToken(token string) error {
 	return nil
 }
 
+// GetClusterID validates the token and delegates to the wrapped client.
+func (f *fakeToolsClient) GetClusterID(ctx context.Context, token string, clusterNameOrID string) (string, error) {
+	if err := f.validateToken(token); err != nil {
+		return "", err
+	}
+	return f.client.GetClusterID(ctx, token, clusterNameOrID)
+}
+
 // GetResource validates the token and delegates to the wrapped client.
 func (f *fakeToolsClient) GetResource(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error) {
 	if err := f.validateToken(params.Token); err != nil {
 		return nil, err
 	}
 	return f.client.GetResource(ctx, params)
-}
-
-// GetResourceInterface validates the token and delegates to the wrapped client.
-func (f *fakeToolsClient) GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
-	if err := f.validateToken(token); err != nil {
-		return nil, err
-	}
-	return f.client.GetResourceInterface(ctx, token, namespace, cluster, gvr)
 }
 
 // GetResources validates the token and delegates to the wrapped client.
@@ -58,17 +57,10 @@ func (f *fakeToolsClient) GetResources(ctx context.Context, params client.ListPa
 	return f.client.GetResources(ctx, params)
 }
 
-// CreateClientSet validates the token and delegates to the wrapped client.
-func (f *fakeToolsClient) CreateClientSet(ctx context.Context, token string, cluster string) (kubernetes.Interface, error) {
+// GetResourceInterface validates the token and delegates to the wrapped client.
+func (f *fakeToolsClient) GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
 	if err := f.validateToken(token); err != nil {
 		return nil, err
 	}
-	return f.client.CreateClientSet(ctx, token, cluster)
-}
-
-func (f *fakeToolsClient) GetClusterID(ctx context.Context, token string, clusterNameOrID string) (string, error) {
-	if err := f.validateToken(token); err != nil {
-		return "", err
-	}
-	return f.client.GetClusterID(ctx, token, clusterNameOrID)
+	return f.client.GetResourceInterface(ctx, token, namespace, cluster, gvr)
 }

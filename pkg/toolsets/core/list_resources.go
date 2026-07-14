@@ -35,7 +35,6 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 		Cluster:       params.Cluster,
 		Kind:          params.Kind,
 		Namespace:     params.Namespace,
-		URL:           t.rancherURL(toolReq),
 		Token:         middleware.Token(ctx),
 		LabelSelector: params.LabelSelector,
 	})

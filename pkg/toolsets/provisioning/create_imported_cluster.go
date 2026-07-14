@@ -42,7 +42,7 @@ func (t *Tools) createImportedCluster(ctx context.Context, toolReq *mcp.CallTool
 		return nil, nil, fmt.Errorf("failed to marshal cluster object to JSON: %w", err)
 	}
 
-	respBody, status, err := makeRancherRequest(ctx, t.rancherURL(toolReq), http.MethodPost, "v3/clusters", middleware.Token(ctx), clusterJSON)
+	respBody, status, err := makeRancherRequest(ctx, t.client.RancherURL(), http.MethodPost, "v3/clusters", middleware.Token(ctx), clusterJSON)
 	if err != nil {
 		log.Error("failed to make request to Rancher API to create imported cluster", zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to make request to Rancher API to create imported cluster: %w", err)
