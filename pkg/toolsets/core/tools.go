@@ -56,7 +56,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of Kubernetes resources. The namespace must be empty for all namespaces or cluster-wide resources.`},
+		Description: `Returns a list of Kubernetes resources. The namespace must be empty for all namespaces or cluster-wide resources. Supports offset/limit pagination and an optional JSONPath predicate to filter which resources are returned.`},
 		t.listKubernetesResources,
 	)
 

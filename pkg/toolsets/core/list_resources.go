@@ -9,6 +9,8 @@ import (
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/util/jsonpath"
 )
 
 const defaultListLimit = 10
@@ -19,7 +21,9 @@ type listKubernetesResourcesParams struct {
 	Kind          string `json:"kind" jsonschema:"the type of Kubernetes resource (e.g., Pod, Deployment, Service)"`
 	Cluster       string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
 	Limit         int64  `json:"limit,omitempty" jsonschema:"maximum number of resources to return, defaults to 10"`
+	Offset        int64  `json:"offset,omitempty" jsonschema:"number of resources to skip before returning results, defaults to 0. Used with limit for pagination"`
 	LabelSelector string `json:"labelSelector,omitempty" jsonschema:"optional label selector to filter resources (e.g. app=nginx)"`
+	JSONPath      string `json:"jsonPath,omitempty" jsonschema:"optional JSONPath filter predicate to select matching resources. Use @ to reference a resource, e.g. @.status.phase==\"Running\" or @.metadata.labels.app==\"nginx\". Only resources matching the predicate are returned"`
 }
 
 // listKubernetesResources lists Kubernetes resources of a specific kind and namespace.
@@ -29,6 +33,10 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 	limit := params.Limit
 	if limit <= 0 {
 		limit = defaultListLimit
+	}
+	offset := params.Offset
+	if offset < 0 {
+		offset = 0
 	}
 
 	resources, err := t.client.GetResources(ctx, client.ListParams{
@@ -43,16 +51,35 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 		return nil, nil, err
 	}
 
-	total := int64(len(resources))
-	truncated := total > limit
-	if truncated {
-		resources = resources[:limit]
+	if params.JSONPath != "" {
+		resources, err = filterByJSONPath(resources, params.JSONPath)
+		if err != nil {
+			zap.L().Error("failed to filter resources by jsonpath", zap.String("tool", "listKubernetesResource"), zap.Error(err))
+			return nil, nil, err
+		}
 	}
 
+	total := int64(len(resources))
+
+	// window the results in-memory: [offset, offset+limit)
+	start := min(offset, total)
+	end := min(offset+limit, total)
+	resources = resources[start:end]
+
+	hasMore := offset+limit < total
+
 	var mcpResponse string
-	if truncated {
-		note := fmt.Sprintf("Results were limited to %d items out of %d total. There may be more resources matching the query. "+
-			"Use a namespace or label selector to narrow results, or increase the limit.", limit, total)
+	if hasMore || offset > 0 {
+		filterSuffix := ""
+		if params.JSONPath != "" {
+			filterSuffix = " matching the JSONPath filter"
+		}
+		note := fmt.Sprintf("Returned %d resources (offset %d, limit %d) out of %d total%s. "+
+			"Use a namespace or label selector to narrow results, or increase the limit.",
+			len(resources), offset, limit, total, filterSuffix)
+		if hasMore {
+			note += fmt.Sprintf(" To get the next page, set offset=%d.", offset+limit)
+		}
 		mcpResponse, err = response.CreateMcpResponse(resources, params.Cluster, note)
 	} else {
 		mcpResponse, err = response.CreateMcpResponse(resources, params.Cluster)
@@ -65,4 +92,37 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
 	}, nil, nil
+}
+
+// filterByJSONPath returns the subset of objs matching the given JSONPath predicate
+// expression (the body of a kubectl-style [?(...)] filter, e.g. `@.status.phase=="Running"`).
+// The objects are wrapped as a list so the filter can iterate over them, mirroring
+// kubectl's `{.items[?(<predicate>)]}` selector semantics.
+func filterByJSONPath(objs []*unstructured.Unstructured, expr string) ([]*unstructured.Unstructured, error) {
+	items := make([]interface{}, len(objs))
+	for i, obj := range objs {
+		items[i] = obj.Object
+	}
+	input := map[string]interface{}{"items": items}
+
+	jp := jsonpath.New("filter").AllowMissingKeys(true)
+	if err := jp.Parse("{.items[?(" + expr + ")]}"); err != nil {
+		return nil, fmt.Errorf("invalid jsonPath filter %q: %w", expr, err)
+	}
+
+	results, err := jp.FindResults(input)
+	if err != nil {
+		return nil, fmt.Errorf("failed to evaluate jsonPath filter %q: %w", expr, err)
+	}
+
+	filtered := make([]*unstructured.Unstructured, 0)
+	for _, group := range results {
+		for _, v := range group {
+			if m, ok := v.Interface().(map[string]interface{}); ok {
+				filtered = append(filtered, &unstructured.Unstructured{Object: m})
+			}
+		}
+	}
+
+	return filtered, nil
 }
