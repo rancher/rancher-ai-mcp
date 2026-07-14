@@ -1,4 +1,4 @@
-package core
+package projects
 
 import (
 	"context"
@@ -14,7 +14,6 @@ import (
 )
 
 func TestCreateProjectPlan(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
@@ -123,8 +122,8 @@ func TestCreateProjectPlan(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			c := &client.Client{}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), "", false)
-			req := test.NewCallToolRequest(fakeUrl)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
+			req := &mcp.CallToolRequest{}
 
 			result, _, err := tools.createProjectPlan(context.Background(), req, tt.params)
 

@@ -126,7 +126,7 @@ func TestGetClusterId(t *testing.T) {
 				},
 			}
 
-			clusterID, err := c.GetClusterID(context.TODO(), fakeToken, fakeUrl, test.clusterNameOrIDInput)
+			clusterID, err := c.GetClusterID(context.TODO(), fakeToken, test.clusterNameOrIDInput)
 
 			if test.expectErr != "" {
 				require.ErrorContains(t, err, test.expectErr)
@@ -184,7 +184,6 @@ func TestGetResource(t *testing.T) {
 				Kind:      "pod",
 				Namespace: "default",
 				Name:      "test-pod",
-				URL:       fakeUrl,
 				Token:     fakeToken,
 			},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme(), fakePod),
@@ -196,7 +195,6 @@ func TestGetResource(t *testing.T) {
 				Kind:      "pod",
 				Namespace: "default",
 				Name:      "nonexistent-pod",
-				URL:       fakeUrl,
 				Token:     fakeToken,
 			},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),
@@ -269,7 +267,6 @@ func TestGetResources(t *testing.T) {
 				Cluster:   "local",
 				Kind:      "pod",
 				Namespace: "default",
-				URL:       fakeUrl,
 				Token:     fakeToken,
 			},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme(), fakePod1, fakePod2, fakePod3),
@@ -281,7 +278,6 @@ func TestGetResources(t *testing.T) {
 				Cluster:       "local",
 				Kind:          "pod",
 				Namespace:     "default",
-				URL:           fakeUrl,
 				Token:         fakeToken,
 				LabelSelector: "app=nginx",
 			},
@@ -294,7 +290,6 @@ func TestGetResources(t *testing.T) {
 				Cluster:   "local",
 				Kind:      "pod",
 				Namespace: "kube-system",
-				URL:       fakeUrl,
 				Token:     fakeToken,
 			},
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(scheme()),
@@ -326,6 +321,53 @@ func TestGetResources(t *testing.T) {
 				}
 				assert.ElementsMatch(t, test.expectedNames, actualNames)
 			}
+		})
+	}
+}
+
+func TestRancherURLFromAuthServerURL(t *testing.T) {
+	testCases := map[string]struct {
+		input    string
+		expected string
+		wantErr  bool
+	}{
+		"empty input returns empty string": {
+			input:    "",
+			expected: "",
+			wantErr:  false,
+		},
+		"removes path query and fragment": {
+			input:    "https://rancher.example.com/v3-public/auth?scope=openid#section",
+			expected: "https://rancher.example.com",
+			wantErr:  false,
+		},
+		"keeps scheme host and port": {
+			input:    "https://rancher.example.com:9443/oauth2/authorize",
+			expected: "https://rancher.example.com:9443",
+			wantErr:  false,
+		},
+		"strips trailing slash-only path": {
+			input:    "https://rancher.example.com/",
+			expected: "https://rancher.example.com",
+			wantErr:  false,
+		},
+		"invalid URL returns error": {
+			input:   "http://[::1",
+			wantErr: true,
+		},
+	}
+
+	for name, tt := range testCases {
+		t.Run(name, func(t *testing.T) {
+			actual, err := rancherURLFromAuthServerURL(tt.input)
+
+			if tt.wantErr {
+				require.Error(t, err)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, actual)
 		})
 	}
 }

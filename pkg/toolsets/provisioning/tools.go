@@ -13,7 +13,6 @@ import (
 const (
 	toolsSet    = "provisioning"
 	toolsSetAnn = "toolset"
-	urlHeader   = "R_url"
 )
 
 type toolsClient interface {
@@ -22,31 +21,22 @@ type toolsClient interface {
 	GetResourcesAtAnyAPIVersion(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
 	GetResourceByGVR(ctx context.Context, params client.GetParams, gvr schema.GroupVersionResource) (*unstructured.Unstructured, error)
 	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
-	GetResourceInterface(ctx context.Context, token string, url string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
+	GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
+	RancherURL() string
 }
 
 // Tools contains tools for accessing provisioning information.
 type Tools struct {
-	client     toolsClient
-	RancherURL string
-	ReadOnly   bool
+	client   toolsClient
+	ReadOnly bool
 }
 
 // NewTools creates and returns a new Tools instance.
-func NewTools(client toolsClient, rancherURL string, readOnly bool) *Tools {
+func NewTools(client toolsClient, readOnly bool) *Tools {
 	return &Tools{
-		client:     client,
-		RancherURL: rancherURL,
-		ReadOnly:   readOnly,
+		client:   client,
+		ReadOnly: readOnly,
 	}
-}
-
-func (t *Tools) rancherURL(toolReq *mcp.CallToolRequest) string {
-	if t.RancherURL == "" {
-		return toolReq.Extra.Header.Get(urlHeader)
-	}
-
-	return t.RancherURL
 }
 
 func (t *Tools) AddTools(mcpServer *mcp.Server) {

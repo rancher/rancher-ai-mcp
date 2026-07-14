@@ -207,18 +207,6 @@ func TestGetDeploymentDetails(t *testing.T) {
 				]
 			}`,
 		},
-		"get deployment from cluster - no rancherURL or request URL": {
-			params: specificResourceParams{
-				Name:      "nonexistent-deployment",
-				Namespace: "default",
-				Cluster:   "local",
-			},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(deploymentScheme(), map[schema.GroupVersionResource]string{
-				{Group: "apps", Version: "v1", Resource: "deployments"}: "DeploymentList",
-				{Group: "", Version: "v1", Resource: "pods"}:            "PodList",
-			}),
-			expectedError: "no URL for rancher request",
-		},
 	}
 
 	for name, tt := range tests {
@@ -228,7 +216,7 @@ func TestGetDeploymentDetails(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest(tt.requestURL)
 
 			result, _, err := tools.getDeploymentDetails(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

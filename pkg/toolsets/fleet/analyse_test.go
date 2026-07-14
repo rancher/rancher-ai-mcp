@@ -7,11 +7,27 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/client-go/rest"
 )
+
+// fakeFleetClient is a minimal toolsClient implementation for tests.
+type fakeFleetClient struct{}
+
+func (f *fakeFleetClient) GetResource(_ context.Context, _ client.GetParams) (*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (f *fakeFleetClient) GetResources(_ context.Context, _ client.ListParams) ([]*unstructured.Unstructured, error) {
+	return nil, nil
+}
+
+func (f *fakeFleetClient) CreateRestConfig(_ string, _ string) (*rest.Config, error) {
+	return &rest.Config{}, nil
+}
 
 // fakeResourceAnalyzer is a test double for the resourceAnalyzer interface.
 type fakeResourceAnalyzer struct {
@@ -24,29 +40,19 @@ func (f *fakeResourceAnalyzer) analyzeFleetResources(_ context.Context, _ *rest.
 }
 
 func TestAnalyzeFleetResources(t *testing.T) {
-	fakeURL := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
 		analyzer       *fakeResourceAnalyzer
-		requestURL     string
-		rancherURL     string
 		expectedResult string
 		expectedError  string
 	}{
-		"returns report on success using request URL": {
+		"returns report on success": {
 			analyzer:       &fakeResourceAnalyzer{report: "fleet is healthy"},
-			requestURL:     fakeURL,
 			expectedResult: "fleet is healthy",
-		},
-		"returns report on success using configured rancherURL": {
-			analyzer:       &fakeResourceAnalyzer{report: "2 bundles not ready"},
-			rancherURL:     fakeURL,
-			expectedResult: "2 bundles not ready",
 		},
 		"error from resourceAnalyzer is propagated": {
 			analyzer:      &fakeResourceAnalyzer{err: errors.New("cluster unreachable")},
-			requestURL:    fakeURL,
 			expectedError: "cluster unreachable",
 		},
 	}
@@ -54,10 +60,10 @@ func TestAnalyzeFleetResources(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			tools := &Tools{
-				RancherURL:       tt.rancherURL,
 				resourceAnalyzer: tt.analyzer,
+				client:           &fakeFleetClient{},
 			}
-			req := test.NewCallToolRequest(tt.requestURL)
+			req := &mcp.CallToolRequest{}
 
 			result, extra, err := tools.analyzeFleetResources(
 				middleware.WithToken(t.Context(), fakeToken),

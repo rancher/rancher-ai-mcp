@@ -2,6 +2,8 @@ name: Publish Docker Image to Staging Prime Registry
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -34,8 +36,9 @@ jobs:
             secret/data/github/repo/${{ github.repository }}/rancher-prime-stg-registry/credentials password | STAGING_PRIME_REGISTRY_PASSWORD ;
 
         # This encapsulates: login, qemu, build/push
-      - name: Build and push image to staging prime registry
-        uses: rancher/ecm-distro-tools/actions/publish-image@c7c07fc1b7ca15c3a8fca06899a6a5657d34ac35 # master
+      - name: Build and push image
+        if: ${{ github.ref_type == 'tag' }}
+        uses: rancher/ecm-distro-tools/actions/publish-image@e72982e61644408c47b5c181e7ea331532d180d1 # master
         with:
           image: rancher-ai-mcp
           tag: ${{ github.ref_name }}
@@ -45,3 +48,16 @@ jobs:
           prime-repo: rancher
           prime-username: ${{ env.STAGING_PRIME_REGISTRY_USERNAME }}
           prime-password: ${{ env.STAGING_PRIME_REGISTRY_PASSWORD }}
+
+      - name: Build and push head image
+        if: ${{ github.ref_name == 'main' }}
+        uses: rancher/ecm-distro-tools/actions/publish-image@e72982e61644408c47b5c181e7ea331532d180d1 # master
+        with:
+          image: rancher-ai-mcp
+          tag: head
+          push-to-prime: false
+          push-to-public: true
+          public-registry: ${{ env.STAGING_PRIME_REGISTRY }}
+          public-repo: rancher
+          public-username: ${{ env.STAGING_PRIME_REGISTRY_USERNAME }}
+          public-password: ${{ env.STAGING_PRIME_REGISTRY_PASSWORD }}

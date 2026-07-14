@@ -19,7 +19,6 @@ import (
 )
 
 func TestListClusters(t *testing.T) {
-	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
 	scheme := runtime.NewScheme()
@@ -60,9 +59,7 @@ func TestListClusters(t *testing.T) {
 		}
 		tools := Tools{client: newFakeToolsClient(c, fakeToken)}
 
-		result, _, err := tools.listClusters(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{
-			Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {fakeUrl}}},
-		}, struct{}{})
+		result, _, err := tools.listClusters(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, struct{}{})
 
 		require.NoError(t, err)
 		assert.NotNil(t, result)

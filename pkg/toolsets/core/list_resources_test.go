@@ -136,17 +136,6 @@ func TestListKubernetesResources(t *testing.T) {
 				]
 			}`,
 		},
-		"list pods - no rancherURL or request URL": {
-			params: listKubernetesResourcesParams{
-				Kind:      "pod",
-				Namespace: "kube-system",
-				Cluster:   "local",
-			},
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
-				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
-			}),
-			expectedError: "no URL for rancher request",
-		},
 		"list pods - with explicit limit": {
 			params: listKubernetesResourcesParams{
 				Kind:      "pod",
@@ -180,7 +169,7 @@ func TestListKubernetesResources(t *testing.T) {
 					return tt.fakeDynClient, nil
 				},
 			}
-			tools := NewTools(test.WrapClient(c, fakeToken, fakeUrl), tt.rancherURL, false)
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
 			req := test.NewCallToolRequest(tt.requestURL)
 
 			result, _, err := tools.listKubernetesResources(middleware.WithToken(t.Context(), fakeToken), req, tt.params)

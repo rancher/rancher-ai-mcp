@@ -190,10 +190,10 @@ func TestCreateImportedClusterPlan(t *testing.T) {
 				Params: &mcp.CallToolParamsRaw{
 					Name: "createImportedClusterPlan",
 				},
-				Extra: &mcp.RequestExtra{Header: map[string][]string{urlHeader: {testURL}}},
 			}, test.params)
 
 			if test.expectedError != "" {
+				require.Error(t, err)
 				assert.ErrorContains(t, err, test.expectedError)
 			} else {
 				assert.NoError(t, err)
