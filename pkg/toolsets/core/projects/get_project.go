@@ -100,7 +100,41 @@ func (t *Tools) getProject(ctx context.Context, toolReq *mcp.CallToolRequest, pa
 		return nil, nil, err
 	}
 
+	projectMembers, err := t.client.GetResources(ctx, client.ListParams{
+		Cluster:   LocalCluster,
+		Kind:      "projectroletemplatebinding",
+		Namespace: projectID,
+		Token:     middleware.Token(ctx),
+	})
+	if err != nil {
+		zap.L().Error("failed to get members for project", zapGetProject, zap.Error(err))
+		return nil, nil, err
+	}
+
 	resources := append([]*unstructured.Unstructured{projectResource}, projectNamespaces...)
+	for _, prtb := range projectMembers {
+		slim := &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": prtb.GetAPIVersion(),
+				"kind":       prtb.GetKind(),
+				"metadata": map[string]any{
+					"name":      prtb.GetName(),
+					"namespace": prtb.GetNamespace(),
+				},
+			},
+		}
+		// Return only the subject identity and role instead of the full PRTB,
+		// which bloats the response for projects with many members.
+		// A PRTB is either a user binding (userName/userPrincipalName) or a group binding
+		// (groupName/groupPrincipalName), never both; copying only non-empty fields
+		// naturally produces the right pair without branching.
+		for _, field := range []string{"userName", "userPrincipalName", "groupName", "groupPrincipalName", "roleTemplateName"} {
+			if v, _, _ := unstructured.NestedString(prtb.Object, field); v != "" {
+				slim.Object[field] = v
+			}
+		}
+		resources = append(resources, slim)
+	}
 
 	mcpResponse, err := response.CreateMcpResponse(resources, clusterID)
 	if err != nil {
