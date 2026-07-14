@@ -16,7 +16,7 @@ replace (
 require (
 	github.com/MicahParks/keyfunc/v3 v3.7.0
 	github.com/evanphx/json-patch/v5 v5.9.11
-	github.com/golang-jwt/jwt/v5 v5.3.0
+	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/modelcontextprotocol/go-sdk v1.4.1
 	github.com/rancher/dynamiclistener v1.27.5
 	github.com/rancher/fleet v0.15.0-rc.1.0.20260309094116-5553b4101a80
