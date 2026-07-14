@@ -314,8 +314,8 @@ github.com/rancher/dynamiclistener v1.27.5 h1:FA/s9vbQzGz1Au3BuFvdbBfBBUmHGXGR3x
 github.com/rancher/dynamiclistener v1.27.5/go.mod h1:VqBaJNi+bZmre0+gi+2Jb6jbn7ovHzRueW+M7QhVKsk=
 github.com/rancher/fleet v0.16.0-rc.4.0.20260713044520-84ff7effd8f5 h1:cX11nbrIyNQGulnYJ7ZETqKEQOkl/J56dyOZmzb9nFc=
 github.com/rancher/fleet v0.16.0-rc.4.0.20260713044520-84ff7effd8f5/go.mod h1:s/72hULXuKvlwUBncJ5f5PAKQUtkKyAKEKi0cQSYH04=
-github.com/rancher/fleet/pkg/apis v0.15.4 h1:qk18X7NLbYUiqMD10BGVfNlmF5WfmPrrHaq6IQmSjVA=
-github.com/rancher/fleet/pkg/apis v0.15.4/go.mod h1:0zKqgb4oGrf5FupqlKa9L6SotEHdOIVruGKkekBVVU4=
+github.com/rancher/fleet/pkg/apis v0.16.0-rc.2.0.20260713044520-84ff7effd8f5 h1:UU9fSqOOIVN1R8VpMGcNCIfirkJxJZ2BaQnHDlN6kSg=
+github.com/rancher/fleet/pkg/apis v0.16.0-rc.2.0.20260713044520-84ff7effd8f5/go.mod h1:lacPRJRUl9Q2boMgUz9G5wWMbbtNuzFc/2j2NCNL4kk=
 github.com/rancher/fleet/pkg/helmvalues v0.0.0-20260713044520-84ff7effd8f5 h1:FvVec+SHUPRCnTRTeW/rVVMaNMN46k7xH8390rUZGiQ=
 github.com/rancher/fleet/pkg/helmvalues v0.0.0-20260713044520-84ff7effd8f5/go.mod h1:Ic6EppHtNHp/N5m74vM5ydp94v+DD6HwqsbS8Mjf17k=
 github.com/rancher/lasso v0.2.9 h1:5Xk9Qid+YDOLpa6s5xalcSR0cA5BMbgWcaOZ8kdNU7k=

@@ -18,7 +18,7 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.4.1
 	github.com/rancher/dynamiclistener v1.27.5
 	github.com/rancher/fleet v0.16.0-rc.4.0.20260713044520-84ff7effd8f5
-	github.com/rancher/fleet/pkg/apis v0.15.4
+	github.com/rancher/fleet/pkg/apis v0.16.0-rc.2.0.20260713044520-84ff7effd8f5
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894
 	github.com/rancher/wrangler v1.1.2
 	github.com/spf13/cobra v1.10.2
