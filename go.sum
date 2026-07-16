@@ -310,12 +310,10 @@ github.com/prometheus/procfs v0.20.1 h1:XwbrGOIplXW/AU3YhIhLODXMJYyC1isLFfYCsTEy
 github.com/prometheus/procfs v0.20.1/go.mod h1:o9EMBZGRyvDrSPH1RqdxhojkuXstoe4UlK79eF5TGGo=
 github.com/rancher/dynamiclistener v0.9.0 h1:IppFgaKHBN4H0CeFLRiFDzUfZuoB7C8RvW+TuEAamDM=
 github.com/rancher/dynamiclistener v0.9.0/go.mod h1:3Hcbw5m/9/RMas1eeghac6pdN2/cJ2BkNcIDjOCcEQg=
-github.com/rancher/fleet v0.16.0-rc.4.0.20260713044520-84ff7effd8f5 h1:cX11nbrIyNQGulnYJ7ZETqKEQOkl/J56dyOZmzb9nFc=
-github.com/rancher/fleet v0.16.0-rc.4.0.20260713044520-84ff7effd8f5/go.mod h1:s/72hULXuKvlwUBncJ5f5PAKQUtkKyAKEKi0cQSYH04=
-github.com/rancher/fleet/pkg/apis v0.16.0-rc.2.0.20260713044520-84ff7effd8f5 h1:UU9fSqOOIVN1R8VpMGcNCIfirkJxJZ2BaQnHDlN6kSg=
-github.com/rancher/fleet/pkg/apis v0.16.0-rc.2.0.20260713044520-84ff7effd8f5/go.mod h1:lacPRJRUl9Q2boMgUz9G5wWMbbtNuzFc/2j2NCNL4kk=
-github.com/rancher/fleet/pkg/helmvalues v0.0.0-20260713044520-84ff7effd8f5 h1:FvVec+SHUPRCnTRTeW/rVVMaNMN46k7xH8390rUZGiQ=
-github.com/rancher/fleet/pkg/helmvalues v0.0.0-20260713044520-84ff7effd8f5/go.mod h1:Ic6EppHtNHp/N5m74vM5ydp94v+DD6HwqsbS8Mjf17k=
+github.com/rancher/fleet v0.16.0-rc.5 h1:GS/5FM0U+BA0v1E1+7YWE9GpL8m/640TFYGA0hx2SVo=
+github.com/rancher/fleet v0.16.0-rc.5/go.mod h1:Tca9foGHyyn1AxqaFofX25vu7abcXYggW6ZWC9oMidI=
+github.com/rancher/fleet/pkg/apis v0.16.0-rc.2 h1:UlY/H1hosSSS6vOm2bjqJwmfb5cltbVTtDzW/AAxiA0=
+github.com/rancher/fleet/pkg/apis v0.16.0-rc.2/go.mod h1:XTTBOcNYFmS9T1gIoTUOKlDlZAIIpTspDOSEGmCE1Xc=
 github.com/rancher/lasso v0.2.9 h1:5Xk9Qid+YDOLpa6s5xalcSR0cA5BMbgWcaOZ8kdNU7k=
 github.com/rancher/lasso v0.2.9/go.mod h1:PMtxoVahRQvhEAi1HVOfyLDe1CrtGwTqOtkPVjSSkns=
 github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894 h1:zMfb+Wn4Ckh4PyXKFNRPiz3Q87an8Zm8GqrXHvWSMGA=

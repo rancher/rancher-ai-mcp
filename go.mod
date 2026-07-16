@@ -18,7 +18,7 @@ require (
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/rancher/dynamiclistener v0.9.0
 	github.com/rancher/fleet v0.16.0-rc.5
-	github.com/rancher/fleet/pkg/apis v0.16.0-rc.2.0.20260713044520-84ff7effd8f5
+	github.com/rancher/fleet/pkg/apis v0.16.0-rc.2
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894
 	github.com/rancher/wrangler/v3 v3.7.0
 	github.com/spf13/cobra v1.10.2
@@ -92,11 +92,10 @@ require (
 	github.com/golang/groupcache v0.0.0-20241129210726-2c02b8208cf8 // indirect
 	github.com/google/btree v1.1.3 // indirect
 	github.com/google/gnostic-models v0.7.1 // indirect
-	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/go-containerregistry v0.21.7 // indirect
 	github.com/google/go-github/v88 v88.0.0 // indirect
 	github.com/google/go-querystring v1.2.0 // indirect
+	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/gosuri/uitable v0.0.4 // indirect
 	github.com/huandu/xstrings v1.5.0 // indirect
@@ -133,7 +132,6 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.69.0 // indirect
 	github.com/prometheus/procfs v0.20.1 // indirect
-	github.com/rancher/fleet/pkg/helmvalues v0.0.0-20260713044520-84ff7effd8f5 // indirect
 	github.com/rancher/lasso v0.2.9 // indirect
 	github.com/reugn/go-quartz v0.15.2 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
