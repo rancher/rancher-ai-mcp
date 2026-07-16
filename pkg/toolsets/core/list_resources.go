@@ -55,7 +55,7 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 	if params.JSONPath != "" {
 		resources, err = filterByJSONPath(resources, params.JSONPath)
 		if err != nil {
-			zap.L().Error("failed to filter resources by jsonpath", zap.String("tool", "listKubernetesResource"), zap.Error(err))
+			zap.L().Error("failed to filter resources by jsonpath", zap.String("tool", "listKubernetesResources"), zap.Error(err))
 			return nil, nil, err
 		}
 	}
