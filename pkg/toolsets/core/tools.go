@@ -56,7 +56,11 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a list of Kubernetes resources. The namespace must be empty for all namespaces or cluster-wide resources. Supports offset/limit pagination and an optional JSONPath predicate to filter which resources are returned.`},
+		Description: `Returns a list of Kubernetes resources. The namespace must be empty for all namespaces or cluster-wide resources. Supports an optional JSONPath predicate to filter which resources are returned.
+
+Results are paginated with limit (page size, default 10) and offset (how many resources to skip from the start, default 0). To page through results, keep limit the same and increase offset by limit each time: offset=0 is the first page, offset=10 is the second page, offset=20 is the third page, and so on (with limit=10). When more resources remain, the response includes the exact offset value to pass in for the next page.
+
+IMPORTANT: Always display the current page of results to the user before fetching the next page. Never call this tool multiple times in a row without first showing the results and asking the user whether they want to continue to the next page.`},
 		t.listKubernetesResources,
 	)
 

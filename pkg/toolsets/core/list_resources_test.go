@@ -72,6 +72,41 @@ var fakePod3 = &corev1.Pod{
 	},
 }
 
+// pods used to verify sort ordering. They are intentionally declared out of
+// namespace/name order.
+var fakePodBravo = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "pod-1",
+		Namespace: "bravo",
+	},
+	Spec: corev1.PodSpec{
+		Containers: []corev1.Container{{Name: "nginx", Image: "nginx:latest"}},
+	},
+	Status: corev1.PodStatus{Phase: corev1.PodRunning},
+}
+
+var fakePodAlphaB = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "pod-2",
+		Namespace: "alpha",
+	},
+	Spec: corev1.PodSpec{
+		Containers: []corev1.Container{{Name: "redis", Image: "redis:latest"}},
+	},
+	Status: corev1.PodStatus{Phase: corev1.PodRunning},
+}
+
+var fakePodAlphaA = &corev1.Pod{
+	ObjectMeta: metav1.ObjectMeta{
+		Name:      "pod-1",
+		Namespace: "alpha",
+	},
+	Spec: corev1.PodSpec{
+		Containers: []corev1.Container{{Name: "busybox", Image: "busybox:latest"}},
+	},
+	Status: corev1.PodStatus{Phase: corev1.PodRunning},
+}
+
 func listResourcesScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
@@ -280,6 +315,59 @@ func TestListKubernetesResources(t *testing.T) {
 			}, fakePod1, fakePod2),
 			requestURL:    fakeUrl,
 			expectedError: "invalid jsonPath filter",
+		},
+		"list pods - sorted by namespace then name": {
+			params: listKubernetesResourcesParams{
+				Kind:    "pod",
+				Cluster: "local",
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
+				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
+			}, fakePodBravo, fakePodAlphaB, fakePodAlphaA),
+			requestURL: fakeUrl,
+			expectedResult: `{
+				"llm": [
+					{
+						"metadata": {"name": "pod-1", "namespace": "alpha"},
+						"spec": {"containers": [{"image": "busybox:latest", "name": "busybox", "resources": {}}]},
+						"status": {"phase": "Running"}
+					},
+					{
+						"metadata": {"name": "pod-2", "namespace": "alpha"},
+						"spec": {"containers": [{"image": "redis:latest", "name": "redis", "resources": {}}]},
+						"status": {"phase": "Running"}
+					},
+					{
+						"metadata": {"name": "pod-1", "namespace": "bravo"},
+						"spec": {"containers": [{"image": "nginx:latest", "name": "nginx", "resources": {}}]},
+						"status": {"phase": "Running"}
+					}
+				]
+			}`,
+		},
+		"list pods - sorted ordering respected with paging": {
+			params: listKubernetesResourcesParams{
+				Kind:    "pod",
+				Cluster: "local",
+				Limit:   1,
+				Offset:  1,
+			},
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(listResourcesScheme(), map[schema.GroupVersionResource]string{
+				{Group: "", Version: "v1", Resource: "pods"}: "PodList",
+			}, fakePodBravo, fakePodAlphaB, fakePodAlphaA),
+			requestURL: fakeUrl,
+			expectedResult: `{
+				"llm": {
+					"resources": [
+						{
+							"metadata": {"name": "pod-2", "namespace": "alpha"},
+							"spec": {"containers": [{"image": "redis:latest", "name": "redis", "resources": {}}]},
+							"status": {"phase": "Running"}
+						}
+					],
+					"note": "Returned 1 resources (offset 1, limit 1) out of 3 total. Use a namespace or label selector to narrow results, or increase the limit. To get the next page, set offset=2."
+				}
+			}`,
 		},
 	}
 

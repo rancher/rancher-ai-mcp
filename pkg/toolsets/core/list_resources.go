@@ -3,6 +3,7 @@ package core
 import (
 	"context"
 	"fmt"
+	"sort"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
@@ -20,8 +21,8 @@ type listKubernetesResourcesParams struct {
 	Namespace     string `json:"namespace" jsonschema:"the namespace where the resources are located. It must be empty for all namespaces or cluster-wide resources"`
 	Kind          string `json:"kind" jsonschema:"the type of Kubernetes resource (e.g., Pod, Deployment, Service)"`
 	Cluster       string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
-	Limit         int64  `json:"limit,omitempty" jsonschema:"maximum number of resources to return, defaults to 10"`
-	Offset        int64  `json:"offset,omitempty" jsonschema:"number of resources to skip before returning results, defaults to 0. Used with limit for pagination"`
+	Limit         int64  `json:"limit,omitempty" jsonschema:"maximum number of resources to return, defaults to 10. Do not change this value unless the user explicitly asks for a different page size or wants to see all the remaining results"`
+	Offset        int64  `json:"offset,omitempty" jsonschema:"how many resources to skip from the start of the full list before returning results. Defaults to 0 (start at the first resource). Use it together with limit to page through results: set offset=0 for the first page, then increase offset by limit for each next page. For example, with limit=10: offset=0 returns resources 1-10, offset=10 returns resources 11-20, offset=20 returns resources 21-30. When more resources are available, the response tells you the exact offset to use for the next page"`
 	LabelSelector string `json:"labelSelector,omitempty" jsonschema:"optional label selector to filter resources (e.g. app=nginx)"`
 	JSONPath      string `json:"jsonPath,omitempty" jsonschema:"optional JSONPath filter predicate to select matching resources. Use @ to reference a resource, e.g. @.status.phase==\"Running\" or @.metadata.labels.app==\"nginx\". Only resources matching the predicate are returned"`
 }
@@ -58,6 +59,15 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 			return nil, nil, err
 		}
 	}
+
+	// The order of resources returned by the API is not guaranteed to be stable
+	// across calls, so sort by namespace/name to make offset pagination deterministic.
+	sort.Slice(resources, func(i, j int) bool {
+		if ns := resources[i].GetNamespace(); ns != resources[j].GetNamespace() {
+			return ns < resources[j].GetNamespace()
+		}
+		return resources[i].GetName() < resources[j].GetName()
+	})
 
 	total := int64(len(resources))
 
