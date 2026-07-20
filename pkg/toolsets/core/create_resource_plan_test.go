@@ -9,31 +9,34 @@ import (
 )
 
 func TestCreateKubernetesResourcePlan(t *testing.T) {
-	configMapResource := map[string]interface{}{
+	configMapYAML := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config
+  namespace: default
+data:
+  key1: value1
+  key2: value2`
+
+	configMapJSON := `{
 		"apiVersion": "v1",
-		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
-			"name":      "test-config",
-			"namespace": "default",
-		},
-		"data": map[string]interface{}{
-			"key1": "value1",
-			"key2": "value2",
-		},
-	}
+		"kind": "ConfigMap",
+		"metadata": {"name": "test-config", "namespace": "default"},
+		"data": {"key1": "value1", "key2": "value2"}
+	}`
 
 	tests := map[string]struct {
 		params         createKubernetesResourceParams
 		expectedResult string
 		expectedError  string
 	}{
-		"create configmap plan": {
+		"create configmap plan from YAML": {
 			params: createKubernetesResourceParams{
 				Name:      "test-config",
 				Namespace: "default",
 				Kind:      "configmap",
 				Cluster:   "local",
-				Resource:  configMapResource,
+				Manifest:  configMapYAML,
 			},
 			expectedResult: `[{
 				"type": "create",
@@ -51,25 +54,49 @@ func TestCreateKubernetesResourcePlan(t *testing.T) {
 				}
 			}]`,
 		},
-		"create plan - marshal error": {
+		"create configmap plan from JSON": {
 			params: createKubernetesResourceParams{
 				Name:      "test-config",
 				Namespace: "default",
 				Kind:      "configmap",
 				Cluster:   "local",
-				Resource:  make(chan int),
+				Manifest:  configMapJSON,
 			},
-			expectedError: "failed to marshal resource",
+			expectedResult: `[{
+				"type": "create",
+				"payload": {
+					"apiVersion": "v1",
+					"kind": "ConfigMap",
+					"metadata": {"name": "test-config", "namespace": "default"},
+					"data": {"key1": "value1", "key2": "value2"}
+				},
+				"resource": {
+					"name": "test-config",
+					"kind": "ConfigMap",
+					"cluster": "local",
+					"namespace": "default"
+				}
+			}]`,
 		},
-		"create plan - invalid resource": {
+		"create plan - malformed manifest": {
 			params: createKubernetesResourceParams{
 				Name:      "test-config",
 				Namespace: "default",
 				Kind:      "configmap",
 				Cluster:   "local",
-				Resource:  "invalid-resource-type",
+				Manifest:  "foo: [bar",
 			},
-			expectedError: "failed to create unstructured object",
+			expectedError: "failed to parse manifest",
+		},
+		"create plan - not an object": {
+			params: createKubernetesResourceParams{
+				Name:      "test-config",
+				Namespace: "default",
+				Kind:      "configmap",
+				Cluster:   "local",
+				Manifest:  "invalid-resource-type",
+			},
+			expectedError: "failed to parse manifest",
 		},
 	}
 

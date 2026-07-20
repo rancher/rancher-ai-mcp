@@ -2,13 +2,13 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"sigs.k8s.io/yaml"
 )
 
 // createKubernetesResourcePlan plans the creation of a new Kubernetes resource.
@@ -16,16 +16,10 @@ import (
 func (t *Tools) createKubernetesResourcePlan(_ context.Context, _ *mcp.CallToolRequest, params createKubernetesResourceParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("createKubernetesResource_plan called")
 
-	objBytes, err := json.Marshal(params.Resource)
-	if err != nil {
-		zap.L().Error("failed to marshal resource", zap.String("tool", "createKubernetesResource_plan"), zap.Error(err))
-		return nil, nil, fmt.Errorf("failed to marshal resource: %w", err)
-	}
-
 	unstructuredObj := &unstructured.Unstructured{}
-	if err := json.Unmarshal(objBytes, unstructuredObj); err != nil {
-		zap.L().Error("failed to create unstructured resource", zap.String("tool", "createKubernetesResource_plan"), zap.Error(err))
-		return nil, nil, fmt.Errorf("failed to create unstructured object: %w", err)
+	if err := yaml.Unmarshal([]byte(params.Manifest), unstructuredObj); err != nil {
+		zap.L().Error("failed to parse manifest", zap.String("tool", "createKubernetesResource_plan"), zap.Error(err))
+		return nil, nil, fmt.Errorf("failed to parse manifest (expected YAML or JSON): %w", err)
 	}
 
 	createResource := response.NewCreateResourceInput(unstructuredObj, params.Cluster)
