@@ -18,7 +18,7 @@ type getUserParams struct {
 }
 
 func (t *Tools) getUser(ctx context.Context, toolReq *mcp.CallToolRequest, params getUserParams) (*mcp.CallToolResult, any, error) {
-	zap.L().Debug("getUser called", zap.String("username", params.Username))
+	zap.L().Debug("getUser called")
 
 	users, err := t.client.GetResources(ctx, client.ListParams{
 		Cluster: "local",
@@ -31,8 +31,15 @@ func (t *Tools) getUser(ctx context.Context, toolReq *mcp.CallToolRequest, param
 	}
 
 	var matchedUser []*unstructured.Unstructured
+	// We return the first user that matches either the username or the metadata.name field.
+	// It's possible that a user could have a username that matches another user's metadata.name, but this is unlikely since metadata.name is generated.
+	// We will return the first match we find in a best effort approach.
 	for _, u := range users {
 		if userName, found, err := unstructured.NestedString(u.Object, "username"); err == nil && found && userName == params.Username {
+			matchedUser = append(matchedUser, u)
+			break
+		}
+		if metadataName, found, err := unstructured.NestedString(u.Object, "metadata", "name"); err == nil && found && metadataName == params.Username {
 			matchedUser = append(matchedUser, u)
 			break
 		}

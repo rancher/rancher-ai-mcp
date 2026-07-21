@@ -12,7 +12,7 @@ import (
 
 var zapListRoleTemplates = zap.String("tool", "listRoleTemplates")
 
-// listRoleTemplates retrieves a role template resource.
+// listRoleTemplates lists role template resources.
 func (t *Tools) listRoleTemplates(ctx context.Context, toolReq *mcp.CallToolRequest, params struct{}) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("listRoleTemplates called")
 
