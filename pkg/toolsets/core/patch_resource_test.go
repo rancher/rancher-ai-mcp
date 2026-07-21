@@ -236,6 +236,9 @@ func TestJsonPatchListUnmarshalJSON(t *testing.T) {
 		"JSON string containing stringified array": {
 			input: `"[{\"op\":\"replace\",\"path\":\"/spec/replicas\",\"value\":3},{\"op\":\"add\",\"path\":\"/metadata/labels/env\",\"value\":\"prod\"}]"`,
 		},
+		"JSON string containing stringified array wrapped in single quotes": {
+		    input: `"'[{\"op\":\"replace\",\"path\":\"/spec/replicas\",\"value\":3},{\"op\":\"add\",\"path\":\"/metadata/labels/env\",\"value\":\"prod\"}]'"`,
+		},
 	}
 
 	for name, tt := range tests {
