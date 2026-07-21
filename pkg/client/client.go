@@ -465,8 +465,8 @@ func fetchRancherURL() (string, error) {
 		return "", fmt.Errorf("getting internal-server-url setting: %w", err)
 	}
 
-	value, _, _ := unstructured.NestedString(obj.Object, "value")
-	return value, nil
+	value, _, err := unstructured.NestedString(obj.Object, "value")
+	return value, err
 }
 
 // fetchCABundle fetches the CA certificate from the Rancher internal-cacerts Setting
