@@ -26,7 +26,7 @@ func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 	if ns == "" {
 		ns = DefaultClusterResourcesNamespace
 		if params.Cluster == LocalCluster {
-			ns = "fleet-local"
+			ns = LocalClusterResourcesNamespace
 		}
 	}
 
@@ -37,7 +37,7 @@ func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 
 	log.Debug("Analyzing cluster")
 
-	provClusterResource, provCluster, err := t.getProvisioningCluster(ctx, toolReq, log, ns, params.Cluster)
+	provClusterResource, provCluster, err := t.getProvisioningCluster(ctx, log, ns, params.Cluster)
 	if err != nil && !apierrors.IsNotFound(err) {
 		log.Error("failed to get provisioning cluster", zap.Error(err))
 		return nil, nil, err
@@ -107,7 +107,7 @@ func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 
 	// get all machine configs for node driver clusters.
 	log.Debug("fetching machine pool configs")
-	machineConfigs, err := t.getMachinePoolConfigs(ctx, toolReq, log, provCluster)
+	machineConfigs, err := t.getMachinePoolConfigs(ctx, log, provCluster)
 	if err != nil && !apierrors.IsNotFound(err) {
 		log.Error("failed to get machine pool configs", zap.Error(err))
 		return nil, nil, err
@@ -122,7 +122,7 @@ func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 
 	// get all the CAPI machine resources
 	log.Debug("fetching CAPI machine resources")
-	machines, machineSets, machineDeployments, err := t.getAllCAPIMachineResources(ctx, toolReq, log, getCAPIMachineResourcesParams{
+	machines, machineSets, machineDeployments, err := t.getAllCAPIMachineResources(ctx, log, getCAPIMachineResourcesParams{
 		namespace:     DefaultClusterResourcesNamespace,
 		targetCluster: params.Cluster,
 	})

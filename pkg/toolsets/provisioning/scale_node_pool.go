@@ -91,7 +91,7 @@ func (t *Tools) scaleClusterNodePoolPatch(ctx context.Context, toolReq *mcp.Call
 	amountToAdd := int32(params.AmountToAdd)
 	amountToSubtract := int32(params.AmountToSubtract)
 
-	_, provCluster, err := t.getProvisioningCluster(ctx, toolReq, log, params.Namespace, params.Cluster)
+	_, provCluster, err := t.getProvisioningCluster(ctx, log, params.Namespace, params.Cluster)
 	if err != nil {
 		log.Error("failed to get provisioning cluster", zap.Error(err))
 		return nil, err

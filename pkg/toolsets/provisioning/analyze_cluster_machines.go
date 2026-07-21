@@ -29,7 +29,7 @@ func (t *Tools) analyzeClusterMachines(ctx context.Context, toolReq *mcp.CallToo
 	})
 	log.Info("Analyzing Cluster Machines")
 
-	machines, machineSets, machineDeployments, err := t.getAllCAPIMachineResources(ctx, toolReq, log, getCAPIMachineResourcesParams{
+	machines, machineSets, machineDeployments, err := t.getAllCAPIMachineResources(ctx, log, getCAPIMachineResourcesParams{
 		namespace:     ns,
 		targetCluster: params.Cluster,
 	})
