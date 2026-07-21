@@ -15,6 +15,7 @@ var zapListClusterRoleTemplateBindings = zap.String("tool", "listClusterRoleTemp
 type listCRTBParams struct {
 	Cluster string `json:"cluster" jsonschema:"the name of the cluster the search is scoped to"`
 	User    string `json:"user,omitempty" jsonschema:"(optional) the user to get permissions for"`
+	Group   string `json:"group,omitempty" jsonschema:"(optional) the group to get permissions for"`
 }
 
 // listClusterRoleTemplateBindings retrieves a cluster role template binding resource.
@@ -43,7 +44,10 @@ func (t *Tools) listClusterRoleTemplateBindings(ctx context.Context, toolReq *mc
 	if params.User != "" {
 		crtbs = filterResourcesByField(crtbs, "userName", params.User)
 	}
-
+	// Filter the resources to only include those that match the specified group
+	if params.Group != "" {
+		crtbs = filterResourcesByField(crtbs, "groupName", params.Group)
+	}
 	mcpResponse, err := response.CreateMcpResponse(crtbs, "local")
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapListClusterRoleTemplateBindings, zap.Error(err))
