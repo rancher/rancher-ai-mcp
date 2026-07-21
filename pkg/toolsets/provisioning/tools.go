@@ -92,7 +92,8 @@ This should only be used when information about the supported rke2 and k3s is ne
 			},
 			Description: `Changes the size of an existing node pool for an rke2 or k3s cluster.
 This should be used when the user wants to change the size of an existing node pool for an rke2 or k3s cluster.
-Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.`},
+Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.
+The local cluster does not support node pool scaling.`},
 			t.scaleClusterNodePool)
 
 		mcp.AddTool(mcpServer, &mcp.Tool{
@@ -102,7 +103,8 @@ Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below
 			},
 			Description: `Plans to change the size of an existing node pool for an rke2 or k3s cluster. It returns the JSON representation of the updated node pool resource without actually applying the change in the cluster.
 Only used for displaying the resource when using human validation. This should be used when the user wants to change the size of an existing node pool for an rke2 or k3s cluster.
-Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.`},
+Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.
+The local cluster does not support node pool scaling.`},
 			t.scaleClusterNodePoolPlan)
 
 		mcp.AddTool(mcpServer, &mcp.Tool{
