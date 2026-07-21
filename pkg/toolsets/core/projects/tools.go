@@ -44,7 +44,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: toolsSet,
 		},
-		Description: `Returns a project resource and its associated namespaces.`},
+		Description: `Returns a project resource and its associated namespaces and members.`},
 		t.getProject,
 	)
 
