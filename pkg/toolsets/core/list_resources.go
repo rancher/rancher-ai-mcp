@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"fmt"
-	"sort"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
@@ -14,14 +13,12 @@ import (
 	"k8s.io/client-go/util/jsonpath"
 )
 
-const defaultListLimit = 10
-
 // listKubernetesResourcesParams specifies the parameters needed to list kubernetes resources.
 type listKubernetesResourcesParams struct {
 	Namespace     string `json:"namespace" jsonschema:"the namespace where the resources are located. It must be empty for all namespaces or cluster-wide resources"`
 	Kind          string `json:"kind" jsonschema:"the type of Kubernetes resource (e.g., Pod, Deployment, Service)"`
 	Cluster       string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
-	Limit         int64  `json:"limit,omitempty" jsonschema:"maximum number of resources to return, defaults to 10. Do not change this value unless the user explicitly asks for a different page size or wants to see all the remaining results"`
+	Limit         int64  `json:"limit,omitempty" jsonschema:"maximum number of resources to return, defaults to 100"`
 	Offset        int64  `json:"offset,omitempty" jsonschema:"how many resources to skip from the start of the full list before returning results. Defaults to 0 (start at the first resource). Use it together with limit to page through results: set offset=0 for the first page, then increase offset by limit for each next page. For example, with limit=10: offset=0 returns resources 1-10, offset=10 returns resources 11-20, offset=20 returns resources 21-30. When more resources are available, the response tells you the exact offset to use for the next page"`
 	LabelSelector string `json:"labelSelector,omitempty" jsonschema:"optional label selector to filter resources (e.g. app=nginx)"`
 	JSONPath      string `json:"jsonPath,omitempty" jsonschema:"optional JSONPath filter predicate to select matching resources. Use @ to reference a resource, e.g. @.status.phase==\"Running\" or @.metadata.labels.app==\"nginx\". Only resources matching the predicate are returned"`
@@ -30,15 +27,6 @@ type listKubernetesResourcesParams struct {
 // listKubernetesResources lists Kubernetes resources of a specific kind and namespace.
 func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallToolRequest, params listKubernetesResourcesParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("listKubernetesResource called")
-
-	limit := params.Limit
-	if limit <= 0 {
-		limit = defaultListLimit
-	}
-	offset := params.Offset
-	if offset < 0 {
-		offset = 0
-	}
 
 	resources, err := t.client.GetResources(ctx, client.ListParams{
 		Cluster:       params.Cluster,
@@ -60,39 +48,18 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 		}
 	}
 
-	// The order of resources returned by the API is not guaranteed to be stable
-	// across calls, so sort by namespace/name to make offset pagination deterministic.
-	sort.Slice(resources, func(i, j int) bool {
-		if ns := resources[i].GetNamespace(); ns != resources[j].GetNamespace() {
-			return ns < resources[j].GetNamespace()
-		}
-		return resources[i].GetName() < resources[j].GetName()
-	})
+	page := t.paginator.SortAndPaginate(resources, params.Offset, params.Limit)
 
-	total := int64(len(resources))
-
-	// window the results in-memory: [offset, offset+limit)
-	start := min(offset, total)
-	end := min(offset+limit, total)
-	resources = resources[start:end]
-
-	hasMore := offset+limit < total
+	filterSuffix := ""
+	if params.JSONPath != "" {
+		filterSuffix = " matching the JSONPath filter"
+	}
 
 	var mcpResponse string
-	if hasMore || offset > 0 {
-		filterSuffix := ""
-		if params.JSONPath != "" {
-			filterSuffix = " matching the JSONPath filter"
-		}
-		note := fmt.Sprintf("Returned %d resources (offset %d, limit %d) out of %d total%s. "+
-			"Use a namespace or label selector to narrow results, or increase the limit.",
-			len(resources), offset, limit, total, filterSuffix)
-		if hasMore {
-			note += fmt.Sprintf(" To get the next page, set offset=%d.", offset+limit)
-		}
-		mcpResponse, err = response.CreateMcpResponse(resources, params.Cluster, note)
+	if note := t.paginator.BuildNote(page, filterSuffix); note != "" {
+		mcpResponse, err = response.CreateMcpResponse(page.Items, params.Cluster, note)
 	} else {
-		mcpResponse, err = response.CreateMcpResponse(resources, params.Cluster)
+		mcpResponse, err = response.CreateMcpResponse(page.Items, params.Cluster)
 	}
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zap.String("tool", "listKubernetesResource"), zap.Error(err))

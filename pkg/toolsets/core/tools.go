@@ -6,6 +6,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/core/projects"
+	"github.com/rancher/rancher-ai-mcp/pkg/utils"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -27,15 +28,17 @@ type toolsClient interface {
 
 // Tools contains all tools for the MCP server
 type Tools struct {
-	client   toolsClient
-	ReadOnly bool
+	client    toolsClient
+	paginator utils.Paginator
+	ReadOnly  bool
 }
 
 // NewTools creates and returns a new Tools instance.
 func NewTools(client toolsClient, readOnly bool) *Tools {
 	return &Tools{
-		client:   client,
-		ReadOnly: readOnly,
+		client:    client,
+		paginator: utils.NewResourcePaginator(),
+		ReadOnly:  readOnly,
 	}
 }
 
@@ -58,9 +61,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		},
 		Description: `Returns a list of Kubernetes resources. The namespace must be empty for all namespaces or cluster-wide resources. Supports an optional JSONPath predicate to filter which resources are returned.
 
-Results are paginated with limit (page size, default 10) and offset (how many resources to skip from the start, default 0). To page through results, keep limit the same and increase offset by limit each time: offset=0 is the first page, offset=10 is the second page, offset=20 is the third page, and so on (with limit=10). When more resources remain, the response includes the exact offset value to pass in for the next page.
-
-IMPORTANT: Always display the current page of results to the user before fetching the next page. Never call this tool multiple times in a row without first showing the results and asking the user whether they want to continue to the next page.`},
+Results are paginated with limit (page size, default 100) and offset (how many resources to skip from the start, default 0). To page through results, keep limit the same and increase offset by limit each time: offset=0 is the first page, offset=100 is the second page, offset=200 is the third page, and so on (with limit=100). When more resources remain, the response includes the exact offset value to pass in for the next page.`},
 		t.listKubernetesResources,
 	)
 
