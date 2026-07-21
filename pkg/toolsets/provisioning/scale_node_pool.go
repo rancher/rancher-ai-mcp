@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
@@ -39,6 +40,15 @@ func (t *Tools) scaleClusterNodePool(ctx context.Context, toolReq *mcp.CallToolR
 		"amountToAdd":      strconv.Itoa(params.AmountToAdd),
 		"amountToSubtract": strconv.Itoa(params.AmountToSubtract),
 	})
+
+	// The local cluster can never be scaled as it does not utilize
+	// node pools, it's a special kind of imported cluster. A dedicated
+	// error is returned so the agent knows that this isn't just a
+	// generic problem with the tool.
+	if strings.ToLower(params.Cluster) == "local" {
+		log.Error("scaling is not supported for the local cluster")
+		return nil, nil, fmt.Errorf("scaling node pools in the local cluster is not supported")
+	}
 
 	log.Debug("Scaling cluster node pool")
 
