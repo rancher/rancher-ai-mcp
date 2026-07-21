@@ -299,7 +299,7 @@ func TestListKubernetesResources(t *testing.T) {
 			expectedResult: `{
 				"llm": {
 					"resources": "no resources found",
-					"note": "Returned 0 resources (offset 10, limit 10) out of 2 total. Use a namespace or label selector to narrow results, or increase the limit."
+					"note": "Returned 0 resources (offset 10, limit 100) out of 2 total. Use a namespace or label selector to narrow results, or increase the limit."
 				}
 			}`,
 		},
