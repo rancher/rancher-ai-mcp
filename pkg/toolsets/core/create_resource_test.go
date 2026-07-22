@@ -27,18 +27,21 @@ func TestCreateKubernetesResource(t *testing.T) {
 	fakeUrl := "https://localhost:8080"
 	fakeToken := "fakeToken"
 
-	configMapResource := map[string]interface{}{
+	configMapYAML := `apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: test-config
+  namespace: default
+data:
+  key1: value1
+  key2: value2`
+
+	configMapJSON := `{
 		"apiVersion": "v1",
-		"kind":       "ConfigMap",
-		"metadata": map[string]interface{}{
-			"name":      "test-config",
-			"namespace": "default",
-		},
-		"data": map[string]interface{}{
-			"key1": "value1",
-			"key2": "value2",
-		},
-	}
+		"kind": "ConfigMap",
+		"metadata": {"name": "test-config", "namespace": "default"},
+		"data": {"key1": "value1", "key2": "value2"}
+	}`
 
 	tests := map[string]struct {
 		params        createKubernetesResourceParams
@@ -51,13 +54,13 @@ func TestCreateKubernetesResource(t *testing.T) {
 		expectedResult string
 		expectedError  string
 	}{
-		"create configmap": {
+		"create configmap from YAML": {
 			params: createKubernetesResourceParams{
 				Name:      "test-config",
 				Namespace: "default",
 				Kind:      "configmap",
 				Cluster:   "local",
-				Resource:  configMapResource,
+				Manifest:  configMapYAML,
 			},
 			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createResourceScheme(), map[schema.GroupVersionResource]string{
@@ -77,13 +80,13 @@ func TestCreateKubernetesResource(t *testing.T) {
 				]
 			}`,
 		},
-		"create configmap when tool is configured with URL": {
+		"create configmap from JSON when tool is configured with URL": {
 			params: createKubernetesResourceParams{
 				Name:      "test-config",
 				Namespace: "default",
 				Kind:      "configmap",
 				Cluster:   "local",
-				Resource:  configMapResource,
+				Manifest:  configMapJSON,
 			},
 			rancherURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createResourceScheme(), map[schema.GroupVersionResource]string{
@@ -104,31 +107,31 @@ func TestCreateKubernetesResource(t *testing.T) {
 			}`,
 		},
 
-		"create configmap - marshal error": {
+		"create configmap - malformed manifest": {
 			params: createKubernetesResourceParams{
 				Name:      "test-config",
 				Namespace: "default",
 				Kind:      "configmap",
 				Cluster:   "local",
-				Resource:  make(chan int),
+				Manifest:  "foo: [bar",
 			},
 			requestURL:    fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClient(createResourceScheme()),
-			expectedError: `failed to marshal resource`,
+			expectedError: `failed to parse manifest`,
 		},
-		"create configmap - invalid": {
+		"create configmap - not an object": {
 			params: createKubernetesResourceParams{
 				Name:      "test-config",
 				Namespace: "default",
 				Kind:      "configmap",
 				Cluster:   "local",
-				Resource:  "invalid-resource-type",
+				Manifest:  "invalid-resource-type",
 			},
 			requestURL: fakeUrl,
 			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(createResourceScheme(), map[schema.GroupVersionResource]string{
 				{Group: "", Version: "v1", Resource: "configmaps"}: "ConfigMapList",
 			}),
-			expectedError: "failed to create unstructured object",
+			expectedError: "failed to parse manifest",
 		},
 	}
 

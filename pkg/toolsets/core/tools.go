@@ -124,7 +124,15 @@ Results are paginated with limit (page size, default 100) and offset (how many r
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,
 			},
-			Description: `Creates a resource in a Kubernetes cluster. The namespace must be empty for cluster-wide resources.`},
+			Description: `Creates a resource in a Kubernetes cluster from a complete Kubernetes manifest passed in the 'manifest' field, in YAML or JSON. The namespace must be empty for cluster-wide resources.
+
+Example of the manifest parameter (YAML):
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: my-cm
+data:
+  key: value`},
 			t.createKubernetesResource,
 		)
 
@@ -133,7 +141,7 @@ Results are paginated with limit (page size, default 100) and offset (how many r
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,
 			},
-			Description: `Plans to create a resource in a Kubernetes cluster. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation. The namespace must be empty for cluster-wide resources.`},
+			Description: `Plans to create a resource in a Kubernetes cluster from a complete Kubernetes manifest passed in the 'manifest' field, in YAML or JSON. It returns the JSON representation of the resource to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation. The namespace must be empty for cluster-wide resources.`},
 			t.createKubernetesResourcePlan)
 
 		mcp.AddTool(mcpServer, &mcp.Tool{
