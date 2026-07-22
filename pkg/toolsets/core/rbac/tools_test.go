@@ -68,7 +68,7 @@ func startMCPServer(t *testing.T, tools *Tools) (*mcp.ClientSession, func()) {
 }
 
 func TestAddTools(t *testing.T) {
-	c, err := client.NewClient(true, "")
+	c, err := client.NewClient(true, fakeURL)
 	require.NoError(t, err)
 	cs, cleanup := startMCPServer(t, NewTools(c, false))
 	defer cleanup()
@@ -82,7 +82,7 @@ func TestAddTools(t *testing.T) {
 }
 
 func TestAddToolsReadOnly(t *testing.T) {
-	c, err := client.NewClient(true, "")
+	c, err := client.NewClient(true, fakeURL)
 	require.NoError(t, err)
 	cs, cleanup := startMCPServer(t, NewTools(c, true))
 	defer cleanup()
