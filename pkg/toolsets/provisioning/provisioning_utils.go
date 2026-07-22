@@ -11,7 +11,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/converter"
@@ -31,6 +30,7 @@ const (
 
 	LocalCluster                     = "local"
 	DefaultClusterResourcesNamespace = "fleet-default"
+	LocalClusterResourcesNamespace   = "fleet-local"
 )
 
 type getCAPIMachineResourcesParams struct {
@@ -39,7 +39,7 @@ type getCAPIMachineResourcesParams struct {
 	machineName   string
 }
 
-func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, toolReq *mcp.CallToolRequest, log *zap.Logger, params getCAPIMachineResourcesParams) (*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.Unstructured, error) {
+func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, log *zap.Logger, params getCAPIMachineResourcesParams) (*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.Unstructured, error) {
 	if params.namespace == "" {
 		params.namespace = DefaultClusterResourcesNamespace
 	}
@@ -165,7 +165,7 @@ func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, toolReq *mcp.
 }
 
 // getAllCAPIMachineResources retrieves the cluster API machines, machine sets, and machine deployments for a given provisioning cluster.
-func (t *Tools) getAllCAPIMachineResources(ctx context.Context, toolReq *mcp.CallToolRequest, log *zap.Logger, params getCAPIMachineResourcesParams) ([]*unstructured.Unstructured, []*unstructured.Unstructured, []*unstructured.Unstructured, error) {
+func (t *Tools) getAllCAPIMachineResources(ctx context.Context, log *zap.Logger, params getCAPIMachineResourcesParams) ([]*unstructured.Unstructured, []*unstructured.Unstructured, []*unstructured.Unstructured, error) {
 	if params.namespace == "" {
 		params.namespace = DefaultClusterResourcesNamespace
 	}
@@ -278,7 +278,7 @@ func (t *Tools) getAllCAPIMachineResources(ctx context.Context, toolReq *mcp.Cal
 	return capiMachines, capiMachineSets, capiMachineDeployments, nil
 }
 
-func (t *Tools) getProvisioningCluster(ctx context.Context, toolReq *mcp.CallToolRequest, log *zap.Logger, ns, clusterName string) (*unstructured.Unstructured, provisioningV1.Cluster, error) {
+func (t *Tools) getProvisioningCluster(ctx context.Context, log *zap.Logger, ns, clusterName string) (*unstructured.Unstructured, provisioningV1.Cluster, error) {
 	log.Debug("fetching provisioning cluster",
 		zap.String("namespace", ns),
 		zap.String("cluster", clusterName))
@@ -325,7 +325,7 @@ func (t *Tools) getProvisioningCluster(ctx context.Context, toolReq *mcp.CallToo
 	return provisioningClusterResource, provCluster, nil
 }
 
-func (t *Tools) getMachinePoolConfigs(ctx context.Context, toolReq *mcp.CallToolRequest, log *zap.Logger, provCluster provisioningV1.Cluster) ([]*unstructured.Unstructured, error) {
+func (t *Tools) getMachinePoolConfigs(ctx context.Context, log *zap.Logger, provCluster provisioningV1.Cluster) ([]*unstructured.Unstructured, error) {
 	log.Debug("fetching machine pool configs",
 		zap.String("cluster", provCluster.Name))
 

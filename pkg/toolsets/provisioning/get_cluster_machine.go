@@ -26,7 +26,7 @@ func (t *Tools) getClusterMachine(ctx context.Context, toolReq *mcp.CallToolRequ
 	log.Info("Getting Cluster Machine")
 
 	var resources []*unstructured.Unstructured
-	machine, machineSet, machineDeployment, err := t.getCAPIMachineResourcesByName(ctx, toolReq, log, getCAPIMachineResourcesParams{
+	machine, machineSet, machineDeployment, err := t.getCAPIMachineResourcesByName(ctx, log, getCAPIMachineResourcesParams{
 		namespace:     "fleet-default",
 		targetCluster: params.Cluster,
 		machineName:   params.MachineName,
