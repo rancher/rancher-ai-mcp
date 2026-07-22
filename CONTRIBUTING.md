@@ -37,6 +37,12 @@ go test -v -cover ./...
 go build -o mcp-server .
 ```
 
+### Running Locally for Development
+
+When running the MCP server locally (outside of a Kubernetes cluster), set the `RANCHER_URL` environment variable to point to your Rancher instance. This skips the in-cluster auto-detection and lets the server connect directly to your Rancher API:
+
+If `RANCHER_URL` is not set and the server is not running inside a cluster, startup will fail because it cannot auto-discover the Rancher URL.
+
 ### Project Structure
 
 ```

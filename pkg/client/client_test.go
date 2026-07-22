@@ -2,6 +2,7 @@ package client
 
 import (
 	"context"
+	"os"
 	"sync"
 	"testing"
 
@@ -368,6 +369,97 @@ func TestRancherURLFromAuthServerURL(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, actual)
+		})
+	}
+}
+
+func TestCreateRestConfig(t *testing.T) {
+	tests := map[string]struct {
+		client             *Client
+		token              string
+		clusterID          string
+		expectInsecure     bool
+		expectCAData       []byte
+		expectServerSuffix string
+	}{
+		"insecure mode sets InsecureSkipTLSVerify": {
+			client: &Client{
+				insecure:   true,
+				rancherURL: fakeUrl,
+			},
+			token:              fakeToken,
+			clusterID:          "local",
+			expectInsecure:     true,
+			expectCAData:       nil,
+			expectServerSuffix: "/k8s/clusters/local",
+		},
+		"secure mode with caBundle sets CAData": {
+			client: &Client{
+				insecure:   false,
+				rancherURL: fakeUrl,
+				caBundle:   []byte("-----BEGIN CERTIFICATE-----\nfake\n-----END CERTIFICATE-----"),
+			},
+			token:              fakeToken,
+			clusterID:          "c-m-12345",
+			expectInsecure:     false,
+			expectCAData:       []byte("-----BEGIN CERTIFICATE-----\nfake\n-----END CERTIFICATE-----"),
+			expectServerSuffix: "/k8s/clusters/c-m-12345",
+		},
+		"secure mode without caBundle leaves both empty": {
+			client: &Client{
+				insecure:   false,
+				rancherURL: fakeUrl,
+				caBundle:   nil,
+			},
+			token:              fakeToken,
+			clusterID:          "local",
+			expectInsecure:     false,
+			expectCAData:       nil,
+			expectServerSuffix: "/k8s/clusters/local",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			cfg, err := test.client.CreateRestConfig(test.token, test.clusterID)
+			require.NoError(t, err)
+
+			assert.Contains(t, cfg.Host, test.expectServerSuffix)
+			assert.Equal(t, "Bearer "+fakeToken, "Bearer "+cfg.BearerToken)
+			assert.Equal(t, test.expectInsecure, cfg.TLSClientConfig.Insecure)
+			assert.Equal(t, test.expectCAData, cfg.TLSClientConfig.CAData)
+		})
+	}
+}
+
+func TestNewClient_RancherURL(t *testing.T) {
+	tests := map[string]struct {
+		authzServerURL string
+		envVar         string
+		expectedURL    string
+	}{
+		"uses authzServerURL when provided": {
+			authzServerURL: "https://rancher.example.com/v3-public/auth",
+			expectedURL:    "https://rancher.example.com",
+		},
+		"falls back to RANCHER_URL env var": {
+			authzServerURL: "",
+			envVar:         "https://my-rancher.internal",
+			expectedURL:    "https://my-rancher.internal",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			if test.envVar != "" {
+				t.Setenv("RANCHER_URL", test.envVar)
+			} else {
+				os.Unsetenv("RANCHER_URL")
+			}
+
+			c, err := NewClient(true, test.authzServerURL)
+			require.NoError(t, err)
+			assert.Equal(t, test.expectedURL, c.RancherURL())
 		})
 	}
 }

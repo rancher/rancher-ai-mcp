@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 
@@ -26,6 +27,7 @@ var clustersDisplayNameToIDCache = sync.Map{}
 type Client struct {
 	insecure         bool
 	rancherURL       string
+	caBundle         []byte
 	DynClientCreator func(*rest.Config) (dynamic.Interface, error)
 	ClientSetCreator func(*rest.Config) (kubernetes.Interface, error)
 }
@@ -57,9 +59,24 @@ func NewClient(insecure bool, authzServerURL string) (*Client, error) {
 		return nil, fmt.Errorf("parsing authz-server-url: %w", err)
 	}
 	if rancherURL == "" {
-		rancherURL = "https://rancher.cattle-system"
+		if envURL := os.Getenv("RANCHER_URL"); envURL != "" {
+			rancherURL = envURL
+		} else {
+			rancherURL, err = fetchRancherURL()
+			if err != nil {
+				return nil, fmt.Errorf("fetching internal-server-url from rancher: %w", err)
+			}
+		}
+	}
+	var caBundle []byte
+	if !insecure {
+		caBundle, err = fetchCABundle()
+		if err != nil {
+			return nil, fmt.Errorf("fetching internal-cacerts from rancher: %w", err)
+		}
 	}
 	return &Client{
+		caBundle:   caBundle,
 		insecure:   insecure,
 		rancherURL: rancherURL,
 		DynClientCreator: func(cfg *rest.Config) (dynamic.Interface, error) {
@@ -363,10 +380,15 @@ func (c *Client) GetClusterID(ctx context.Context, token string, clusterNameOrID
 func (c *Client) CreateRestConfig(token string, clusterID string) (*rest.Config, error) {
 	clusterURL := c.rancherURL + "/k8s/clusters/" + clusterID
 	kubeconfig := clientcmdapi.NewConfig()
-	kubeconfig.Clusters["Cluster"] = &clientcmdapi.Cluster{
-		Server:                clusterURL,
-		InsecureSkipTLSVerify: c.insecure,
+	cluster := &clientcmdapi.Cluster{
+		Server: clusterURL,
 	}
+	if c.insecure {
+		cluster.InsecureSkipTLSVerify = true
+	} else if len(c.caBundle) > 0 {
+		cluster.CertificateAuthorityData = c.caBundle
+	}
+	kubeconfig.Clusters["Cluster"] = cluster
 	kubeconfig.AuthInfos["mcp"] = &clientcmdapi.AuthInfo{
 		Token: token,
 	}
@@ -417,6 +439,68 @@ func (c *Client) getAPIVersionsForGR(ctx context.Context, token, cluster string,
 		}
 	}
 	return versions, nil
+}
+
+// fetchRancherURL fetches the Rancher server URL from the internal-server-url Setting
+// resource via the Kubernetes API using in-cluster config.
+func fetchRancherURL() (string, error) {
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		return "", fmt.Errorf("creating in-cluster config: %w", err)
+	}
+
+	dynClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return "", fmt.Errorf("creating dynamic client: %w", err)
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "management.cattle.io",
+		Version:  "v3",
+		Resource: "settings",
+	}
+
+	obj, err := dynClient.Resource(gvr).Get(context.Background(), "internal-server-url", metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("getting internal-server-url setting: %w", err)
+	}
+
+	value, _, err := unstructured.NestedString(obj.Object, "value")
+	return value, err
+}
+
+// fetchCABundle fetches the CA certificate from the Rancher internal-cacerts Setting
+// resource via the Kubernetes API using in-cluster config.
+func fetchCABundle() ([]byte, error) {
+	cfg, err := rest.InClusterConfig()
+	if err != nil {
+		return nil, fmt.Errorf("creating in-cluster config: %w", err)
+	}
+
+	dynClient, err := dynamic.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating dynamic client: %w", err)
+	}
+
+	gvr := schema.GroupVersionResource{
+		Group:    "management.cattle.io",
+		Version:  "v3",
+		Resource: "settings",
+	}
+
+	obj, err := dynClient.Resource(gvr).Get(context.Background(), "internal-cacerts", metav1.GetOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("getting internal-cacerts setting: %w", err)
+	}
+
+	value, found, err := unstructured.NestedString(obj.Object, "value")
+	if err != nil {
+		return nil, fmt.Errorf("reading internal-cacerts value: %w", err)
+	}
+	if !found || strings.TrimSpace(value) == "" {
+		return nil, nil
+	}
+	return []byte(value), nil
 }
 
 func rancherURLFromAuthServerURL(s string) (string, error) {
