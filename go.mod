@@ -18,7 +18,7 @@ require (
 	github.com/google/jsonschema-go v0.4.3
 	github.com/modelcontextprotocol/go-sdk v1.6.1
 	github.com/rancher/dynamiclistener v0.9.0
-	github.com/rancher/fleet v0.16.0-rc.5
+	github.com/rancher/fleet v0.16.0
 	github.com/rancher/fleet/pkg/apis v0.16.0-rc.2
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894
 	github.com/rancher/wrangler/v3 v3.7.0
