@@ -9,6 +9,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/provisioning"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -65,7 +66,11 @@ func TestAddTools(t *testing.T) {
 	assert.Len(t, toolsResult.Tools, 21, "incorrect number of tools registered")
 	// assert that all tools have the correct toolset annotation
 	for _, tool := range toolsResult.Tools {
-		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
+		if tool.Name == "listClusters" {
+			assert.Equal(t, toolsSet+","+provisioning.ToolsSet, tool.Meta[toolsSetAnn])
+		} else {
+			assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
+		}
 	}
 }
 
@@ -121,7 +126,11 @@ func TestAddToolsReadOnly(t *testing.T) {
 	toolNames := make(map[string]bool)
 	for _, tool := range toolsResult.Tools {
 		toolNames[tool.Name] = true
-		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
+		if tool.Name == "listClusters" {
+			assert.Equal(t, toolsSet+","+provisioning.ToolsSet, tool.Meta[toolsSetAnn])
+		} else {
+			assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
+		}
 	}
 	assert.False(t, toolNames["patchKubernetesResource"], "patchKubernetesResource should not be registered in read-only mode")
 	assert.False(t, toolNames["patchKubernetesResourcePlan"], "patchKubernetesResourcePlan should not be registered in read-only mode")
