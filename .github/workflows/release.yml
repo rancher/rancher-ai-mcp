@@ -38,7 +38,7 @@ jobs:
         # This encapsulates: login, qemu, build/push
       - name: Build and push image
         if: ${{ github.ref_type == 'tag' }}
-        uses: rancher/ecm-distro-tools/actions/publish-image@9c0bda834a5d891b5440b99126fd31b25b7fc8ed # master
+        uses: rancher/ecm-distro-tools/actions/publish-image@2f4f6329dd9c0c88c7c26a4ed2747b915f8c6100 # master
         with:
           image: rancher-ai-mcp
           tag: ${{ github.ref_name }}
@@ -51,7 +51,7 @@ jobs:
 
       - name: Build and push head image
         if: ${{ github.ref_name == 'main' }}
-        uses: rancher/ecm-distro-tools/actions/publish-image@9c0bda834a5d891b5440b99126fd31b25b7fc8ed # master
+        uses: rancher/ecm-distro-tools/actions/publish-image@2f4f6329dd9c0c88c7c26a4ed2747b915f8c6100 # master
         with:
           image: rancher-ai-mcp
           tag: head
