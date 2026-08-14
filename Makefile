@@ -16,6 +16,10 @@ VERSION ?= 0.0.0-$(COMMIT)$(DIRTY)
 TAG ?= $(VERSION)
 IMAGE = $(REPO)/rancher-ai-mcp:$(TAG)
 
+.PHONY: generate
+generate:
+	go generate ./...
+
 push-image:
 	docker buildx build \
 		${IID_FILE_FLAG} \

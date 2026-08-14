@@ -53,25 +53,15 @@ The server supports two modes:
 
 ### Available Tools
 
-Each tool is exposed through the MCP protocol and can be invoked by the Rancher AI agent:
+Each tool is exposed through the MCP protocol and can be invoked by the Rancher AI agent. The full, up-to-date list of tools grouped by toolset is maintained in [TOOLS.md](TOOLS.md), which is generated from the tool definitions.
 
-| Tool                       | Description                                                                                  |
-|----------------------------|----------------------------------------------------------------------------------------------|
-| `getKubernetesResource`    | Retrieve a specific Kubernetes resource by name and type                                     |
-| `patchKubernetesResource`  | Apply JSON patch operations to existing resources                                            |
-| `listKubernetesResources`  | List all resources of a specific type in a namespace                                         |
-| `inspectPod`               | Get detailed information about a pod including logs and events                               |
-| `getDeployment`            | Retrieve deployment details with replica status                                              |
-| `getNodeMetrics`           | Fetch resource usage metrics for cluster nodes                                               |
-| `createKubernetesResource` | Create new Kubernetes resources from manifests                                               |
-| `getClusterImages`         | List all container images used across the cluster                                            |
-| `analyzeCluster`           | Retrieve multiple kubernetes resources related to a downstream cluster and its current state |
-| `analyzeClusterMachines`   | Retrieve all Cluster API objects related to all machines within a downstream cluster         |
-| `getClusterMachine`        | Retrieve all cluster API objects related to a specific machine within a downstream cluster   |
-| `listKubernetesVersions`   | Lists all of the RKE2 and K3s versions that Rancher can provision.                           |
-| `createImportedCluster`    | Creates an imported cluster using the provided name and settings                             |
-| `createCustomCluster`      | Creates a custom cluster using the provided name and settings                                |
-| `scaleClusterNodePool`     | Scales an existing node pool within a Rancher provisioned cluster up or down                 |
+To regenerate it after adding or changing tools, run:
+
+```bash
+go generate ./...
+# or
+make generate
+```
 
 ## Configuration
 
