@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -391,5 +392,167 @@ func TestListKubernetesResources(t *testing.T) {
 				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
 		})
+	}
+}
+
+func TestFilterByJSONPath(t *testing.T) {
+	running1 := newUnstructuredPod("pod-1", "default", "Running", map[string]string{"app": "nginx"})
+	running2 := newUnstructuredPod("pod-2", "default", "Running", map[string]string{"app": "redis"})
+	pending := newUnstructuredPod("pod-3", "default", "Pending", map[string]string{"app": "busybox"})
+	failed := newUnstructuredPod("pod-4", "default", "Failed", nil)
+
+	tests := map[string]struct {
+		objs          []*unstructured.Unstructured
+		expr          string
+		expectedNames []string
+		expectError   string
+	}{
+		"matches single phase": {
+			objs:          []*unstructured.Unstructured{running1, running2, pending},
+			expr:          `@.status.phase=="Running"`,
+			expectedNames: []string{"pod-1", "pod-2"},
+		},
+		"matches no resources": {
+			objs:          []*unstructured.Unstructured{running1, running2},
+			expr:          `@.status.phase=="Failed"`,
+			expectedNames: []string{},
+		},
+		"matches all resources": {
+			objs:          []*unstructured.Unstructured{running1, running2},
+			expr:          `@.status.phase=="Running"`,
+			expectedNames: []string{"pod-1", "pod-2"},
+		},
+		"logical OR matches two different phases": {
+			objs:          []*unstructured.Unstructured{running1, pending, failed},
+			expr:          `@.status.phase=="Running" || @.status.phase=="Pending"`,
+			expectedNames: []string{"pod-1", "pod-3"},
+		},
+		"logical OR where only one branch matches": {
+			objs:          []*unstructured.Unstructured{running1, running2, pending},
+			expr:          `@.status.phase=="Failed" || @.status.phase=="Pending"`,
+			expectedNames: []string{"pod-3"},
+		},
+		"logical OR matching all": {
+			objs:          []*unstructured.Unstructured{running1, pending, failed},
+			expr:          `@.status.phase=="Running" || @.status.phase=="Pending" || @.status.phase=="Failed"`,
+			expectedNames: []string{"pod-1", "pod-3", "pod-4"},
+		},
+		"matches by label": {
+			objs:          []*unstructured.Unstructured{running1, running2, pending},
+			expr:          `@.metadata.labels.app=="nginx"`,
+			expectedNames: []string{"pod-1"},
+		},
+		"missing field treated as non-match": {
+			objs:          []*unstructured.Unstructured{running1, failed},
+			expr:          `@.metadata.labels.app=="nginx"`,
+			expectedNames: []string{"pod-1"},
+		},
+		"empty input returns empty slice": {
+			objs:          []*unstructured.Unstructured{},
+			expr:          `@.status.phase=="Running"`,
+			expectedNames: []string{},
+		},
+		"invalid expression returns error": {
+			objs:        []*unstructured.Unstructured{running1},
+			expr:        `@.status.phase==`,
+			expectError: "invalid jsonPath filter",
+		},
+		"nested predicate OR - restartCount or CrashLoopBackOff": {
+			objs: []*unstructured.Unstructured{
+				newContainerStatusPod("pod-high-restart", int64(5), ""),
+				newContainerStatusPod("pod-crashloop", int64(0), "CrashLoopBackOff"),
+				newContainerStatusPod("pod-both", int64(3), "CrashLoopBackOff"),
+				newContainerStatusPod("pod-healthy", int64(1), ""),
+			},
+			expr:          `@.status.containerStatuses[?(@.restartCount>2 || @.state.waiting.reason=='CrashLoopBackOff')]`,
+			expectedNames: []string{"pod-high-restart", "pod-crashloop", "pod-both"},
+		},
+		"logical AND matches intersection of two conditions": {
+			objs:          []*unstructured.Unstructured{running1, running2, pending},
+			expr:          `@.status.phase=="Running" && @.metadata.labels.app=="nginx"`,
+			expectedNames: []string{"pod-1"},
+		},
+		"logical AND no matches when conditions are mutually exclusive": {
+			objs:          []*unstructured.Unstructured{running1, running2},
+			expr:          `@.status.phase=="Running" && @.status.phase=="Pending"`,
+			expectedNames: []string{},
+		},
+		"logical AND with missing field": {
+			objs:          []*unstructured.Unstructured{running1, running2, failed},
+			expr:          `@.status.phase=="Running" && @.metadata.labels.app=="redis"`,
+			expectedNames: []string{"pod-2"},
+		},
+		"logical AND combined with OR respects precedence": {
+			// A || B && C  is evaluated as  A || (B && C)
+			objs:          []*unstructured.Unstructured{running1, running2, pending, failed},
+			expr:          `@.status.phase=="Failed" || @.status.phase=="Running" && @.metadata.labels.app=="nginx"`,
+			expectedNames: []string{"pod-1", "pod-4"},
+		},
+		"nested predicate AND - must satisfy both conditions on same container": {
+			objs: []*unstructured.Unstructured{
+				newContainerStatusPod("pod-both", int64(5), "CrashLoopBackOff"),
+				newContainerStatusPod("pod-high-restart-only", int64(5), ""),
+				newContainerStatusPod("pod-crashloop-only", int64(0), "CrashLoopBackOff"),
+				newContainerStatusPod("pod-healthy", int64(1), ""),
+			},
+			expr:          `@.status.containerStatuses[?(@.restartCount>2 && @.state.waiting.reason=='CrashLoopBackOff')]`,
+			expectedNames: []string{"pod-both"},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			got, err := filterByJSONPath(tt.objs, tt.expr)
+			if tt.expectError != "" {
+				assert.ErrorContains(t, err, tt.expectError)
+				return
+			}
+			require.NoError(t, err)
+			names := make([]string, len(got))
+			for i, obj := range got {
+				names[i] = obj.GetName()
+			}
+			assert.ElementsMatch(t, tt.expectedNames, names)
+		})
+	}
+}
+
+func newUnstructuredPod(name, namespace, phase string, labels map[string]string) *unstructured.Unstructured {
+	obj := map[string]any{
+		"metadata": map[string]any{
+			"name":      name,
+			"namespace": namespace,
+		},
+		"status": map[string]any{
+			"phase": phase,
+		},
+	}
+	if len(labels) > 0 {
+		labelMap := make(map[string]any, len(labels))
+		for k, v := range labels {
+			labelMap[k] = v
+		}
+		obj["metadata"].(map[string]any)["labels"] = labelMap
+	}
+	return &unstructured.Unstructured{Object: obj}
+}
+
+func newContainerStatusPod(name string, restartCount int64, waitingReason string) *unstructured.Unstructured {
+	cs := map[string]any{"name": "app", "restartCount": restartCount}
+	if waitingReason != "" {
+		cs["state"] = map[string]any{
+			"waiting": map[string]any{"reason": waitingReason},
+		}
+	}
+	return &unstructured.Unstructured{
+		Object: map[string]any{
+			"metadata": map[string]any{
+				"name":      name,
+				"namespace": "default",
+			},
+			"status": map[string]any{
+				"containerStatuses": []any{cs},
+			},
+		},
 	}
 }
