@@ -2,6 +2,9 @@ package client
 
 import (
 	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"sync"
 	"testing"
@@ -460,6 +463,89 @@ func TestNewClient_RancherURL(t *testing.T) {
 			c, err := NewClient(true, test.authzServerURL)
 			require.NoError(t, err)
 			assert.Equal(t, test.expectedURL, c.RancherURL())
+		})
+	}
+}
+
+func TestGetRancherURL(t *testing.T) {
+	type collection struct {
+		Kind string `json:"kind"`
+		Data []any  `json:"data"`
+	}
+
+	tests := map[string]struct {
+		method         string
+		path           string
+		responseStatus int
+		responseBody   string
+		out            any
+		expectedOut    any
+		expectedErr    string
+	}{
+		"GET returns raw body on 200 with nil out": {
+			method:         http.MethodGet,
+			path:           "/v1/management.cattle.io.clusters",
+			responseStatus: http.StatusOK,
+			responseBody:   `{"kind":"Collection","data":[]}`,
+		},
+		"GET unmarshals into out when non-nil": {
+			method:         http.MethodGet,
+			path:           "/v1/management.cattle.io.clusters",
+			responseStatus: http.StatusOK,
+			responseBody:   `{"kind":"Collection","data":[]}`,
+			out:            &collection{},
+			expectedOut:    &collection{Kind: "Collection", Data: []any{}},
+		},
+		"DELETE returns body on 200": {
+			method:         http.MethodDelete,
+			path:           "/v1/management.cattle.io.clusters/c-m-12345",
+			responseStatus: http.StatusOK,
+			responseBody:   `{}`,
+		},
+		"returns error on 401": {
+			method:         http.MethodGet,
+			path:           "/v1/management.cattle.io.clusters",
+			responseStatus: http.StatusUnauthorized,
+			expectedErr:    "unexpected status 401",
+		},
+		"returns error on 500": {
+			method:         http.MethodGet,
+			path:           "/v1/management.cattle.io.clusters",
+			responseStatus: http.StatusInternalServerError,
+			expectedErr:    "unexpected status 500",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			var receivedAuth string
+			var receivedMethod string
+			var receivedPath string
+
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				receivedAuth = r.Header.Get("Authorization")
+				receivedMethod = r.Method
+				receivedPath = r.URL.Path
+				w.WriteHeader(test.responseStatus)
+				fmt.Fprint(w, test.responseBody)
+			}))
+			defer server.Close()
+
+			c := &Client{insecure: true, rancherURL: server.URL}
+
+			err := c.GetRancherURL(t.Context(), fakeToken, test.method, test.path, nil, test.out)
+
+			assert.Equal(t, test.method, receivedMethod)
+			assert.Equal(t, test.path, receivedPath)
+			assert.Equal(t, "Bearer "+fakeToken, receivedAuth)
+			if test.expectedErr != "" {
+				require.ErrorContains(t, err, test.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+			if test.expectedOut != nil {
+				assert.Equal(t, test.expectedOut, test.out)
+			}
 		})
 	}
 }
