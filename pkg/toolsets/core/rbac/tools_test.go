@@ -27,6 +27,8 @@ var rbacGVRs = map[schema.GroupVersionResource]string{
 	{Group: "management.cattle.io", Version: "v3", Resource: "projectroletemplatebindings"}: "ProjectRoleTemplateBindingList",
 	{Group: "management.cattle.io", Version: "v3", Resource: "roletemplates"}:               "RoleTemplateList",
 	{Group: "management.cattle.io", Version: "v3", Resource: "users"}:                       "UserList",
+	{Group: "management.cattle.io", Version: "v3", Resource: "userattributes"}:              "UserAttributeList",
+	{Group: "management.cattle.io", Version: "v3", Resource: "authconfigs"}:                 "AuthConfigList",
 }
 
 func rbacScheme() *runtime.Scheme {
@@ -75,7 +77,7 @@ func TestAddTools(t *testing.T) {
 
 	toolsResult, err := cs.ListTools(context.Background(), &mcp.ListToolsParams{})
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 5, "incorrect number of RBAC tools registered")
+	assert.Len(t, toolsResult.Tools, 9, "incorrect number of RBAC tools registered")
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 	}
@@ -89,7 +91,7 @@ func TestAddToolsReadOnly(t *testing.T) {
 
 	toolsResult, err := cs.ListTools(context.Background(), &mcp.ListToolsParams{})
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 5, "incorrect number of RBAC tools registered in read-only mode")
+	assert.Len(t, toolsResult.Tools, 9, "incorrect number of RBAC tools registered in read-only mode")
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 	}

@@ -8,6 +8,7 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -20,6 +21,7 @@ type toolsClient interface {
 	GetResource(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error)
 	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
 	GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
+	CreateClientSet(ctx context.Context, token string, cluster string) (kubernetes.Interface, error)
 }
 
 // Tools contains tools for interacting with RBAC in Rancher.
@@ -83,5 +85,41 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		},
 		Description: `Get a role template by name.`},
 		t.getRoleTemplate,
+	)
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "whoAmI",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Returns the identity of the currently authenticated Rancher user: their user ID, group memberships, and full user details.
+		Use this to answer questions such as "who am I" or "which user/account am I logged in as".`},
+		t.whoAmI,
+	)
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "listUsers",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `List all users in Rancher, including their username, display name, principal IDs (authentication provider identities) and enabled status.`},
+		t.listUsers,
+	)
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "listAuthConfigs",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `List all authentication provider configurations in Rancher (e.g. local, Active Directory, LDAP, SAML, GitHub, OIDC).
+		Each entry indicates whether it is enabled. Use this to determine which authentication mechanism(s) are active.`},
+		t.listAuthConfigs,
+	)
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "listUserAttributes",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `List login attributes for Rancher users, including the last login time.
+		If a username or user ID is specified, only returns the attributes for that user; otherwise returns attributes for all users.
+		Use this to find when a user last logged in, or to audit users that haven't logged in recently.`},
+		t.listUserAttributes,
 	)
 }
