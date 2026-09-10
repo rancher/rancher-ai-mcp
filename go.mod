@@ -6,9 +6,9 @@ go 1.26.0
 // will need to be bumped alongside the rancher/rancher/pkg/apis
 // dependency
 replace (
-	k8s.io/api => k8s.io/api v0.36.3
-	k8s.io/apimachinery => k8s.io/apimachinery v0.36.3
-	k8s.io/client-go => k8s.io/client-go v0.36.3
+	k8s.io/api => k8s.io/api v0.36.4
+	k8s.io/apimachinery => k8s.io/apimachinery v0.36.4
+	k8s.io/client-go => k8s.io/client-go v0.36.4
 )
 
 require (
@@ -25,10 +25,10 @@ require (
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/zap v1.28.0
-	k8s.io/api v0.36.3
-	k8s.io/apimachinery v0.36.3
+	k8s.io/api v0.36.4
+	k8s.io/apimachinery v0.36.4
 	k8s.io/client-go v12.0.0+incompatible
-	k8s.io/metrics v0.36.3
+	k8s.io/metrics v0.36.4
 	k8s.io/utils v0.0.0-20260319190234-28399d86e0b5
 	sigs.k8s.io/controller-runtime v0.24.1
 	sigs.k8s.io/yaml v1.6.0
