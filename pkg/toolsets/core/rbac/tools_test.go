@@ -24,6 +24,7 @@ const (
 
 var rbacGVRs = map[schema.GroupVersionResource]string{
 	{Group: "management.cattle.io", Version: "v3", Resource: "clusterroletemplatebindings"}: "ClusterRoleTemplateBindingList",
+	{Group: "management.cattle.io", Version: "v3", Resource: "projects"}:                    "ProjectList",
 	{Group: "management.cattle.io", Version: "v3", Resource: "projectroletemplatebindings"}: "ProjectRoleTemplateBindingList",
 	{Group: "management.cattle.io", Version: "v3", Resource: "roletemplates"}:               "RoleTemplateList",
 	{Group: "management.cattle.io", Version: "v3", Resource: "users"}:                       "UserList",

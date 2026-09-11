@@ -8,6 +8,7 @@ import (
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
+	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/core/projects"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -49,7 +50,16 @@ func (t *Tools) listProjectRoleTemplateBindings(ctx context.Context, toolReq *mc
 
 	namespace := ""
 	if params.ProjectID != "" {
-		projectBackingNamespace := clusterID + "-" + params.ProjectID
+		_, projectResource, err := projects.GetProjectID(ctx, t.client, middleware.Token(ctx), clusterID, params.ProjectID)
+		if err != nil {
+			zap.L().Error("failed to get project by ID", zapListProjectRoleTemplateBindings, zap.Error(err))
+			return nil, nil, err
+		}
+		projectBackingNamespace, err := projects.GetProjectBackingNamespace(projectResource)
+		if err != nil {
+			zap.L().Error("failed to get project backing namespace", zapListProjectRoleTemplateBindings, zap.Error(err))
+			return nil, nil, err
+		}
 		namespace = projectBackingNamespace
 	}
 

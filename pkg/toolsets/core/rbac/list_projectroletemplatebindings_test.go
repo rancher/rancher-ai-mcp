@@ -56,6 +56,19 @@ func TestListProjectRoleTemplateBindings(t *testing.T) {
 			"roleTemplateName": "project-member",
 		},
 	}
+	projectABC := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "management.cattle.io/v3",
+			"kind":       "Project",
+			"metadata": map[string]any{
+				"name":      "p-abc",
+				"namespace": "local",
+			},
+			"status": map[string]any{
+				"backingNamespace": "local-p-abc",
+			},
+		},
+	}
 
 	tests := map[string]struct {
 		params         listPRTBParams
@@ -101,7 +114,7 @@ func TestListProjectRoleTemplateBindings(t *testing.T) {
 		},
 		"filter by project": {
 			params:  listPRTBParams{Cluster: "local", ProjectID: "p-abc"},
-			objects: []runtime.Object{prtb1, prtb2, prtb3},
+			objects: []runtime.Object{projectABC, prtb1, prtb2, prtb3},
 			expectedResult: `{
 				"llm": [
 					{
@@ -157,7 +170,7 @@ func TestListProjectRoleTemplateBindings(t *testing.T) {
 		},
 		"filter by project and user": {
 			params:  listPRTBParams{Cluster: "local", ProjectID: "p-abc", User: "u-user1"},
-			objects: []runtime.Object{prtb1, prtb2, prtb3},
+			objects: []runtime.Object{projectABC, prtb1, prtb2, prtb3},
 			expectedResult: `{
 				"llm": [
 					{
