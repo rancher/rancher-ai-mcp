@@ -1,5 +1,5 @@
 ## MCP Server for Rancher
-[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/rancher/security/badge)](https://scorecard.dev/viewer/?uri=github.com/rancher/rancher-ai-mcp)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/rancher/rancher-ai-mcp/badge)](https://scorecard.dev/viewer/?uri=github.com/rancher/rancher-ai-mcp)
 
 The MCP server allows the [Rancher AI agent](https://github.com/rancher-sandbox/rancher-ai-agent) to securely retrieve or update Kubernetes and Rancher resources across local and downstream clusters. It expects the Rancher token in a header, which the agent will always provide for authentication.
 
