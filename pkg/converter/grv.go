@@ -115,6 +115,8 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 	ManagementClusterResourceKind: {Group: ManagementGroup, Version: "v3", Resource: "clusters"},
 	"project":                     {Group: ManagementGroup, Version: "v3", Resource: "projects"},
 	"user":                        {Group: ManagementGroup, Version: "v3", Resource: "users"},
+	"userattribute":               {Group: ManagementGroup, Version: "v3", Resource: "userattributes"},
+	"authconfig":                  {Group: ManagementGroup, Version: "v3", Resource: "authconfigs"},
 	"roletemplate":                {Group: ManagementGroup, Version: "v3", Resource: "roletemplates"},
 	"globalrole":                  {Group: ManagementGroup, Version: "v3", Resource: "globalroles"},
 	"globalrolebinding":           {Group: ManagementGroup, Version: "v3", Resource: "globalrolebindings"},
