@@ -84,5 +84,13 @@ The resource usage includes CPU and memory requests, limits and actual usage, as
 			},
 			Description: `Plans to create a project resource for a specified cluster. It returns the JSON representation of the project to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.`},
 			t.createProjectPlan)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "moveNamespace",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Moves a namespace to a project in the specified cluster.`},
+			t.moveNamespace)
 	}
 }

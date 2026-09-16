@@ -54,6 +54,7 @@ Each tool is exposed through the MCP protocol and can be invoked by the Rancher 
 | `listProjectRoleTemplateBindings` | Read-only | List all project role template bindings (PRTBs) in a Rancher cluster.<br>If a user ID is specified only returns PRTBs for that user.<br>If a project ID is specified only returns PRTBs for that project.<br>PRTBs provide users permissions as specified by a RoleTemplate in a project. |
 | `listProjects` | Read-only | Returns a list of project resources for a specified cluster. |
 | `listRoleTemplates` | Read-only | List all role templates in a Rancher cluster.<br>Role templates define a set of permissions that can be assigned to users or groups. |
+| `moveNamespace` | Write | Moves a namespace to a project in the specified cluster. |
 | `patchKubernetesResource` | Write | Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. Returns the modified resource. |
 | `patchKubernetesResourcePlan` | Write | Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. |
 
