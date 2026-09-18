@@ -16,7 +16,7 @@ require (
 	github.com/evanphx/json-patch/v5 v5.9.11
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/jsonschema-go v0.4.3
-	github.com/modelcontextprotocol/go-sdk v1.7.0
+	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/rancher/dynamiclistener v0.9.0
 	github.com/rancher/fleet v0.16.0
 	github.com/rancher/fleet/pkg/apis v0.16.0
