@@ -84,7 +84,7 @@ func (t *Tools) getResourceUsage(ctx context.Context, toolReq *mcp.CallToolReque
 	} else {
 		var projectResources []*unstructured.Unstructured
 		if params.Project != "" {
-			_, projectResource, err := t.getProjectID(ctx, middleware.Token(ctx), clusterID, params.Project)
+			_, projectResource, err := GetProjectID(ctx, t.client, middleware.Token(ctx), clusterID, params.Project)
 			if err != nil {
 				zap.L().Error("failed to get project", zapGetResourceUsage, zap.Error(err))
 				return nil, nil, err

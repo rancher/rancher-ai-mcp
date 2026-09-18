@@ -23,7 +23,7 @@ func TestListProjectRoleTemplateBindings(t *testing.T) {
 			"kind":       "ProjectRoleTemplateBinding",
 			"metadata": map[string]any{
 				"name":      "prtb-1",
-				"namespace": "local-p-abc",
+				"namespace": "p-abc",
 			},
 			"projectName":      "local:p-abc",
 			"userName":         "u-user1",
@@ -36,7 +36,7 @@ func TestListProjectRoleTemplateBindings(t *testing.T) {
 			"kind":       "ProjectRoleTemplateBinding",
 			"metadata": map[string]any{
 				"name":      "prtb-2",
-				"namespace": "local-p-abc",
+				"namespace": "p-abc",
 			},
 			"projectName":      "local:p-abc",
 			"userName":         "u-user2",
@@ -56,6 +56,19 @@ func TestListProjectRoleTemplateBindings(t *testing.T) {
 			"roleTemplateName": "project-member",
 		},
 	}
+	projectABC := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "management.cattle.io/v3",
+			"kind":       "Project",
+			"metadata": map[string]any{
+				"name":      "p-abc",
+				"namespace": "local",
+			},
+			"status": map[string]any{
+				"backingNamespace": "p-abc",
+			},
+		},
+	}
 
 	tests := map[string]struct {
 		params         listPRTBParams
@@ -70,7 +83,15 @@ func TestListProjectRoleTemplateBindings(t *testing.T) {
 					{
 						"apiVersion": "management.cattle.io/v3",
 						"kind": "ProjectRoleTemplateBinding",
-						"metadata": {"name": "prtb-1", "namespace": "local-p-abc"},
+						"metadata": {"name": "prtb-3", "namespace": "local-p-xyz"},
+						"projectName": "local:p-xyz",
+						"roleTemplateName": "project-member",
+						"userName": "u-user1"
+					},
+					{
+						"apiVersion": "management.cattle.io/v3",
+						"kind": "ProjectRoleTemplateBinding",
+						"metadata": {"name": "prtb-1", "namespace": "p-abc"},
 						"projectName": "local:p-abc",
 						"roleTemplateName": "project-owner",
 						"userName": "u-user1"
@@ -78,36 +99,28 @@ func TestListProjectRoleTemplateBindings(t *testing.T) {
 					{
 						"apiVersion": "management.cattle.io/v3",
 						"kind": "ProjectRoleTemplateBinding",
-						"metadata": {"name": "prtb-2", "namespace": "local-p-abc"},
+						"metadata": {"name": "prtb-2", "namespace": "p-abc"},
 						"projectName": "local:p-abc",
 						"roleTemplateName": "project-member",
 						"userName": "u-user2"
-					},
-					{
-						"apiVersion": "management.cattle.io/v3",
-						"kind": "ProjectRoleTemplateBinding",
-						"metadata": {"name": "prtb-3", "namespace": "local-p-xyz"},
-						"projectName": "local:p-xyz",
-						"roleTemplateName": "project-member",
-						"userName": "u-user1"
 					}
 				],
 				"uiContext": [
-					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-1", "namespace": "local-p-abc", "type": "projectroletemplatebinding"},
-					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-2", "namespace": "local-p-abc", "type": "projectroletemplatebinding"},
-					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-3", "namespace": "local-p-xyz", "type": "projectroletemplatebinding"}
+					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-3", "namespace": "local-p-xyz", "type": "projectroletemplatebinding"},
+					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-1", "namespace": "p-abc", "type": "projectroletemplatebinding"},
+					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-2", "namespace": "p-abc", "type": "projectroletemplatebinding"}
 				]
 			}`,
 		},
 		"filter by project": {
 			params:  listPRTBParams{Cluster: "local", ProjectID: "p-abc"},
-			objects: []runtime.Object{prtb1, prtb2, prtb3},
+			objects: []runtime.Object{projectABC, prtb1, prtb2, prtb3},
 			expectedResult: `{
 				"llm": [
 					{
 						"apiVersion": "management.cattle.io/v3",
 						"kind": "ProjectRoleTemplateBinding",
-						"metadata": {"name": "prtb-1", "namespace": "local-p-abc"},
+						"metadata": {"name": "prtb-1", "namespace": "p-abc"},
 						"projectName": "local:p-abc",
 						"roleTemplateName": "project-owner",
 						"userName": "u-user1"
@@ -115,15 +128,15 @@ func TestListProjectRoleTemplateBindings(t *testing.T) {
 					{
 						"apiVersion": "management.cattle.io/v3",
 						"kind": "ProjectRoleTemplateBinding",
-						"metadata": {"name": "prtb-2", "namespace": "local-p-abc"},
+						"metadata": {"name": "prtb-2", "namespace": "p-abc"},
 						"projectName": "local:p-abc",
 						"roleTemplateName": "project-member",
 						"userName": "u-user2"
 					}
 				],
 				"uiContext": [
-					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-1", "namespace": "local-p-abc", "type": "projectroletemplatebinding"},
-					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-2", "namespace": "local-p-abc", "type": "projectroletemplatebinding"}
+					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-1", "namespace": "p-abc", "type": "projectroletemplatebinding"},
+					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-2", "namespace": "p-abc", "type": "projectroletemplatebinding"}
 				]
 			}`,
 		},
@@ -135,42 +148,42 @@ func TestListProjectRoleTemplateBindings(t *testing.T) {
 					{
 						"apiVersion": "management.cattle.io/v3",
 						"kind": "ProjectRoleTemplateBinding",
-						"metadata": {"name": "prtb-1", "namespace": "local-p-abc"},
-						"projectName": "local:p-abc",
-						"roleTemplateName": "project-owner",
+						"metadata": {"name": "prtb-3", "namespace": "local-p-xyz"},
+						"projectName": "local:p-xyz",
+						"roleTemplateName": "project-member",
 						"userName": "u-user1"
 					},
 					{
 						"apiVersion": "management.cattle.io/v3",
 						"kind": "ProjectRoleTemplateBinding",
-						"metadata": {"name": "prtb-3", "namespace": "local-p-xyz"},
-						"projectName": "local:p-xyz",
-						"roleTemplateName": "project-member",
-						"userName": "u-user1"
-					}
-				],
-				"uiContext": [
-					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-1", "namespace": "local-p-abc", "type": "projectroletemplatebinding"},
-					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-3", "namespace": "local-p-xyz", "type": "projectroletemplatebinding"}
-				]
-			}`,
-		},
-		"filter by project and user": {
-			params:  listPRTBParams{Cluster: "local", ProjectID: "p-abc", User: "u-user1"},
-			objects: []runtime.Object{prtb1, prtb2, prtb3},
-			expectedResult: `{
-				"llm": [
-					{
-						"apiVersion": "management.cattle.io/v3",
-						"kind": "ProjectRoleTemplateBinding",
-						"metadata": {"name": "prtb-1", "namespace": "local-p-abc"},
+						"metadata": {"name": "prtb-1", "namespace": "p-abc"},
 						"projectName": "local:p-abc",
 						"roleTemplateName": "project-owner",
 						"userName": "u-user1"
 					}
 				],
 				"uiContext": [
-					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-1", "namespace": "local-p-abc", "type": "projectroletemplatebinding"}
+					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-3", "namespace": "local-p-xyz", "type": "projectroletemplatebinding"},
+					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-1", "namespace": "p-abc", "type": "projectroletemplatebinding"}
+				]
+			}`,
+		},
+		"filter by project and user": {
+			params:  listPRTBParams{Cluster: "local", ProjectID: "p-abc", User: "u-user1"},
+			objects: []runtime.Object{projectABC, prtb1, prtb2, prtb3},
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "management.cattle.io/v3",
+						"kind": "ProjectRoleTemplateBinding",
+						"metadata": {"name": "prtb-1", "namespace": "p-abc"},
+						"projectName": "local:p-abc",
+						"roleTemplateName": "project-owner",
+						"userName": "u-user1"
+					}
+				],
+				"uiContext": [
+					{"cluster": "local", "kind": "ProjectRoleTemplateBinding", "name": "prtb-1", "namespace": "p-abc", "type": "projectroletemplatebinding"}
 				]
 			}`,
 		},
