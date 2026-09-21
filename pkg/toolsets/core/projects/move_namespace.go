@@ -29,7 +29,7 @@ func (t *Tools) moveNamespace(ctx context.Context, toolReq *mcp.CallToolRequest,
 		return nil, nil, err
 	}
 
-	projectID, _, err := t.getProjectID(ctx, middleware.Token(ctx), clusterID, params.Project)
+	projectID, _, err := GetProjectID(ctx, t.client, middleware.Token(ctx), clusterID, params.Project)
 	if err != nil {
 		return nil, nil, err
 	}
