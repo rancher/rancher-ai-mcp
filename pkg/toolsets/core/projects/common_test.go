@@ -145,6 +145,13 @@ func TestGetProjectBackingNamespace(t *testing.T) {
 			project: project("p-abc", "", ""),
 			want:    "p-abc",
 		},
+		"falls back to project name for empty status backing namespace": {
+			project: &unstructured.Unstructured{Object: map[string]any{
+				"metadata": map[string]any{"name": "p-abc"},
+				"status":   map[string]any{"backingNamespace": ""},
+			}},
+			want: "p-abc",
+		},
 		"returns error for invalid backing namespace": {
 			project: &unstructured.Unstructured{Object: map[string]any{
 				"metadata": map[string]any{"name": "p-abc"},

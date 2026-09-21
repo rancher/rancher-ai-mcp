@@ -60,7 +60,7 @@ func GetProjectBackingNamespace(project *unstructured.Unstructured) (string, err
 	if err != nil {
 		return "", err
 	}
-	if !found {
+	if !found || projectBackingNamespace == "" {
 		projectBackingNamespace, found, err = unstructured.NestedString(project.Object, "metadata", "name")
 		if err != nil {
 			return "", fmt.Errorf("failed to get backing namespace for project: %w", err)
