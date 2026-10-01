@@ -3,28 +3,18 @@ package provisioning
 import (
 	"context"
 	"encoding/json"
-	"strconv"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"github.com/rancher/rancher-ai-mcp/pkg/utils"
 	"go.uber.org/zap"
 )
 
 func (t *Tools) scaleClusterNodePoolPlan(ctx context.Context, toolReq *mcp.CallToolRequest, params scaleNodePoolParameters) (*mcp.CallToolResult, any, error) {
-	if params.Namespace == "" || params.Namespace == "default" {
-		params.Namespace = DefaultClusterResourcesNamespace
+	log, err := params.validate(toolReq)
+	if err != nil {
+		return nil, nil, err
 	}
-
-	log := utils.NewChildLogger(toolReq, map[string]string{
-		"cluster_id":       params.Cluster,
-		"namespace":        params.Namespace,
-		"nodePoolName":     params.NodePoolName,
-		"desiredSize":      strconv.Itoa(params.DesiredSize),
-		"amountToAdd":      strconv.Itoa(params.AmountToAdd),
-		"amountToSubtract": strconv.Itoa(params.AmountToSubtract),
-	})
 
 	log.Debug("Planning cluster node pool scale operation")
 

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"regexp"
 	"slices"
 	"strconv"
 	"strings"
@@ -31,6 +32,11 @@ const (
 	LocalCluster                     = "local"
 	DefaultClusterResourcesNamespace = "fleet-default"
 	LocalClusterResourcesNamespace   = "fleet-local"
+)
+
+var (
+	fleetNameRegex = regexp.MustCompile("^[a-z0-9][-a-z0-9]*[a-z0-9]$")
+	mgmtNameRegex  = regexp.MustCompile("^c-[a-z0-9]{5}$")
 )
 
 type getCAPIMachineResourcesParams struct {
@@ -540,4 +546,38 @@ func makeRancherRequest(ctx context.Context, rancherURL, method, path, token str
 	}
 
 	return body, resp.StatusCode, nil
+}
+
+// validateClusterName enforces the same naming validation that is done
+// within the Rancher webhook. This gives models explicit feedback on why
+// a provided tool ClusterName parameter is invalid. This validation
+// should be used both when looking up clusters and when creating them.
+func validateClusterName(clusterName string) error {
+	if clusterName == "local" {
+		return nil
+	}
+
+	if clusterName == "" {
+		return fmt.Errorf("cluster name is required")
+	}
+
+	if len(clusterName) > 63 {
+		return fmt.Errorf("cluster name must be at most 63 characters")
+	}
+
+	isLegacyName := mgmtNameRegex.MatchString(clusterName)
+	isFleetName := fleetNameRegex.MatchString(clusterName)
+
+	if isLegacyName || isFleetName {
+		return nil
+	}
+
+	return fmt.Errorf("cluster names may only contain lowercase alphanumeric characters, hyphens, and must be less than 63 characters long")
+}
+
+func validateDistribution(distribution string) error {
+	if distribution != "rke2" && distribution != "k3s" {
+		return fmt.Errorf("invalid value for Distribution: %s. Valid values are 'rke2' and 'k3s'", distribution)
+	}
+	return nil
 }

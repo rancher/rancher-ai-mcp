@@ -20,24 +20,40 @@ type inspectClusterParams struct {
 	Namespace string `json:"namespace,omitempty" jsonschema:"the namespace where the resource is located. The default namespace will be used if not provided"`
 }
 
-// analyzeCluster returns a set of kubernetes resources that can be used to inspect the cluster for debugging and summary purposes.
-func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params inspectClusterParams) (*mcp.CallToolResult, any, error) {
+func (params *inspectClusterParams) validate(toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
 	ns := params.Namespace
 	if ns == "" {
-		ns = DefaultClusterResourcesNamespace
 		if params.Cluster == LocalCluster {
 			ns = LocalClusterResourcesNamespace
+		} else {
+			ns = DefaultClusterResourcesNamespace
 		}
 	}
+	params.Namespace = ns
 
 	log := utils.NewChildLogger(toolReq, map[string]string{
 		"cluster":   params.Cluster,
-		"namespace": ns,
+		"namespace": params.Namespace,
 	})
+
+	if err := validateClusterName(params.Cluster); err != nil {
+		log.Error("Cluster name is invalid", zap.Error(err))
+		return nil, err
+	}
+
+	return log, nil
+}
+
+// analyzeCluster returns a set of kubernetes resources that can be used to inspect the cluster for debugging and summary purposes.
+func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params inspectClusterParams) (*mcp.CallToolResult, any, error) {
+	log, err := params.validate(toolReq)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	log.Debug("Analyzing cluster")
 
-	provClusterResource, provCluster, err := t.getProvisioningCluster(ctx, log, ns, params.Cluster)
+	provClusterResource, provCluster, err := t.getProvisioningCluster(ctx, log, params.Namespace, params.Cluster)
 	if err != nil && !apierrors.IsNotFound(err) {
 		log.Error("failed to get provisioning cluster", zap.Error(err))
 		return nil, nil, err
@@ -46,7 +62,7 @@ func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 	if apierrors.IsNotFound(err) {
 		// the only cluster type without a provisioning cluster object is rke1, which is no longer supported.
 		log.Warn("provisioning cluster not found, unsupported cluster type")
-		return nil, nil, fmt.Errorf("provisioning cluster %s not found in namespace %s", params.Cluster, ns)
+		return nil, nil, fmt.Errorf("provisioning cluster %s not found in namespace %s", params.Cluster, params.Namespace)
 	}
 
 	log.Debug("found provisioning cluster",

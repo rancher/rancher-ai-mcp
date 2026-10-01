@@ -27,7 +27,7 @@ type scaleNodePoolParameters struct {
 	AmountToSubtract int    `json:"amountToSubtract,omitempty" jsonschema:"the amount of nodes to remove from the node pool. If specified, desiredSize will be ignored. Cannot be used with amountToAdd. If no specific amount is provided, use zero"`
 }
 
-func (t *Tools) scaleClusterNodePool(ctx context.Context, toolReq *mcp.CallToolRequest, params scaleNodePoolParameters) (*mcp.CallToolResult, any, error) {
+func (params *scaleNodePoolParameters) validate(toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
 	if params.Namespace == "" || params.Namespace == "default" {
 		params.Namespace = DefaultClusterResourcesNamespace
 	}
@@ -41,13 +41,26 @@ func (t *Tools) scaleClusterNodePool(ctx context.Context, toolReq *mcp.CallToolR
 		"amountToSubtract": strconv.Itoa(params.AmountToSubtract),
 	})
 
+	if err := validateClusterName(params.Cluster); err != nil {
+		return nil, err
+	}
+
 	// The local cluster can never be scaled as it does not utilize
 	// node pools, it's a special kind of imported cluster. A dedicated
 	// error is returned so the agent knows that this isn't just a
 	// generic problem with the tool.
 	if strings.ToLower(params.Cluster) == "local" {
 		log.Error("scaling is not supported for the local cluster")
-		return nil, nil, fmt.Errorf("scaling node pools in the local cluster is not supported")
+		return nil, fmt.Errorf("scaling node pools in the local cluster is not supported")
+	}
+
+	return log, nil
+}
+
+func (t *Tools) scaleClusterNodePool(ctx context.Context, toolReq *mcp.CallToolRequest, params scaleNodePoolParameters) (*mcp.CallToolResult, any, error) {
+	log, err := params.validate(toolReq)
+	if err != nil {
+		return nil, nil, err
 	}
 
 	log.Debug("Scaling cluster node pool")

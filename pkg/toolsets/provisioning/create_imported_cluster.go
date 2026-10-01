@@ -21,12 +21,29 @@ type createImportedClusterParams struct {
 	VersionManagementSetting string `json:"VersionManagementSetting,omitempty" jsonschema:"specifies the version management setting for the cluster. Potential values are system-default, true, and false. If not specified, the global version management setting will be used"`
 }
 
-func (t *Tools) createImportedCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params createImportedClusterParams) (*mcp.CallToolResult, any, error) {
+func (params *createImportedClusterParams) validate(toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
 	log := utils.NewChildLogger(toolReq, map[string]string{
 		"Name":                     params.Name,
 		"Description":              params.Description,
 		"versionManagementSetting": params.VersionManagementSetting,
 	})
+
+	if err := validateClusterName(params.Name); err != nil {
+		return nil, err
+	}
+
+	if params.VersionManagementSetting != "" && (params.VersionManagementSetting != "true" && params.VersionManagementSetting != "false" && params.VersionManagementSetting != "system-default") {
+		return nil, fmt.Errorf("invalid value for VersionManagementSetting: %s. Valid values are 'system-default', 'true', and 'false'", params.VersionManagementSetting)
+	}
+
+	return log, nil
+}
+
+func (t *Tools) createImportedCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params createImportedClusterParams) (*mcp.CallToolResult, any, error) {
+	log, err := params.validate(toolReq)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	log.Debug("Creating imported cluster")
 
@@ -73,16 +90,8 @@ func (t *Tools) createImportedCluster(ctx context.Context, toolReq *mcp.CallTool
 }
 
 func (t *Tools) createImportedClusterObj(params createImportedClusterParams) (*unstructured.Unstructured, error) {
-	if params.VersionManagementSetting != "" && (params.VersionManagementSetting != "true" && params.VersionManagementSetting != "false" && params.VersionManagementSetting != "system-default") {
-		return nil, fmt.Errorf("invalid value for VersionManagementSetting: %s. Valid values are 'system-default', 'true', and 'false'", params.VersionManagementSetting)
-	}
-
 	if params.VersionManagementSetting == "" {
 		params.VersionManagementSetting = "system-default"
-	}
-
-	if params.Name == "" {
-		return nil, fmt.Errorf("name is required")
 	}
 
 	cluster := &unstructured.Unstructured{
