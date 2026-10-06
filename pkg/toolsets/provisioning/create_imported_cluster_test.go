@@ -92,6 +92,39 @@ func TestCreateImportedCluster(t *testing.T) {
 			}`,
 			expectedError: "",
 		},
+		{
+			name: "missing cluster name returns an error",
+			params: createImportedClusterParams{
+				Name:                     "",
+				Description:              "A test cluster",
+				VersionManagementSetting: "true",
+			},
+			serverStatus:  http.StatusCreated,
+			serverBody:    `{}`,
+			expectedError: "cluster name is required",
+		},
+		{
+			name: "invalid cluster name returns an error",
+			params: createImportedClusterParams{
+				Name:                     "not valid",
+				Description:              "A test cluster",
+				VersionManagementSetting: "true",
+			},
+			serverBody:    `{}`,
+			serverStatus:  http.StatusCreated,
+			expectedError: "cluster names may only contain lowercase alphanumeric characters, hyphens, and must be less than 63 characters long",
+		},
+		{
+			name: "invalid version management setting returns an error",
+			params: createImportedClusterParams{
+				Name:                     "cluster",
+				Description:              "A test cluster",
+				VersionManagementSetting: "maybe",
+			},
+			serverStatus:  http.StatusCreated,
+			serverBody:    `{}`,
+			expectedError: "invalid value for VersionManagementSetting: maybe. Valid values are 'system-default', 'true', and 'false'",
+		},
 	}
 
 	for _, test := range tests {
@@ -198,23 +231,6 @@ func TestCreateImportedClusterObj(t *testing.T) {
 				annotations := cluster.GetAnnotations()
 				assert.Equal(t, "system-default", annotations["rancher.io/imported-cluster-version-management"])
 			},
-		},
-		{
-			name: "missing name returns error",
-			params: createImportedClusterParams{
-				Name:                     "",
-				Description:              "no name",
-				VersionManagementSetting: "true",
-			},
-			expectedError: "name is required",
-		},
-		{
-			name: "invalid version management setting returns error",
-			params: createImportedClusterParams{
-				Name:                     "my-cluster",
-				VersionManagementSetting: "maybe",
-			},
-			expectedError: "invalid value for VersionManagementSetting: maybe",
 		},
 		{
 			name: "description is set on the object",

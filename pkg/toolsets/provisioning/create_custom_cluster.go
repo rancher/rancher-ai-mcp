@@ -29,8 +29,39 @@ type createCustomClusterParams struct {
 	Distribution string `json:"distribution" jsonschema:"the distribution of the cluster, either rke2 or k3s"`
 }
 
-func (t *Tools) createCustomCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params createCustomClusterParams) (*mcp.CallToolResult, any, error) {
+func (params *createCustomClusterParams) validate(t *Tools, toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
+	if err := validateClusterName(params.Name); err != nil {
+		return nil, err
+	}
+
+	if err := validateDistribution(params.Distribution); err != nil {
+		return nil, err
+	}
+
+	allCNIs, cniSupported := supportedCNI(strings.ToLower(params.CNI))
+	if !cniSupported {
+		return nil, fmt.Errorf("unsupported CNI \"%s\". Valid values are \"%v\"", params.CNI, strings.Join(allCNIs, "\", \""))
+	}
+
 	log := utils.NewChildLogger(toolReq, map[string]string{
+		"Name":         params.Name,
+		"Description":  params.Description,
+		"CNI":          params.CNI,
+		"Distribution": params.Distribution,
+	})
+
+	fullVersion, allSupportedVersions, supported, err := supportedKubernetesVersion(t.client.RancherURL(), params.Distribution, params.Version, log)
+	if err != nil {
+		return nil, fmt.Errorf("error checking supported Kubernetes versions: %w", err)
+	}
+
+	if !supported {
+		return nil, fmt.Errorf("unsupported Kubernetes version: %s for distribution: %s. Only support versions %v", params.Version, params.Distribution, allSupportedVersions)
+	}
+
+	params.Version = fullVersion
+
+	log = utils.NewChildLogger(toolReq, map[string]string{
 		"Name":         params.Name,
 		"Description":  params.Description,
 		"CNI":          params.CNI,
@@ -38,9 +69,18 @@ func (t *Tools) createCustomCluster(ctx context.Context, toolReq *mcp.CallToolRe
 		"Distribution": params.Distribution,
 	})
 
+	return log, nil
+}
+
+func (t *Tools) createCustomCluster(ctx context.Context, toolReq *mcp.CallToolRequest, params createCustomClusterParams) (*mcp.CallToolResult, any, error) {
+	log, err := params.validate(t, toolReq)
+	if err != nil {
+		return nil, nil, err
+	}
+
 	log.Debug("creating a custom cluster")
 
-	unstructuredObj, err := t.CreateCustomClusterObj(toolReq, params, log)
+	unstructuredObj, err := t.createCustomClusterObj(params, log)
 	if err != nil {
 		log.Error("failed to create custom cluster object", zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to create custom cluster object: %w", err)
@@ -68,34 +108,7 @@ func (t *Tools) createCustomCluster(ctx context.Context, toolReq *mcp.CallToolRe
 	}, nil, nil
 }
 
-func (t *Tools) CreateCustomClusterObj(toolReq *mcp.CallToolRequest, params createCustomClusterParams, log *zap.Logger) (*unstructured.Unstructured, error) {
-	if params.Name == "" {
-		log.Debug("cluster name is required")
-		return nil, fmt.Errorf("cluster name is required")
-	}
-
-	if params.Distribution != "rke2" && params.Distribution != "k3s" {
-		log.Debug("invalid distribution")
-		return nil, fmt.Errorf("invalid value for Distribution: %s. Valid values are 'rke2' and 'k3s'", params.Distribution)
-	}
-
-	allCNIs, cniSupported := supportedCNI(strings.ToLower(params.CNI))
-	if !cniSupported {
-		log.Debug("invalid CNI")
-		return nil, fmt.Errorf("unsupported CNI \"%s\". Valid values are \"%v\"", params.CNI, strings.Join(allCNIs, "\", \""))
-	}
-
-	fullVersion, allSupportedVersions, supported, err := supportedKubernetesVersion(t.client.RancherURL(), params.Distribution, params.Version, log)
-	if err != nil {
-		log.Error("error getting supported Kubernetes version", zap.Error(err))
-		return nil, fmt.Errorf("error checking supported Kubernetes versions: %w", err)
-	}
-
-	if !supported {
-		log.Error("unsupported distribution")
-		return nil, fmt.Errorf("unsupported Kubernetes version: %s for distribution: %s. Only support versions %v", params.Version, params.Distribution, allSupportedVersions)
-	}
-
+func (t *Tools) createCustomClusterObj(params createCustomClusterParams, log *zap.Logger) (*unstructured.Unstructured, error) {
 	custom := provisioningV1.Cluster{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "Cluster",
@@ -109,7 +122,7 @@ func (t *Tools) CreateCustomClusterObj(toolReq *mcp.CallToolRequest, params crea
 			},
 		},
 		Spec: provisioningV1.ClusterSpec{
-			KubernetesVersion: fullVersion,
+			KubernetesVersion: params.Version,
 			RKEConfig: &provisioningV1.RKEConfig{
 				ClusterConfiguration: v1.ClusterConfiguration{
 					ETCD: &v1.ETCD{

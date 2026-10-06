@@ -16,12 +16,23 @@ type getClusterMachineParams struct {
 	MachineName string `json:"machineName" jsonschema:"the name of the machine to get"`
 }
 
-// getClusterMachine returns the cluster API machine for a given provisioning cluster and machine name.
-func (t *Tools) getClusterMachine(ctx context.Context, toolReq *mcp.CallToolRequest, params getClusterMachineParams) (*mcp.CallToolResult, any, error) {
+func (params *getClusterMachineParams) validate(toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
 	log := utils.NewChildLogger(toolReq, map[string]string{
 		"cluster":     params.Cluster,
 		"machineName": params.MachineName,
 	})
+	if err := validateClusterName(params.Cluster); err != nil {
+		return nil, err
+	}
+	return log, nil
+}
+
+// getClusterMachine returns the cluster API machine for a given provisioning cluster and machine name.
+func (t *Tools) getClusterMachine(ctx context.Context, toolReq *mcp.CallToolRequest, params getClusterMachineParams) (*mcp.CallToolResult, any, error) {
+	log, err := params.validate(toolReq)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	log.Info("Getting Cluster Machine")
 

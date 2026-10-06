@@ -7,16 +7,14 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"github.com/rancher/rancher-ai-mcp/pkg/utils"
 	"go.uber.org/zap"
 )
 
 func (t *Tools) createImportedClusterPlan(_ context.Context, toolReq *mcp.CallToolRequest, params createImportedClusterParams) (*mcp.CallToolResult, any, error) {
-	log := utils.NewChildLogger(toolReq, map[string]string{
-		"clusterName":              params.Name,
-		"clusterDescription":       params.Description,
-		"versionManagementSetting": params.VersionManagementSetting,
-	})
+	log, err := params.validate(toolReq)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	log.Debug("Planning imported cluster creation")
 

@@ -16,21 +16,32 @@ type inspectClusterMachinesParams struct {
 	Namespace string `json:"namespace,omitempty" jsonschema:"the namespace where the resource is located. The default namespace will be used if not provided"`
 }
 
-// analyzeClusterMachines returns the cluster API machines, machine sets, and machine deployments, for a given provisioning cluster.
-func (t *Tools) analyzeClusterMachines(ctx context.Context, toolReq *mcp.CallToolRequest, params inspectClusterMachinesParams) (*mcp.CallToolResult, any, error) {
-	ns := params.Namespace
-	if ns == "" {
-		ns = "fleet-default"
+func (params *inspectClusterMachinesParams) validate(toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
+	if params.Namespace == "" {
+		params.Namespace = "fleet-default"
 	}
-
 	log := utils.NewChildLogger(toolReq, map[string]string{
 		"cluster":   params.Cluster,
 		"namespace": params.Namespace,
 	})
-	log.Info("Analyzing Cluster Machines")
+	if err := validateClusterName(params.Cluster); err != nil {
+		log.Error("invalid cluster name")
+		return nil, err
+	}
+	return log, nil
+}
+
+// analyzeClusterMachines returns the cluster API machines, machine sets, and machine deployments, for a given provisioning cluster.
+func (t *Tools) analyzeClusterMachines(ctx context.Context, toolReq *mcp.CallToolRequest, params inspectClusterMachinesParams) (*mcp.CallToolResult, any, error) {
+	log, err := params.validate(toolReq)
+	if err != nil {
+		return nil, log, err
+	}
+
+	log.Debug("Analyzing Cluster Machines")
 
 	machines, machineSets, machineDeployments, err := t.getAllCAPIMachineResources(ctx, log, getCAPIMachineResourcesParams{
-		namespace:     ns,
+		namespace:     params.Namespace,
 		targetCluster: params.Cluster,
 	})
 	if err != nil && !errors.IsNotFound(err) {

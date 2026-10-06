@@ -5,22 +5,18 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"github.com/rancher/rancher-ai-mcp/pkg/utils"
 	"go.uber.org/zap"
 )
 
 func (t *Tools) createCustomClusterPlan(_ context.Context, toolReq *mcp.CallToolRequest, params createCustomClusterParams) (*mcp.CallToolResult, any, error) {
-	log := utils.NewChildLogger(toolReq, map[string]string{
-		"Name":         params.Name,
-		"Description":  params.Description,
-		"CNI":          params.CNI,
-		"Version":      params.Version,
-		"Distribution": params.Distribution,
-	})
+	log, err := params.validate(t, toolReq)
+	if err != nil {
+		return nil, nil, err
+	}
 
 	log.Debug("Planning custom cluster creation")
 
-	unstructuredObj, err := t.CreateCustomClusterObj(toolReq, params, log)
+	unstructuredObj, err := t.createCustomClusterObj(params, log)
 	if err != nil {
 		log.Error("failed to create custom cluster object", zap.Error(err))
 		return nil, nil, err
