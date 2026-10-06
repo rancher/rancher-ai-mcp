@@ -88,6 +88,21 @@ func patchResourceInputSchema() *jsonschema.Schema {
 		patch.Types = nil
 	}
 
+	if patch, ok := s.Properties["patch"]; ok {
+		if value, ok := patch.Items.Properties["value"]; ok {
+			// jsonschema-go serializes an unconstrained schema (from a field of
+			// type any) as the boolean subschema `true`. That is valid JSON
+			// Schema 2020-12, but strict OpenAPI-style validators used by some
+			// OpenAI-compatible providers (e.g. Volcano Engine Ark, error
+			// 11133) reject boolean subschemas and refuse any request carrying
+			// the tool declarations. {"type":["null","object","array","string",
+			// "number","integer","boolean"]} is semantically equivalent (accepts
+			// any JSON value, matching field type any) while serializing as a
+			// plain object schema.
+			value.Types = []string{"null", "object", "array", "string", "number", "integer", "boolean"}
+		}
+	}
+
 	return s
 }
 

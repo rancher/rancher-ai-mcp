@@ -2,6 +2,7 @@ package core
 
 import (
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -237,7 +238,7 @@ func TestJsonPatchListUnmarshalJSON(t *testing.T) {
 			input: `"[{\"op\":\"replace\",\"path\":\"/spec/replicas\",\"value\":3},{\"op\":\"add\",\"path\":\"/metadata/labels/env\",\"value\":\"prod\"}]"`,
 		},
 		"JSON string containing stringified array wrapped in single quotes": {
-		    input: `"'[{\"op\":\"replace\",\"path\":\"/spec/replicas\",\"value\":3},{\"op\":\"add\",\"path\":\"/metadata/labels/env\",\"value\":\"prod\"}]'"`,
+			input: `"'[{\"op\":\"replace\",\"path\":\"/spec/replicas\",\"value\":3},{\"op\":\"add\",\"path\":\"/metadata/labels/env\",\"value\":\"prod\"}]'"`,
 		},
 	}
 
@@ -249,4 +250,47 @@ func TestJsonPatchListUnmarshalJSON(t *testing.T) {
 			assert.Equal(t, expected, got)
 		})
 	}
+}
+
+// TestPatchResourceInputSchemaNoBooleanSubschema asserts that the
+// patchKubernetesResource input schema contains no boolean subschemas.
+// Boolean subschemas (e.g. "value": true) are valid JSON Schema 2020-12 but
+// are rejected by strict OpenAPI-style validators used by some
+// OpenAI-compatible providers (e.g. Volcano Engine Ark, error 11133), which
+// makes those providers refuse any request carrying the tool declarations.
+func TestPatchResourceInputSchemaNoBooleanSubschema(t *testing.T) {
+	s := patchResourceInputSchema()
+
+	assert.Equal(t, "array", s.Properties["patch"].Type)
+
+	raw, err := json.Marshal(s)
+	require.NoError(t, err)
+
+	// Positions where a boolean acts as a permissive subschema ("accept
+	// anything"). "additionalProperties: false" is also a boolean subschema
+	// but a restrictive one that OpenAI-style validators themselves emit, so
+	// only permissive positions are checked.
+	permissiveKeys := map[string]bool{"items": true, "value": true, "properties": true}
+
+	var walk func(t *testing.T, path string, v any)
+	walk = func(t *testing.T, path string, v any) {
+		switch node := v.(type) {
+		case map[string]any:
+			for k, child := range node {
+				if b, ok := child.(bool); ok && (permissiveKeys[k] || (k == "additionalProperties" && b)) {
+					t.Errorf("%s.%s: boolean subschema %v — strict providers reject boolean subschemas in permissive positions", path, k, b)
+					continue
+				}
+				walk(t, path+"."+k, child)
+			}
+		case []any:
+			for i, child := range node {
+				walk(t, fmt.Sprintf("%s[%d]", path, i), child)
+			}
+		}
+	}
+
+	var decoded any
+	require.NoError(t, json.Unmarshal(raw, &decoded))
+	walk(t, "$", decoded)
 }
