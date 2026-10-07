@@ -1,8 +1,14 @@
 package client
 
 import (
+	"bytes"
 	"context"
+	"crypto/tls"
+	"crypto/x509"
+	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"net/url"
 	"os"
 	"strings"
@@ -110,7 +116,7 @@ func (c *Client) CreateClientSet(ctx context.Context, token string, cluster stri
 func (c *Client) GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error) {
 	clusterID, err := c.GetClusterID(ctx, token, cluster)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get cluster ID error: %w", err)
 	}
 	restConfig, err := c.CreateRestConfig(token, clusterID)
 	if err != nil {
@@ -133,7 +139,7 @@ func (c *Client) GetResourceInterface(ctx context.Context, token string, namespa
 func (c *Client) GetResource(ctx context.Context, params GetParams) (*unstructured.Unstructured, error) {
 	resourceInterface, err := c.GetResourceInterface(ctx, params.Token, params.Namespace, params.Cluster, converter.K8sKindsToGVRs[strings.ToLower(params.Kind)])
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("get resource interface error: %w", err)
 	}
 
 	obj, err := resourceInterface.Get(ctx, params.Name, metav1.GetOptions{})
@@ -410,6 +416,63 @@ func (c *Client) CreateRestConfig(token string, clusterID string) (*rest.Config,
 	return restConfig, nil
 }
 
+// GetRancherURL performs an authenticated HTTP request against rancherURL+path.
+//
+// The request is authenticated using the provided token as Bearer token in the Authorization header.
+// If body is non-nil it is JSON-encoded and sent as the request body.
+// The request is sent using the specified HTTP method (e.g., GET, POST).
+//
+// The response is expected to have a status code of 200 OK.
+//
+// If v is non-nil the response body is assumed to be JSON and unmarshalled into
+// it.
+func (c *Client) GetRancherURL(ctx context.Context, token string, method string, rancherPath string, body any, v any) error {
+	httpClient := &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: c.insecure, //nolint:gosec
+				RootCAs:            rootCAsFromBundle(c.caBundle),
+			},
+		},
+	}
+
+	requestPath := c.rancherURL + rancherPath
+
+	var reqBody io.Reader
+	if body != nil {
+		b, err := json.Marshal(body)
+		if err != nil {
+			return fmt.Errorf("marshalling request body for %s: %w", requestPath, err)
+		}
+
+		reqBody = bytes.NewReader(b)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, method, requestPath, reqBody)
+	if err != nil {
+		return fmt.Errorf("creating HTTP request: %w", err)
+	}
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("performing HTTP request to %s: %w", requestPath, err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("unexpected status %d from %s", resp.StatusCode, requestPath)
+	}
+	if v != nil {
+		if err := json.NewDecoder(resp.Body).Decode(v); err != nil {
+			return fmt.Errorf("decoding response body from %s: %w", requestPath, err)
+		}
+	}
+
+	return nil
+}
+
 // getAPIVersionsForGR queries the API server for all supported versions of the specified GroupResource.
 // It returns a slice of version strings or an error if the query fails.
 func (c *Client) getAPIVersionsForGR(ctx context.Context, token, cluster string, groupResource schema.GroupResource) ([]string, error) {
@@ -501,6 +564,15 @@ func fetchCABundle() ([]byte, error) {
 		return nil, nil
 	}
 	return []byte(value), nil
+}
+
+func rootCAsFromBundle(bundle []byte) *x509.CertPool {
+	if len(bundle) == 0 {
+		return nil
+	}
+	pool := x509.NewCertPool()
+	pool.AppendCertsFromPEM(bundle)
+	return pool
 }
 
 func rancherURLFromAuthServerURL(s string) (string, error) {
