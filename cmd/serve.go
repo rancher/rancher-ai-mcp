@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/dynamiclistener"
@@ -30,6 +31,7 @@ var (
 	port           int
 	insecure       bool
 	readOnly       bool
+	keepAlive      time.Duration
 	authzServerURL string
 	jwksURL        string
 	resourceURL    string
@@ -48,6 +50,7 @@ func init() {
 	serveCmd.Flags().IntVar(&port, "port", 9092, "Port to listen on")
 	serveCmd.Flags().BoolVar(&insecure, "insecure", false, "Skip TLS verification")
 	serveCmd.Flags().BoolVar(&readOnly, "read-only", false, "Only register read-only tools")
+	serveCmd.Flags().DurationVar(&keepAlive, "keep-alive", 0, "Send periodic pings on the SSE stream to keep it alive across idle periods (e.g. 30s). 0 disables. Recommended behind proxies/ingresses with idle connection timeouts; pick an interval comfortably below the proxy's idle timeout.")
 
 	serveCmd.Flags().StringVar(&authzServerURL, "authz-server-url", "", "Authorization Server URL - used to generate the OIDC urls")
 	serveCmd.Flags().StringVar(&jwksURL, "jwks-url", "", "JWKS URL - from the OAuth2 server")
@@ -55,7 +58,9 @@ func init() {
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
-	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "rancher mcp server", Version: "v1.0.0"}, nil)
+	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "rancher mcp server", Version: "v1.0.0"}, &mcp.ServerOptions{
+		KeepAlive: keepAlive,
+	})
 	client, err := client.NewClient(insecure, authzServerURL)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)

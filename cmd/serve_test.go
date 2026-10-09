@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
@@ -34,4 +35,20 @@ func TestRunServeCommand(t *testing.T) {
 	insecureFlag := testCmd.Flags().Lookup("insecure")
 	require.NotNil(t, insecureFlag)
 	assert.Equal(t, "false", insecureFlag.DefValue)
+}
+
+// TestKeepAliveFlagPinsDefaultOff pins that SSE keepalive is opt-in: the
+// zero default leaves ServerOptions.KeepAlive unset (go-sdk keeps its
+// no-heartbeat behavior), so existing deployments see no change unless the
+// operator explicitly opts in.
+func TestKeepAliveFlagPinsDefaultOff(t *testing.T) {
+	flag := serveCmd.Flags().Lookup("keep-alive")
+	require.NotNil(t, flag, "--keep-alive must be registered")
+	assert.Equal(t, "0s", flag.DefValue, "keep-alive must default to disabled")
+	assert.Equal(t, "duration", flag.Value.Type(), "keep-alive must be a duration flag")
+
+	// It must accept a duration value.
+	require.NoError(t, serveCmd.Flags().Set("keep-alive", "30s"))
+	t.Cleanup(func() { require.NoError(t, serveCmd.Flags().Set("keep-alive", "0s")) })
+	assert.Equal(t, 30*time.Second, keepAlive)
 }
