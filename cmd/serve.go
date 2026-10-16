@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/dynamiclistener"
@@ -33,6 +34,9 @@ var (
 	authzServerURL string
 	jwksURL        string
 	resourceURL    string
+	stdio          bool
+	rancherToken   string
+	rancherURL     string
 )
 
 var serveCmd = &cobra.Command{
@@ -52,18 +56,41 @@ func init() {
 	serveCmd.Flags().StringVar(&authzServerURL, "authz-server-url", "", "Authorization Server URL - used to generate the OIDC urls")
 	serveCmd.Flags().StringVar(&jwksURL, "jwks-url", "", "JWKS URL - from the OAuth2 server")
 	serveCmd.Flags().StringVar(&resourceURL, "resource-url", "", "Resource URL for this server - this should be the address to access the MCP server")
+
+	serveCmd.Flags().BoolVar(&stdio, "stdio", false, "Serve MCP over stdin/stdout instead of HTTP (--port, --authz-server-url, --jwks-url and --resource-url are ignored)")
+	serveCmd.Flags().StringVar(&rancherToken, "rancher-token", "", "Rancher token used for all tool calls in stdio mode (defaults to the RANCHER_TOKEN env var)")
+	serveCmd.Flags().StringVar(&rancherURL, "rancher-url", "", "Rancher server URL used in stdio mode (defaults to the RANCHER_URL env var)")
 }
 
 func runServe(cmd *cobra.Command, args []string) error {
 	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "rancher mcp server", Version: "v1.0.0"}, nil)
-	client, err := client.NewClient(insecure, authzServerURL)
+
+	var (
+		c     *client.Client
+		token string
+		err   error
+	)
+	if stdio {
+		var url string
+		token, url, err = stdioConfig()
+		if err != nil {
+			return err
+		}
+		c, err = client.NewClientWithURL(insecure, url)
+	} else {
+		c, err = client.NewClient(insecure, authzServerURL)
+	}
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
 	}
 
-	toolsets.AddAllTools(client, mcpServer, readOnly)
+	toolsets.AddAllTools(c, mcpServer, readOnly)
 
 	zap.L().Info("read-only mode", zap.Bool("enabled", readOnly))
+
+	if stdio {
+		return runStdio(cmd.Context(), mcpServer, token)
+	}
 
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return mcpServer
@@ -87,6 +114,49 @@ func runServe(cmd *cobra.Command, args []string) error {
 	}
 
 	return startTLSServer(mux)
+}
+
+// stdioConfig returns the Rancher token and URL to use in stdio mode, falling
+// back to the RANCHER_TOKEN and RANCHER_URL env vars when the flags are not set.
+func stdioConfig() (string, string, error) {
+	token := rancherToken
+	if token == "" {
+		token = os.Getenv("RANCHER_TOKEN")
+	}
+	url := rancherURL
+	if url == "" {
+		url = os.Getenv("RANCHER_URL")
+	}
+	if token == "" || url == "" {
+		return "", "", fmt.Errorf("--rancher-token and --rancher-url (or RANCHER_TOKEN and RANCHER_URL) are required when --stdio is set")
+	}
+
+	return token, url, nil
+}
+
+// runStdio serves MCP over stdin/stdout, using token for all tool calls.
+func runStdio(ctx context.Context, mcpServer *mcp.Server, token string) error {
+	mcpServer.AddReceivingMiddleware(tokenMiddleware(token))
+
+	// stdout is reserved for the MCP protocol: keep a handle for the transport
+	// and redirect any other stdout writes to stderr.
+	out := os.Stdout
+	os.Stdout = os.Stderr
+	transport := &mcp.IOTransport{Reader: os.Stdin, Writer: out}
+
+	zap.L().Info("MCP Server started!", zap.String("transport", "stdio"), zap.Bool("insecure", insecure))
+
+	return mcpServer.Run(ctx, transport)
+}
+
+// tokenMiddleware returns an MCP middleware that sets token into the context
+// of every request, as the OAuth middleware does for HTTP requests.
+func tokenMiddleware(token string) mcp.Middleware {
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			return next(middleware.WithToken(ctx, token), method, req)
+		}
+	}
 }
 
 func startInsecureServer(handler http.Handler) error {

@@ -463,3 +463,38 @@ func TestNewClient_RancherURL(t *testing.T) {
 		})
 	}
 }
+
+func TestNewClientWithURL(t *testing.T) {
+	tests := map[string]struct {
+		rancherURL  string
+		expectedURL string
+		expectedErr string
+	}{
+		"uses the provided URL": {
+			rancherURL:  "https://rancher.example.com",
+			expectedURL: "https://rancher.example.com",
+		},
+		"trims trailing slash": {
+			rancherURL:  "https://rancher.example.com/",
+			expectedURL: "https://rancher.example.com",
+		},
+		"fails with empty URL": {
+			rancherURL:  "",
+			expectedErr: "rancher URL is required",
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			// insecure=false must not fetch the CA bundle from the in-cluster config
+			c, err := NewClientWithURL(false, test.rancherURL)
+			if test.expectedErr != "" {
+				assert.ErrorContains(t, err, test.expectedErr)
+				return
+			}
+			require.NoError(t, err)
+			assert.Equal(t, test.expectedURL, c.RancherURL())
+			assert.Empty(t, c.caBundle)
+		})
+	}
+}
