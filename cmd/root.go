@@ -1,11 +1,7 @@
 package cmd
 
 import (
-	"context"
-	"os"
-	"os/signal"
 	"strings"
-	"syscall"
 
 	"github.com/rancher/rancher-ai-mcp/pkg/version"
 	"github.com/spf13/cobra"
@@ -30,10 +26,7 @@ or update Kubernetes and Rancher resources across local and downstream clusters.
 
 // Execute runs the root command
 func Execute() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
-
-	cobra.CheckErr(rootCmd.ExecuteContext(ctx))
+	cobra.CheckErr(rootCmd.Execute())
 }
 
 func init() {
