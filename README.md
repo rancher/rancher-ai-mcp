@@ -89,7 +89,7 @@ Example MCP client configuration:
   "mcpServers": {
     "rancher": {
       "command": "mcp",
-      "args": ["serve", "--stdio", "--rancher-url", "https://rancher.example.com", "--rancher-token", "token-xxx"],
+      "args": ["serve", "--stdio", "--rancher-url", "https://rancher.example.com", "--rancher-token", "token-xxx"]
     }
   }
 }
