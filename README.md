@@ -12,7 +12,7 @@ This Model Context Protocol (MCP) server provides a secure bridge between the Ra
 ### Package Structure
 
 - **`cmd/`** - CLI commands and server initialization
-  - `serve.go` - HTTP/TLS server setup with dynamic listener support
+  - `serve.go` - HTTP/TLS server setup with dynamic listener support, and stdio transport
   - `root.go` - Root command configuration
 
 - **`pkg/client/`** - Kubernetes client abstraction
@@ -71,4 +71,26 @@ make generate
 ```bash
 --port <int>              Port to listen on (default: 9092)
 --insecure                Skip TLS verification (default: false)
+--stdio                   Serve MCP over stdin/stdout instead of HTTP (default: false)
+--rancher-token <string>  Rancher token used for all tool calls in stdio mode (default: $RANCHER_TOKEN)
+--rancher-url <string>    Rancher server URL used in stdio mode (default: $RANCHER_URL)
+```
+
+### stdio Mode
+
+With `--stdio` the server talks MCP over stdin/stdout, so a local MCP client can start it as a subprocess. There are no HTTP headers in this mode, so the Rancher token and URL come from `--rancher-token`/`--rancher-url` or the `RANCHER_TOKEN`/`RANCHER_URL` env vars. `--port`, `--authz-server-url`, `--jwks-url` and `--resource-url` are ignored. Logs go to stderr.
+
+Rancher's certificate is checked against the system trust store. 
+
+Example MCP client configuration:
+
+```json
+{
+  "mcpServers": {
+    "rancher": {
+      "command": "mcp",
+      "args": ["serve", "--stdio", "--rancher-url", "https://rancher.example.com", "--rancher-token", "token-xxx"],
+    }
+  }
+}
 ```

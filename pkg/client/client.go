@@ -75,6 +75,24 @@ func NewClient(insecure bool, authzServerURL string) (*Client, error) {
 			return nil, fmt.Errorf("fetching internal-cacerts from rancher: %w", err)
 		}
 	}
+	return newClient(insecure, rancherURL, caBundle), nil
+}
+
+// NewClientWithURL creates a Client that talks to the given Rancher URL.
+//
+// Unlike NewClient, it does not use the in-cluster config to discover the
+// Rancher URL or CA bundle, so it can be used outside of a cluster. When
+// insecure is false the system trust store is used to verify Rancher's certificate.
+func NewClientWithURL(insecure bool, rancherURL string) (*Client, error) {
+	rancherURL = strings.TrimSuffix(rancherURL, "/")
+	if rancherURL == "" {
+		return nil, fmt.Errorf("rancher URL is required")
+	}
+
+	return newClient(insecure, rancherURL, nil), nil
+}
+
+func newClient(insecure bool, rancherURL string, caBundle []byte) *Client {
 	return &Client{
 		caBundle:   caBundle,
 		insecure:   insecure,
@@ -85,7 +103,7 @@ func NewClient(insecure bool, authzServerURL string) (*Client, error) {
 		ClientSetCreator: func(cfg *rest.Config) (kubernetes.Interface, error) {
 			return kubernetes.NewForConfig(cfg)
 		},
-	}, nil
+	}
 }
 
 func (c *Client) RancherURL() string {

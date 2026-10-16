@@ -1,7 +1,11 @@
 package cmd
 
 import (
+	"context"
+	"os"
+	"os/signal"
 	"strings"
+	"syscall"
 
 	"github.com/rancher/rancher-ai-mcp/pkg/version"
 	"github.com/spf13/cobra"
@@ -26,7 +30,10 @@ or update Kubernetes and Rancher resources across local and downstream clusters.
 
 // Execute runs the root command
 func Execute() {
-	cobra.CheckErr(rootCmd.Execute())
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	cobra.CheckErr(rootCmd.ExecuteContext(ctx))
 }
 
 func init() {
@@ -34,12 +41,16 @@ func init() {
 }
 
 func initLogger() {
+	var config zap.Config
 	if strings.ToLower(logLevel) == "debug" {
-		zap.ReplaceGlobals(zap.Must(zap.NewDevelopment()))
+		config = zap.NewDevelopmentConfig()
 	} else {
-		config := zap.NewProductionConfig()
+		config = zap.NewProductionConfig()
 		// remove the "caller" key from the log output
 		config.EncoderConfig.CallerKey = zapcore.OmitKey
-		zap.ReplaceGlobals(zap.Must(config.Build()))
 	}
+	// always log to stderr: stdout is reserved for the MCP stdio transport
+	config.OutputPaths = []string{"stderr"}
+	config.ErrorOutputPaths = []string{"stderr"}
+	zap.ReplaceGlobals(zap.Must(config.Build()))
 }
