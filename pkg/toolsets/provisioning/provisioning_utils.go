@@ -32,6 +32,7 @@ const (
 	LocalCluster                     = "local"
 	DefaultClusterResourcesNamespace = "fleet-default"
 	LocalClusterResourcesNamespace   = "fleet-local"
+	DefaultRancherResourcesNamespace = "cattle-system"
 )
 
 var (
