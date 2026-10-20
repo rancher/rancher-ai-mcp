@@ -16,6 +16,7 @@ import (
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/confirm"
+	"github.com/rancher/rancher-ai-mcp/pkg/keepalivegate"
 	"github.com/rancher/rancher-ai-mcp/pkg/toolconfig"
 	"github.com/rancher/rancher-ai-mcp/pkg/toolsets"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
@@ -58,7 +59,7 @@ func init() {
 	serveCmd.Flags().BoolVar(&readOnly, "read-only", false, "Only register read-only tools")
 	serveCmd.Flags().BoolVar(&allowAutoWrite, "allow-auto-write", false, "Allow create/update-class tools to execute without per-operation user confirmation (env MCP_ALLOW_AUTO_WRITE). Delete and exec always require confirmation. DANGEROUS: enable only for trusted automation")
 	serveCmd.Flags().BoolVar(&enableExec, "enable-exec", false, "Enable the execPod operation of planChange/executeChange (env MCP_ENABLE_EXEC). The tool surface does not change: without this flag the operation is refused at runtime. Disabled by default")
-	serveCmd.Flags().DurationVar(&keepAlive, "keep-alive", 0, "Send periodic pings on the SSE stream to keep it alive across idle periods (e.g. 30s). 0 disables. Recommended behind proxies/ingresses with idle connection timeouts; pick an interval comfortably below the proxy's idle timeout (env MCP_KEEP_ALIVE).")
+	serveCmd.Flags().DurationVar(&keepAlive, "keep-alive", 0, "Interval for server keepalive pings (env MCP_KEEP_ALIVE). Pings are only emitted while a confirmation elicitation is open for that session, where they hold the response's SSE stream through proxy/ingress idle timeouts; at all other times the gate swallows them so clients that never open the standalone SSE stream (and cannot pong) are not disconnected. Pick an interval comfortably below the proxy's idle timeout (e.g. 30s). 0 disables.")
 
 	serveCmd.Flags().StringVar(&authzServerURL, "authz-server-url", "", "Authorization Server URL - used to generate the OIDC urls")
 	serveCmd.Flags().StringVar(&jwksURL, "jwks-url", "", "JWKS URL - from the OAuth2 server")
@@ -79,6 +80,13 @@ func runServe(cmd *cobra.Command, args []string) error {
 		Instructions: toolsets.SafetyInstructions(cfg),
 		KeepAlive:    keepAlive,
 	})
+	// Gate server->client keepalive pings on pending elicitations: pings only
+	// go on the wire while a confirmation dialog is open (holding that POST's
+	// SSE stream through proxy idle timeouts). Every other session's pings are
+	// swallowed, so clients that never open the standalone SSE stream — and
+	// therefore cannot pong — no longer have their sessions destroyed by the
+	// SDK's one-missed-pong session.Close().
+	mcpServer.AddSendingMiddleware(keepalivegate.Middleware())
 	client, err := client.NewClient(insecure, authzServerURL)
 	if err != nil {
 		return fmt.Errorf("failed to create client: %w", err)
