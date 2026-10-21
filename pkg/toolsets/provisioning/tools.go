@@ -50,8 +50,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: ToolsSet,
 		},
-		Description: `Gets a cluster's complete configuration including provisioning and management clusters, the CAPI cluster, CAPI machines, and machine pool configs.
-This should be used when a complete overview of the clusters current state and its configuration is required.`},
+		Description: `Returns cluster configuration and status, including provisioning and management clusters, the CAPI cluster, and machine-pool configs. Optionally include CAPI MachineDeployments, MachineSets, and/or Machines with the corresponding include flags. Use for a cluster-wide overview. Use analyzeClusterMachines or getClusterMachine for focused machine inspection.`},
 		t.analyzeCluster)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -59,8 +58,7 @@ This should be used when a complete overview of the clusters current state and i
 		Meta: map[string]any{
 			toolsSetAnn: ToolsSet,
 		},
-		Description: `Gets all Machine related resources for a cluster including Machines, MachineSets, and MachineDeployments.
-This should be used when a summary or overview of just the existing machine resources is required.`},
+		Description: `Lists selected CAPI MachineDeployments, MachineSets, and/or Machines for a cluster. Set at least one include flag. Use when the machine name is unknown or an issue spans multiple machines; use getClusterMachine for a known machine.`},
 		t.analyzeClusterMachines)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -68,8 +66,7 @@ This should be used when a summary or overview of just the existing machine reso
 		Meta: map[string]any{
 			toolsSetAnn: ToolsSet,
 		},
-		Description: `Gets a specific machine and its parent MachineSet and MachineDeployment.
-This should be used when detailed information about a specific machine is required.`},
+		Description: `Gets a specific CAPI machine and optionally its owning MachineSet and MachineDeployment. Set at least one include flag. Use when the machine name is known. Use analyzeClusterMachines for issues spanning multiple machines.`},
 		t.getClusterMachine)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{

@@ -16,8 +16,15 @@ import (
 )
 
 type inspectClusterParams struct {
-	Cluster   string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
-	Namespace string `json:"namespace,omitempty" jsonschema:"the namespace where the resource is located. The default namespace will be used if not provided"`
+	Cluster                   string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
+	Namespace                 string `json:"namespace,omitempty" jsonschema:"the namespace where the resource is located. The default namespace will be used if not provided"`
+	IncludeMachineDeployments bool   `json:"includeMachineDeployments" jsonschema:"set to true to also return the cluster's CAPI MachineDeployments, which summarize desired and ready replicas for each machine pool"`
+	IncludeMachineSets        bool   `json:"includeMachineSets" jsonschema:"set to true to also return the cluster's CAPI MachineSets, which sit between MachineDeployments and Machines and reflect rollout state"`
+	IncludeMachines           bool   `json:"includeMachines" jsonschema:"set to true to also return the cluster's individual CAPI Machines, which carry per-node phase, conditions, and failure details"`
+}
+
+func (params *inspectClusterParams) includesAnyMachineResources() bool {
+	return params.IncludeMachineDeployments || params.IncludeMachineSets || params.IncludeMachines
 }
 
 func (params *inspectClusterParams) validate(toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
@@ -136,33 +143,28 @@ func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 		resources = append(resources, machineConfigs...)
 	}
 
-	// get all the CAPI machine resources
-	log.Debug("fetching CAPI machine resources")
-	machines, machineSets, machineDeployments, err := t.getAllCAPIMachineResources(ctx, log, getCAPIMachineResourcesParams{
-		namespace:     DefaultClusterResourcesNamespace,
-		targetCluster: params.Cluster,
-	})
-	if err != nil && !apierrors.IsNotFound(err) {
-		log.Error("failed to lookup CAPI machines", zap.Error(err))
-		return nil, nil, err
-	}
-	if apierrors.IsNotFound(err) {
-		log.Debug("CAPI machine resources not found")
-	}
-	if err == nil {
+	if params.includesAnyMachineResources() {
+		log.Debug("fetching CAPI machine resources")
+		machines, machineSets, machineDeployments, err := t.getAllCAPIMachineResources(ctx, log, getCAPIMachineResourcesParams{
+			namespace:     DefaultClusterResourcesNamespace,
+			targetCluster: params.Cluster,
+			kinds: &capiResourceKinds{
+				machines:           params.IncludeMachines,
+				machineSets:        params.IncludeMachineSets,
+				machineDeployments: params.IncludeMachineDeployments,
+			},
+		})
+		if err != nil {
+			log.Error("failed to lookup CAPI machines", zap.Error(err))
+			return nil, nil, err
+		}
 		log.Debug("found CAPI machine resources",
 			zap.Int("machines", len(machines)),
 			zap.Int("machineSets", len(machineSets)),
 			zap.Int("machineDeployments", len(machineDeployments)))
-	}
 
-	if len(machines) > 0 {
 		resources = append(resources, machines...)
-	}
-	if len(machineSets) > 0 {
 		resources = append(resources, machineSets...)
-	}
-	if len(machineDeployments) > 0 {
 		resources = append(resources, machineDeployments...)
 	}
 
