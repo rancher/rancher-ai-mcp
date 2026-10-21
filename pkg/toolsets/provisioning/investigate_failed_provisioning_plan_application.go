@@ -48,6 +48,9 @@ func (params *investigateFailedPlanApplicationParams) validate(ctx context.Conte
 	machines, _, _, err := t.getAllCAPIMachineResources(ctx, log, getCAPIMachineResourcesParams{
 		namespace:     DefaultClusterResourcesNamespace,
 		targetCluster: params.Cluster,
+		kinds: &capiResourceKinds{
+			machines: true,
+		},
 	})
 	if err != nil && !errors.IsNotFound(err) {
 		return nil, fmt.Errorf("did not find any CAPI machine resources for cluster %s. This cluster is likely not managed by Rancher machine plans or the system agent. This tool cannot be run against clusters which do not utilize CAPI (aks,eks,gke,k3k,etc.): %w", params.Cluster, err)
