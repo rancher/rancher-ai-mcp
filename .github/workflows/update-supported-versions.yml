@@ -1,0 +1,56 @@
+name: Update Supported Versions
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions: {}
+
+# Serializes runs that write to the same supported-versions.txt on main
+concurrency:
+  group: update-supported-versions-${{ github.ref_name }} # or a static string if updating the same target branch
+  cancel-in-progress: false
+
+jobs:
+  update-versions:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout supported-versions.txt from main
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+          fetch-depth: 1
+          filter: 'blob:none'
+          sparse-checkout: |
+            supported-versions.txt
+          sparse-checkout-cone-mode: false
+
+      - name: Append and sort tag
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          FILE="supported-versions.txt"
+          touch "${FILE}"
+
+          # Append if tag is not already present
+          if ! grep -Fxq "${TAG}" "${FILE}"; then
+            echo "${TAG}" >> "${FILE}"
+          fi
+
+          # Sort uniquely using version-sort
+          sort -u -V "${FILE}" -o "${FILE}"
+
+      - name: Commit and push changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add supported-versions.txt
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update supported-versions.txt with ${GITHUB_REF_NAME} [skip ci]"
+            # Fetch and rebase before pushing in case another run just finished
+            git pull --rebase origin main
+            git push origin main
+          fi
