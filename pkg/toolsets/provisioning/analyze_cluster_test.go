@@ -1,6 +1,7 @@
 package provisioning
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -29,8 +30,11 @@ func TestAnalyzeCluster(t *testing.T) {
 	}{
 		"analyze cluster with all resources": {
 			params: inspectClusterParams{
-				Cluster:   "test-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "test-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -222,8 +226,11 @@ func TestAnalyzeCluster(t *testing.T) {
 		},
 		"analyze cluster without CAPI cluster": {
 			params: inspectClusterParams{
-				Cluster:   "test-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "test-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -286,8 +293,11 @@ func TestAnalyzeCluster(t *testing.T) {
 		},
 		"analyze cluster without machines": {
 			params: inspectClusterParams{
-				Cluster:   "test-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "test-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -381,8 +391,11 @@ func TestAnalyzeCluster(t *testing.T) {
 		},
 		"analyze local cluster with default namespace": {
 			params: inspectClusterParams{
-				Cluster:   "local",
-				Namespace: "",
+				Cluster:                   "local",
+				Namespace:                 "",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -445,8 +458,11 @@ func TestAnalyzeCluster(t *testing.T) {
 		},
 		"analyze cluster not found": {
 			params: inspectClusterParams{
-				Cluster:   "nonexistent-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "nonexistent-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -455,8 +471,11 @@ func TestAnalyzeCluster(t *testing.T) {
 		},
 		"analyze cluster with multiple machines and sets": {
 			params: inspectClusterParams{
-				Cluster:   "multi-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "multi-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -779,8 +798,11 @@ func TestAnalyzeCluster(t *testing.T) {
 		},
 		"analyze cluster with not-ready management cluster": {
 			params: inspectClusterParams{
-				Cluster:   "unhealthy-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "unhealthy-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -843,8 +865,11 @@ func TestAnalyzeCluster(t *testing.T) {
 		},
 		"analyze cluster with RKE machine pools and machine configs": {
 			params: inspectClusterParams{
-				Cluster:   "rke-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "rke-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -1092,8 +1117,11 @@ func TestAnalyzeCluster(t *testing.T) {
 		},
 		"analyze cluster with namespace not set (defaults to fleet-default)": {
 			params: inspectClusterParams{
-				Cluster:   "test-cluster",
-				Namespace: "",
+				Cluster:                   "test-cluster",
+				Namespace:                 "",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -1187,8 +1215,11 @@ func TestAnalyzeCluster(t *testing.T) {
 		},
 		"analyze cluster with only provisioning and management cluster": {
 			params: inspectClusterParams{
-				Cluster:   "minimal-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "minimal-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -1251,8 +1282,11 @@ func TestAnalyzeCluster(t *testing.T) {
 		},
 		"analyze cluster with single machine and full hierarchy": {
 			params: inspectClusterParams{
-				Cluster:   "single-machine-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "single-machine-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -1471,6 +1505,82 @@ func TestAnalyzeCluster(t *testing.T) {
 				assert.Truef(t, ok, "expected expectedResult to be a JSON string")
 				assert.JSONEq(t, tt.expectedResult, text.Text)
 			}
+		})
+	}
+}
+
+func TestAnalyzeClusterMachineResourceSelection(t *testing.T) {
+	tests := map[string]struct {
+		params        inspectClusterParams
+		expectedKinds []string
+	}{
+		"no machine resources selected returns only cluster-level resources": {
+			params:        inspectClusterParams{Cluster: "test-cluster"},
+			expectedKinds: []string{"Cluster", "Cluster", "Cluster"},
+		},
+		"only machine deployments selected": {
+			params:        inspectClusterParams{Cluster: "test-cluster", IncludeMachineDeployments: true},
+			expectedKinds: []string{"Cluster", "Cluster", "Cluster", "MachineDeployment"},
+		},
+		"only machine sets selected": {
+			params:        inspectClusterParams{Cluster: "test-cluster", IncludeMachineSets: true},
+			expectedKinds: []string{"Cluster", "Cluster", "Cluster", "MachineSet"},
+		},
+		"only machines selected": {
+			params:        inspectClusterParams{Cluster: "test-cluster", IncludeMachines: true},
+			expectedKinds: []string{"Cluster", "Cluster", "Cluster", "Machine"},
+		},
+		"all machine resources selected": {
+			params: inspectClusterParams{
+				Cluster:                   "test-cluster",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
+			},
+			expectedKinds: []string{"Cluster", "Cluster", "Cluster", "Machine", "MachineSet", "MachineDeployment"},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			fakeDynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
+				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
+				newCAPICluster("test-cluster", "fleet-default"),
+				newCAPIMachine("test-cluster-machine-1", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1"),
+				newCAPIMachineSet("test-cluster-machineset-1", "fleet-default", "test-cluster", 1, 1, "test-cluster-md-0"),
+				newCAPIMachineDeployment("test-cluster-md-0", "fleet-default", "test-cluster", 1, 1),
+				newManagementCluster("c-m-abc123", true),
+			)
+			c := &client.Client{
+				ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
+					return newFakeClientSet(), nil
+				},
+				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
+					return fakeDynClient, nil
+				},
+			}
+			tools := NewTools(test.WrapClient(c, testToken), false)
+			req := &mcp.CallToolRequest{}
+			req.Params = &mcp.CallToolParamsRaw{Name: "analyze-cluster"}
+
+			result, _, err := tools.analyzeCluster(middleware.WithToken(t.Context(), testToken), req, tt.params)
+			assert.NoError(t, err)
+
+			text, ok := result.Content[0].(*mcp.TextContent)
+			assert.Truef(t, ok, "expected type *mcp.TextContent")
+
+			var resp struct {
+				LLM []struct {
+					Kind string `json:"kind"`
+				} `json:"llm"`
+			}
+			assert.NoError(t, json.Unmarshal([]byte(text.Text), &resp))
+
+			var kinds []string
+			for _, r := range resp.LLM {
+				kinds = append(kinds, r.Kind)
+			}
+			assert.Equal(t, tt.expectedKinds, kinds)
 		})
 	}
 }
