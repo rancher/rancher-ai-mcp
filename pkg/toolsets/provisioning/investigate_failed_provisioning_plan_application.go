@@ -23,14 +23,18 @@ import (
 )
 
 type investigateFailedPlanApplicationParams struct {
-	Cluster  string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
-	NodeName string `json:"nodeName" jsonschema:"the name of the node which is failing to execute a plan"`
+	Cluster     string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
+	NodeName    string `json:"nodeName" jsonschema:"the name of the node which is failing to execute a plan"`
+	LogLineTail int    `json:"logLineTail" jsonschema:"an optional number of log lines to retrieve from the system-agent logs, defaults to 150. Returns the last N lines of logs. Must be between 30 and 1000."`
 }
+
+const defaultLogLineTail = 150
 
 func (params *investigateFailedPlanApplicationParams) validate(ctx context.Context, t *Tools, toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
 	log := utils.NewChildLogger(toolReq, map[string]string{
-		"cluster":  params.Cluster,
-		"nodeName": params.NodeName,
+		"cluster":     params.Cluster,
+		"nodeName":    params.NodeName,
+		"logLineTail": fmt.Sprintf("%d", params.LogLineTail),
 	})
 
 	log.Debug("investigateFailedPlanApplicationParams called with params", zap.Any("params", params))
@@ -41,6 +45,17 @@ func (params *investigateFailedPlanApplicationParams) validate(ctx context.Conte
 
 	if strings.TrimSpace(params.NodeName) == "" {
 		return nil, fmt.Errorf("node name is required")
+	}
+
+	// explicitly allow a zero value and silently convert it to the default value. This handles
+	// cases where the model omits the parameter entirely, with the intent of using default value as
+	// described in the tool's schema.
+	if (params.LogLineTail < 30 && params.LogLineTail != 0) || params.LogLineTail > 1000 {
+		return nil, fmt.Errorf("logLineTail must be between 30 and 1000")
+	}
+
+	if params.LogLineTail == 0 {
+		params.LogLineTail = defaultLogLineTail
 	}
 
 	// ensure that the provided node name is actually valid for the specified cluster and
@@ -163,7 +178,7 @@ func createJobAndPollPod(ctx context.Context, params investigateFailedPlanApplic
 	log.Debug("retrieving logs from log gatherer pod", zap.String("podName", pod.GetName()), zap.String("namespace", pod.GetNamespace()))
 
 	// Read the logs from stdout
-	logs, err := utils.GetPodLogs(ctx, clientset, pod, 150)
+	logs, err := utils.GetPodLogs(ctx, clientset, pod, params.LogLineTail)
 	if err != nil {
 		return utils.ContainerLogs{}, fmt.Errorf("failed to get pod logs: %w", err)
 	}
