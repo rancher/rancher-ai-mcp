@@ -173,6 +173,71 @@ func TestInvestigateFailedPlanApplication(t *testing.T) {
 			verifyJob:      true,
 			expectedResult: expectedSuccessResult,
 		},
+		"investigate failed plan with a custom log line tail": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				NodeName:    testPlanNode,
+				LogLineTail: 50,
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(
+				newCAPIMachine(testPlanNode, "fleet-default", "test-cluster", "Running", ""),
+				newManagementCluster("test-cluster", true),
+				newFullMachinePlanSecret(testPlanNode),
+				newLogGathererPod(testPlanNode, corev1.PodSucceeded)),
+			verifyJob:      true,
+			expectedResult: expectedSuccessResult,
+		},
+		"investigate failed plan with the minimum log line tail": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				NodeName:    testPlanNode,
+				LogLineTail: 30,
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(
+				newCAPIMachine(testPlanNode, "fleet-default", "test-cluster", "Running", ""),
+				newManagementCluster("test-cluster", true),
+				newFullMachinePlanSecret(testPlanNode),
+				newLogGathererPod(testPlanNode, corev1.PodSucceeded)),
+			verifyJob:      true,
+			expectedResult: expectedSuccessResult,
+		},
+		"investigate failed plan with the maximum log line tail": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				NodeName:    testPlanNode,
+				LogLineTail: 1000,
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(
+				newCAPIMachine(testPlanNode, "fleet-default", "test-cluster", "Running", ""),
+				newManagementCluster("test-cluster", true),
+				newFullMachinePlanSecret(testPlanNode),
+				newLogGathererPod(testPlanNode, corev1.PodSucceeded)),
+			verifyJob:      true,
+			expectedResult: expectedSuccessResult,
+		},
+		"investigate failed plan with a negative log line tail": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				NodeName:    testPlanNode,
+				LogLineTail: -1,
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(),
+			expectedError: "logLineTail must be between",
+		},
+		"investigate failed plan with a log line tail above the maximum": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				NodeName:    testPlanNode,
+				LogLineTail: 1001,
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(),
+			expectedError: "logLineTail must be between",
+		},
 		"investigate failed plan on the local cluster": {
 			params: investigateFailedPlanApplicationParams{
 				Cluster:  "local",
@@ -341,4 +406,43 @@ func verifyLogGathererJob(t *testing.T, dynClient *dynamicfake.FakeDynamicClient
 	assert.Equal(t, []string{"chroot", "/host", "bash", "-c"}, container.Command[:4])
 	assert.Contains(t, container.Command[4], fmt.Sprintf("grep %s", expectedChecksum))
 	assert.Contains(t, container.Command[4], "journalctl -eu rancher-system-agent.service")
+}
+
+func TestInvestigateFailedPlanApplicationLogLineTailDefault(t *testing.T) {
+	fakeToken := "fakeToken"
+	dynClient := newPlanApplicationDynClient(
+		newCAPIMachine(testPlanNode, "fleet-default", "test-cluster", "Running", ""))
+	c := &client.Client{
+		ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
+			return newFakeClientSet(), nil
+		},
+		DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
+			return dynClient, nil
+		},
+	}
+	tools := NewTools(test.WrapClient(c, fakeToken), false)
+	req := &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{Name: "investigate-failed-provisioning-plan-application"}}
+	ctx := middleware.WithToken(t.Context(), fakeToken)
+
+	tests := map[string]struct {
+		input    int
+		expected int
+	}{
+		"unset uses the default": {input: 0, expected: defaultLogLineTail},
+		"provided value is kept": {input: 42, expected: 42},
+		"maximum value is kept":  {input: 1000, expected: 1000},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			params := investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				NodeName:    testPlanNode,
+				LogLineTail: tt.input,
+			}
+			_, err := params.validate(ctx, tools, req)
+			require.NoError(t, err)
+			assert.Equal(t, tt.expected, params.LogLineTail)
+		})
+	}
 }
