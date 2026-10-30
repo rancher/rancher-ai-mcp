@@ -270,6 +270,20 @@ func TestNewUpdateResourceInput(t *testing.T) {
 	}
 }
 
+func TestNewDeleteResourceInput(t *testing.T) {
+	got := NewDeleteResourceInput(newUnstructured("old-pod", "kube-system", "Pod"), "local")
+
+	assert.Equal(t, PlanResource{
+		Type: OperationDelete,
+		Resource: Resource{
+			Name:      "old-pod",
+			Kind:      "Pod",
+			Cluster:   "local",
+			Namespace: "kube-system",
+		},
+	}, got)
+}
+
 func TestCreatePlanResponse(t *testing.T) {
 	tests := map[string]struct {
 		resources   []PlanResource

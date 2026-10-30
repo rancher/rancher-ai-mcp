@@ -180,6 +180,23 @@ func NewUpdateResourceInput(obj *unstructured.Unstructured, patch []byte, cluste
 	return plan_resource
 }
 
+// NewDeleteResourceInput constructs a PlanResource for a DELETE operation.
+// It extracts the resource metadata from the given unstructured object, the
+// payload is always nil.
+func NewDeleteResourceInput(obj *unstructured.Unstructured, cluster string) PlanResource {
+	plan_resource := PlanResource{
+		Type: OperationDelete,
+		Resource: Resource{
+			Name:      obj.GetName(),
+			Kind:      obj.GetKind(),
+			Cluster:   cluster,
+			Namespace: obj.GetNamespace(),
+		},
+	}
+
+	return plan_resource
+}
+
 // CreatePlanResponse serializes a slice of PlanResource into a JSON string.
 // It returns the JSON representation and any marshalling error encountered.
 func CreatePlanResponse(resources []PlanResource) (string, error) {
