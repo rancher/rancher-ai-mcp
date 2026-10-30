@@ -14,13 +14,17 @@ var zapListClusterRoleTemplateBindings = zap.String("tool", "listClusterRoleTemp
 
 type listCRTBParams struct {
 	Cluster string `json:"cluster" jsonschema:"the name of the cluster the search is scoped to"`
-	User    string `json:"user,omitempty" jsonschema:"(optional) the user to get permissions for"`
-	Group   string `json:"group,omitempty" jsonschema:"(optional) the group to get permissions for"`
+	User    string `json:"user,omitempty" jsonschema:"(optional) the username or user ID to get permissions for. Bindings for the groups the user belongs to are included. Cannot be combined with group"`
+	Group   string `json:"group,omitempty" jsonschema:"(optional) the group principal name to get permissions for, e.g. github_team://1234. Cannot be combined with user"`
 }
 
 // listClusterRoleTemplateBindings retrieves a cluster role template binding resource.
 func (t *Tools) listClusterRoleTemplateBindings(ctx context.Context, toolReq *mcp.CallToolRequest, params listCRTBParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("listClusterRoleTemplateBindings called", zap.String("cluster", params.Cluster))
+
+	if params.User != "" && params.Group != "" {
+		return nil, nil, errUserAndGroup
+	}
 
 	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), params.Cluster)
 	if err != nil {
@@ -40,15 +44,22 @@ func (t *Tools) listClusterRoleTemplateBindings(ctx context.Context, toolReq *mc
 		return nil, nil, err
 	}
 
-	// Filter the resources to only include those that match the specified user
+	// Filter the resources to only include those for the specified user, or the groups the user belongs to
+	var notes []string
 	if params.User != "" {
-		crtbs = filterResourcesByField(crtbs, "userName", params.User)
+		subjects, err := t.getUserSubjects(ctx, params.User)
+		if err != nil {
+			zap.L().Error("failed to resolve user", zapListClusterRoleTemplateBindings, zap.Error(err))
+			return nil, nil, err
+		}
+		crtbs = filterBindingsForUser(crtbs, subjects)
+		notes = userGroupsNote(subjects.groups)
 	}
 	// Filter the resources to only include those that match the specified group
 	if params.Group != "" {
-		crtbs = filterResourcesByField(crtbs, "groupName", params.Group)
+		crtbs = filterBindingsForGroup(crtbs, params.Group)
 	}
-	mcpResponse, err := response.CreateMcpResponse(crtbs, "local")
+	mcpResponse, err := response.CreateMcpResponse(crtbs, "local", notes...)
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapListClusterRoleTemplateBindings, zap.Error(err))
 		return nil, nil, err

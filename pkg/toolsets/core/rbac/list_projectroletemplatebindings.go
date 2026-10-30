@@ -18,8 +18,8 @@ var zapListProjectRoleTemplateBindings = zap.String("tool", "listProjectRoleTemp
 type listPRTBParams struct {
 	Cluster   string `json:"cluster" jsonschema:"the name or ID of the cluster resource the project belongs to"`
 	ProjectID string `json:"projectID,omitempty" jsonschema:"(optional) the ID of the project resource (e.g. p-abc)"`
-	User      string `json:"user,omitempty" jsonschema:"(optional) the user to get permissions for"`
-	Group     string `json:"group,omitempty" jsonschema:"(optional) the group to get permissions for"`
+	User      string `json:"user,omitempty" jsonschema:"(optional) the username or user ID to get permissions for. Bindings for the groups the user belongs to are included. Cannot be combined with group"`
+	Group     string `json:"group,omitempty" jsonschema:"(optional) the group principal name to get permissions for, e.g. github_team://1234. Cannot be combined with user"`
 }
 
 func filterPRTBsByCluster(prtbs []*unstructured.Unstructured, clusterName string) []*unstructured.Unstructured {
@@ -41,6 +41,10 @@ func filterPRTBsByCluster(prtbs []*unstructured.Unstructured, clusterName string
 // listProjectRoleTemplateBindings retrieves a project role template binding resource.
 func (t *Tools) listProjectRoleTemplateBindings(ctx context.Context, toolReq *mcp.CallToolRequest, params listPRTBParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("listProjectRoleTemplateBindings called", zap.String("cluster", params.Cluster), zap.String("projectID", params.ProjectID))
+
+	if params.User != "" && params.Group != "" {
+		return nil, nil, errUserAndGroup
+	}
 
 	clusterID, err := t.client.GetClusterID(ctx, middleware.Token(ctx), params.Cluster)
 	if err != nil {
@@ -74,12 +78,20 @@ func (t *Tools) listProjectRoleTemplateBindings(ctx context.Context, toolReq *mc
 		return nil, nil, err
 	}
 
-	// Filter the resources to only include those that match the specified user
+	// Filter the resources to only include those for the specified user, or the groups the user belongs to
+	var notes []string
 	if params.User != "" {
-		prtbs = filterResourcesByField(prtbs, "userName", params.User)
+		subjects, err := t.getUserSubjects(ctx, params.User)
+		if err != nil {
+			zap.L().Error("failed to resolve user", zapListProjectRoleTemplateBindings, zap.Error(err))
+			return nil, nil, err
+		}
+		prtbs = filterBindingsForUser(prtbs, subjects)
+		notes = userGroupsNote(subjects.groups)
 	}
+	// Filter the resources to only include those that match the specified group
 	if params.Group != "" {
-		prtbs = filterResourcesByField(prtbs, "groupName", params.Group)
+		prtbs = filterBindingsForGroup(prtbs, params.Group)
 	}
 
 	// Filter the resources to only include those that match the specified cluster
@@ -87,7 +99,7 @@ func (t *Tools) listProjectRoleTemplateBindings(ctx context.Context, toolReq *mc
 		prtbs = filterPRTBsByCluster(prtbs, clusterID)
 	}
 
-	mcpResponse, err := response.CreateMcpResponse(prtbs, "local")
+	mcpResponse, err := response.CreateMcpResponse(prtbs, "local", notes...)
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapListProjectRoleTemplateBindings, zap.Error(err))
 		return nil, nil, err
