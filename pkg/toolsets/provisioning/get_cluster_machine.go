@@ -2,6 +2,7 @@ package provisioning
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
@@ -12,8 +13,11 @@ import (
 )
 
 type getClusterMachineParams struct {
-	Cluster     string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
-	MachineName string `json:"machineName" jsonschema:"the name of the machine to get"`
+	Cluster                  string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
+	MachineName              string `json:"machineName" jsonschema:"the name of the machine to get"`
+	IncludeMachineDeployment bool   `json:"includeMachineDeployment" jsonschema:"set to true to return the MachineDeployment that owns this machine, which summarizes desired and ready replicas for its machine pool"`
+	IncludeMachineSet        bool   `json:"includeMachineSet" jsonschema:"set to true to return the MachineSet that owns this machine, which sits between the MachineDeployment and the Machine and reflects rollout state"`
+	IncludeMachine           bool   `json:"includeMachine" jsonschema:"set to true to return the CAPI Machine itself, which carries the node's phase, conditions, and failure details"`
 }
 
 func (params *getClusterMachineParams) validate(toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
@@ -24,10 +28,13 @@ func (params *getClusterMachineParams) validate(toolReq *mcp.CallToolRequest) (*
 	if err := validateClusterName(params.Cluster); err != nil {
 		return nil, err
 	}
+	if !params.IncludeMachineDeployment && !params.IncludeMachineSet && !params.IncludeMachine {
+		return nil, fmt.Errorf("at least one of includeMachineDeployment, includeMachineSet, or includeMachine must be true")
+	}
 	return log, nil
 }
 
-// getClusterMachine returns the cluster API machine for a given provisioning cluster and machine name.
+// getClusterMachine returns the selected CAPI resources (the machine, its MachineSet, and its MachineDeployment) for a given provisioning cluster and machine name.
 func (t *Tools) getClusterMachine(ctx context.Context, toolReq *mcp.CallToolRequest, params getClusterMachineParams) (*mcp.CallToolResult, any, error) {
 	log, err := params.validate(toolReq)
 	if err != nil {
@@ -41,6 +48,11 @@ func (t *Tools) getClusterMachine(ctx context.Context, toolReq *mcp.CallToolRequ
 		namespace:     "fleet-default",
 		targetCluster: params.Cluster,
 		machineName:   params.MachineName,
+		kinds: &capiResourceKinds{
+			machines:           params.IncludeMachine,
+			machineSets:        params.IncludeMachineSet,
+			machineDeployments: params.IncludeMachineDeployment,
+		},
 	})
 	if err != nil && !errors.IsNotFound(err) {
 		log.Error("failed to lookup capi machine", zap.Error(err))
