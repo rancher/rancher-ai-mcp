@@ -122,6 +122,26 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 	"projectroletemplatebinding":  {Group: ManagementGroup, Version: "v3", Resource: "projectroletemplatebindings"},
 	"nodetemplate":                {Group: ManagementGroup, Version: "v3", Resource: "nodetemplates"},
 	"nodedriver":                  {Group: ManagementGroup, Version: "v3", Resource: "nodedrivers"},
+	"nodepool":                    {Group: ManagementGroup, Version: "v3", Resource: "nodepools"},
+	ManagementKindPrefix + "node": {Group: ManagementGroup, Version: "v3", Resource: "nodes"}, // Prefixed to avoid collision with core v1 nodes
+	"oidcclient":                  {Group: ManagementGroup, Version: "v3", Resource: "oidcclients"},
+	"authconfig":                  {Group: ManagementGroup, Version: "v3", Resource: "authconfigs"},
+	"token":                       {Group: ManagementGroup, Version: "v3", Resource: "tokens"},
+	"group":                       {Group: ManagementGroup, Version: "v3", Resource: "groups"},
+	"groupmember":                 {Group: ManagementGroup, Version: "v3", Resource: "groupmembers"},
+	"userattribute":               {Group: ManagementGroup, Version: "v3", Resource: "userattributes"},
+	"preference":                  {Group: ManagementGroup, Version: "v3", Resource: "preferences"},
+	"feature":                     {Group: ManagementGroup, Version: "v3", Resource: "features"},
+	"fleetworkspace":              {Group: ManagementGroup, Version: "v3", Resource: "fleetworkspaces"},
+	"kontainerdriver":             {Group: ManagementGroup, Version: "v3", Resource: "kontainerdrivers"},
+	"clusterregistrationtoken":    {Group: ManagementGroup, Version: "v3", Resource: "clusterregistrationtokens"},
+	"clusterproxyconfig":          {Group: ManagementGroup, Version: "v3", Resource: "clusterproxyconfigs"},
+	"clustertemplate":             {Group: ManagementGroup, Version: "v3", Resource: "clustertemplates"},
+	"clustertemplaterevision":     {Group: ManagementGroup, Version: "v3", Resource: "clustertemplaterevisions"},
+	"managedchart":                {Group: ManagementGroup, Version: "v3", Resource: "managedcharts"},
+	"apiservice":                  {Group: ManagementGroup, Version: "v3", Resource: "apiservices"},
+	"rancherusernotification":     {Group: ManagementGroup, Version: "v3", Resource: "rancherusernotifications"},
+	"podsecurityadmissionconfigurationtemplate": {Group: ManagementGroup, Version: "v3", Resource: "podsecurityadmissionconfigurationtemplates"},
 
 	// --- RANCHER PROVISIONING Resources (Group: "provisioning.cattle.io") ---
 	ProvisioningClusterResourceKind: {Group: ProvisioningGroup, Version: "v1", Resource: "clusters"},
@@ -130,11 +150,30 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 	"k3kcluster": {Group: "k3k.io", Version: "v1beta1", Resource: "clusters"},
 
 	// --- RANCHER FLEET Resources (Group: "fleet.cattle.io") ---
-	"bundle":           {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"},
-	"gitrepo":          {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"},
-	"bundledeployment": {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundledeployments"},
-	"clustergroup":     {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "clustergroups"},
-	"fleetcluster":     {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "clusters"}, // Renamed to avoid collision with management.cattle.io/v3/clusters
+	"bundle":                 {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundles"},
+	"gitrepo":                {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitrepos"},
+	"bundledeployment":       {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundledeployments"},
+	"clustergroup":           {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "clustergroups"},
+	"fleetcluster":           {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "clusters"}, // Renamed to avoid collision with management.cattle.io/v3/clusters
+	"helmop":                 {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "helmops"},
+	"gitreporestriction":     {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "gitreporestrictions"},
+	"bundlenamespacemapping": {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundlenamespacemappings"},
+	"clusterregistration":    {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "clusterregistrations"},
+	"imagescan":              {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "imagescans"},
+
+	// --- RANCHER CATALOG Resources (Group: "catalog.cattle.io") ---
+	"app":         {Group: "catalog.cattle.io", Version: "v1", Resource: "apps"},
+	"clusterrepo": {Group: "catalog.cattle.io", Version: "v1", Resource: "clusterrepos"},
+	"operation":   {Group: "catalog.cattle.io", Version: "v1", Resource: "operations"},
+	"uiplugin":    {Group: "catalog.cattle.io", Version: "v1", Resource: "uiplugins"},
+
+	// --- RANCHER RKE2/K3S Resources (Group: "rke.cattle.io") ---
+	"rkecluster":           {Group: "rke.cattle.io", Version: "v1", Resource: "rkeclusters"},
+	"rkecontrolplane":      {Group: "rke.cattle.io", Version: "v1", Resource: "rkecontrolplanes"},
+	"rkebootstrap":         {Group: "rke.cattle.io", Version: "v1", Resource: "rkebootstraps"},
+	"rkebootstraptemplate": {Group: "rke.cattle.io", Version: "v1", Resource: "rkebootstraptemplates"},
+	"etcdsnapshot":         {Group: "rke.cattle.io", Version: "v1", Resource: "etcdsnapshots"},
+	"custommachine":        {Group: "rke.cattle.io", Version: "v1", Resource: "custommachines"},
 
 	// --- RANCHER CATTLE Resources (Group: "cattle.io") ---
 	"setting": {Group: ManagementGroup, Version: "v3", Resource: "settings"},
