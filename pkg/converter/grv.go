@@ -30,6 +30,8 @@ const (
 	ManagementKindPrefix          = "management"
 	ManagementGroup               = "management.cattle.io"
 	ManagementClusterResourceKind = ManagementKindPrefix + "cluster"
+
+	RKEGroup = "rke.cattle.io"
 )
 
 // K8sKindsToGVRs maps lowercase Kubernetes resource kind names to their corresponding
@@ -155,6 +157,9 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 
 	// --- RANCHER PROVISIONING Resources (Group: "provisioning.cattle.io") ---
 	ProvisioningClusterResourceKind: {Group: ProvisioningGroup, Version: "v1", Resource: "clusters"},
+
+	// --- RANCHER RKE Resources (Group: "rke.cattle.io") ---
+	"etcdsnapshot": {Group: RKEGroup, Version: "v1", Resource: "etcdsnapshots"},
 
 	// --- RANCHER VIRTUAL CLUSTER PROVISIONING Resources (Group: "k3k.io") ---
 	"k3kcluster": {Group: "k3k.io", Version: "v1beta1", Resource: "clusters"},
