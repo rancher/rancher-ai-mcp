@@ -1,6 +1,19 @@
 package rbac
 
-import "k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+import (
+	"context"
+	"errors"
+	"fmt"
+	"slices"
+	"strings"
+
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+)
+
+var errUserAndGroup = errors.New("only one of user or group can be specified, bindings for the user's groups are included when a user is specified")
 
 func filterResourcesByField(resources []*unstructured.Unstructured, field, value string) []*unstructured.Unstructured {
 	var filteredResources []*unstructured.Unstructured
@@ -11,4 +24,132 @@ func filterResourcesByField(resources []*unstructured.Unstructured, field, value
 		}
 	}
 	return filteredResources
+}
+
+// userSubjects identifies a user, and the groups they belong to, in the subjects of bindings.
+type userSubjects struct {
+	// userID is the name of the user resource, used in the userName field of bindings.
+	userID string
+	// principalIDs are the principals of the user, used in the userPrincipalName field of bindings.
+	principalIDs []string
+	// groups are the principal names of the groups the user belongs to, used in the
+	// groupPrincipalName field of bindings.
+	groups []string
+	// groupNames are the Kubernetes group names of the groups the user belongs to, used in the
+	// groupName field of bindings. See rbacGroupName.
+	groupNames []string
+}
+
+// rbacGroupName returns the Kubernetes group name that Rancher authenticates a user with for a group
+// principal. Rancher removes the "local://" prefix, so the local group principal local://g-abc is the
+// group g-abc, which is also the name of the Rancher Group resource used in the groupName field.
+func rbacGroupName(groupPrincipal string) string {
+	return strings.TrimPrefix(groupPrincipal, "local://")
+}
+
+// getUserSubjects resolves a username or user ID to the subjects that bindings for the user, and the
+// groups the user belongs to, are made for.
+func (t *Tools) getUserSubjects(ctx context.Context, nameOrID string) (*userSubjects, error) {
+	user, err := t.resolveUser(ctx, nameOrID)
+	if err != nil {
+		return nil, err
+	}
+
+	subjects := &userSubjects{userID: user.GetName()}
+	subjects.principalIDs, _, _ = unstructured.NestedStringSlice(user.Object, "principalIds")
+
+	// Rancher records the groups a user belongs to in the UserAttribute with the same name as the user.
+	// It is only created once the user logs in, so a missing UserAttribute means the user has no groups.
+	userAttribute, err := t.client.GetResource(ctx, client.GetParams{
+		Cluster: "local",
+		Kind:    "userattribute",
+		Name:    subjects.userID,
+		Token:   middleware.Token(ctx),
+	})
+	if apierrors.IsNotFound(err) {
+		return subjects, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get groups for user %q: %w", subjects.userID, err)
+	}
+
+	// The GroupPrincipals and Items fields of UserAttribute have no JSON tags in Rancher's types, so they
+	// are stored with capitalized keys. Each item is a Principal, with its principal ID in metadata.name.
+	groupPrincipals, _, _ := unstructured.NestedMap(userAttribute.Object, "GroupPrincipals")
+	for _, provider := range groupPrincipals {
+		providerMap, ok := provider.(map[string]any)
+		if !ok {
+			continue
+		}
+		items, _, _ := unstructured.NestedSlice(providerMap, "Items")
+		for _, item := range items {
+			itemMap, ok := item.(map[string]any)
+			if !ok {
+				continue
+			}
+			if name, found, err := unstructured.NestedString(itemMap, "metadata", "name"); err == nil && found && name != "" {
+				subjects.groups = append(subjects.groups, name)
+			}
+		}
+	}
+	slices.Sort(subjects.groups)
+	subjects.groups = slices.Compact(subjects.groups)
+	for _, group := range subjects.groups {
+		subjects.groupNames = append(subjects.groupNames, rbacGroupName(group))
+	}
+
+	return subjects, nil
+}
+
+// filterBindingsForUser returns the bindings for the user, or for any of the groups the user belongs to.
+// Each binding is returned at most once.
+func filterBindingsForUser(bindings []*unstructured.Unstructured, subjects *userSubjects) []*unstructured.Unstructured {
+	var filtered []*unstructured.Unstructured
+	for _, binding := range bindings {
+		if bindingMatchesUser(binding, subjects) {
+			filtered = append(filtered, binding)
+		}
+	}
+	return filtered
+}
+
+func bindingMatchesUser(binding *unstructured.Unstructured, subjects *userSubjects) bool {
+	if userName, found, err := unstructured.NestedString(binding.Object, "userName"); err == nil && found && userName == subjects.userID {
+		return true
+	}
+	if principal, found, err := unstructured.NestedString(binding.Object, "userPrincipalName"); err == nil && found && slices.Contains(subjects.principalIDs, principal) {
+		return true
+	}
+	if group, found, err := unstructured.NestedString(binding.Object, "groupPrincipalName"); err == nil && found && slices.Contains(subjects.groups, group) {
+		return true
+	}
+	if group, found, err := unstructured.NestedString(binding.Object, "groupName"); err == nil && found && slices.Contains(subjects.groupNames, group) {
+		return true
+	}
+	return false
+}
+
+// filterBindingsForGroup returns the bindings for the group principal. Bindings normally record the
+// group in groupPrincipalName, but cluster and project role template bindings can also record its
+// Kubernetes group name in groupName.
+func filterBindingsForGroup(bindings []*unstructured.Unstructured, group string) []*unstructured.Unstructured {
+	var filtered []*unstructured.Unstructured
+	for _, binding := range bindings {
+		if value, found, err := unstructured.NestedString(binding.Object, "groupPrincipalName"); err == nil && found && value == group {
+			filtered = append(filtered, binding)
+			continue
+		}
+		if value, found, err := unstructured.NestedString(binding.Object, "groupName"); err == nil && found && value == rbacGroupName(group) {
+			filtered = append(filtered, binding)
+		}
+	}
+	return filtered
+}
+
+// userGroupsNote describes the groups whose bindings were included for a user, if any.
+func userGroupsNote(groups []string) []string {
+	if len(groups) == 0 {
+		return nil
+	}
+	return []string{"includes bindings for the groups the user belongs to: " + strings.Join(groups, ", ")}
 }

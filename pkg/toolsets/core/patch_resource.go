@@ -12,6 +12,7 @@ import (
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
+	"github.com/rancher/rancher-ai-mcp/pkg/utils"
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -81,12 +82,9 @@ func patchResourceInputSchema() *jsonschema.Schema {
 		panic(fmt.Errorf("failed to build patch resource input schema: %w", err))
 	}
 
-	if patch, ok := s.Properties["patch"]; ok {
-		// jsonschema-go infers a slice as type ["null", "array"]. Force a single "array" type
-		// so agent clients (like Gemini / Vertex AI) can validate function declarations.
-		patch.Type = "array"
-		patch.Types = nil
-	}
+	// jsonschema-go infers a slice as type ["null", "array"]. Force a single "array" type
+	// so agent clients (like Gemini / Vertex AI) can validate function declarations.
+	utils.ForceArrayTypes(s)
 
 	if patch, ok := s.Properties["patch"]; ok {
 		if value, ok := patch.Items.Properties["value"]; ok {
