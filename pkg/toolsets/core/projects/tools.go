@@ -92,5 +92,13 @@ The resource usage includes CPU and memory requests, limits and actual usage, as
 			},
 			Description: `Moves a namespace to a project in the specified cluster.`},
 			t.moveNamespace)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "moveNamespacePlan",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Plans to move a namespace to a project in the specified cluster. It returns the JSON patch that would be applied to the namespace without actually applying it in the cluster. Only used for displaying the change when using human validation.`},
+			t.moveNamespacePlan)
 	}
 }
