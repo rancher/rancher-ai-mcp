@@ -1,5 +1,7 @@
 # Define target platforms, image builder and the fully qualified image name.
 TARGET_PLATFORMS ?= linux/amd64,linux/arm64
+GOLANGCI_LINT_VERSION := v2.15.0
+GOLANGCI_LINT ?= go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION)
 
 REPO ?= rancher
 DIRTY := $(shell if [ -n "$$(git status --porcelain --untracked-files=no)" ]; then echo "-dirty"; fi)
@@ -32,3 +34,21 @@ push-image:
 		-t ${IMAGE} \
 		--push \
 		. 
+
+.PHONY: lint
+lint:	## Find any linting issues in the project
+	$(GOLANGCI_LINT) run --timeout=5m
+
+.PHONY: lint-fix
+lint-fix:	## Fix any linting issues in the project
+	$(GOLANGCI_LINT) run --fix --timeout=5m
+
+BASE_BRANCH ?= main
+
+.PHONY: lint-changed
+lint-changed:	## Find linting issues only in files changed or added on this branch (relative to BASE_BRANCH)
+	$(GOLANGCI_LINT) run --timeout=5m --new-from-rev=$$(git merge-base $(BASE_BRANCH) HEAD) --whole-files
+
+.PHONY: lint-fix-changed
+lint-fix-changed:	## Fix linting issues only in files changed or added on this branch (relative to BASE_BRANCH)
+	$(GOLANGCI_LINT) run --fix --timeout=5m --new-from-rev=$$(git merge-base $(BASE_BRANCH) HEAD) --whole-files
