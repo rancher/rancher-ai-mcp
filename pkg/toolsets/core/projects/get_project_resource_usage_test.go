@@ -208,7 +208,7 @@ func TestGetResourceUsage(t *testing.T) {
 						"cpu": {"requests": "0", "limits": "0", "usage": "0"},
 						"memory": {"requests": "0", "limits": "0", "usage": "0"}
 					},
-					"namespaces": null
+					"namespaces": []
 				}]
 			}
 		}`, text)
@@ -672,5 +672,71 @@ func fakePodMetrics(podName, namespace string, usage corev1.ResourceList) *metri
 				Usage: usage,
 			},
 		},
+	}
+}
+
+func TestPodEffectiveResources(t *testing.T) {
+	cpuMem := func(cpu, memory string) corev1.ResourceList {
+		return corev1.ResourceList{
+			corev1.ResourceCPU:    resource.MustParse(cpu),
+			corev1.ResourceMemory: resource.MustParse(memory),
+		}
+	}
+	always := corev1.ContainerRestartPolicyAlways
+
+	tests := map[string]struct {
+		spec                                                 corev1.PodSpec
+		cpuRequests, cpuLimits, memoryRequests, memoryLimits string
+	}{
+		"containers without resources": {
+			spec:        corev1.PodSpec{Containers: []corev1.Container{{Name: "app"}}},
+			cpuRequests: "0", cpuLimits: "0", memoryRequests: "0", memoryLimits: "0",
+		},
+		"init container larger than the app containers": {
+			spec: corev1.PodSpec{
+				Containers:     []corev1.Container{{Name: "app", Resources: corev1.ResourceRequirements{Requests: cpuMem("100m", "128Mi"), Limits: cpuMem("200m", "256Mi")}}},
+				InitContainers: []corev1.Container{{Name: "init", Resources: corev1.ResourceRequirements{Requests: cpuMem("500m", "512Mi"), Limits: cpuMem("1", "1Gi")}}},
+			},
+			cpuRequests: "500m", cpuLimits: "1", memoryRequests: "512Mi", memoryLimits: "1Gi",
+		},
+		"pod overhead is added to requests and limits": {
+			spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "app", Resources: corev1.ResourceRequirements{Requests: cpuMem("100m", "128Mi"), Limits: cpuMem("200m", "256Mi")}}},
+				Overhead:   cpuMem("250m", "120Mi"),
+			},
+			cpuRequests: "350m", cpuLimits: "450m", memoryRequests: "248Mi", memoryLimits: "376Mi",
+		},
+		"pod overhead is not added to unset limits": {
+			spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "app", Resources: corev1.ResourceRequirements{Requests: cpuMem("100m", "128Mi")}}},
+				Overhead:   cpuMem("250m", "120Mi"),
+			},
+			cpuRequests: "350m", cpuLimits: "0", memoryRequests: "248Mi", memoryLimits: "0",
+		},
+		"sidecar container is added to the app containers": {
+			spec: corev1.PodSpec{
+				Containers:     []corev1.Container{{Name: "app", Resources: corev1.ResourceRequirements{Requests: cpuMem("100m", "128Mi"), Limits: cpuMem("200m", "256Mi")}}},
+				InitContainers: []corev1.Container{{Name: "proxy", RestartPolicy: &always, Resources: corev1.ResourceRequirements{Requests: cpuMem("50m", "64Mi"), Limits: cpuMem("100m", "128Mi")}}},
+			},
+			cpuRequests: "150m", cpuLimits: "300m", memoryRequests: "192Mi", memoryLimits: "384Mi",
+		},
+		"pod-level resources take precedence over the containers": {
+			spec: corev1.PodSpec{
+				Containers: []corev1.Container{{Name: "app", Resources: corev1.ResourceRequirements{Requests: cpuMem("100m", "128Mi")}}},
+				Resources:  &corev1.ResourceRequirements{Requests: cpuMem("1", "1Gi"), Limits: cpuMem("2", "2Gi")},
+			},
+			cpuRequests: "1", cpuLimits: "2", memoryRequests: "1Gi", memoryLimits: "2Gi",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cpuRequests, cpuLimits, memoryRequests, memoryLimits := podEffectiveResources(&corev1.Pod{Spec: tt.spec})
+
+			assert.Equal(t, tt.cpuRequests, cpuRequests.String(), "cpu requests")
+			assert.Equal(t, tt.cpuLimits, cpuLimits.String(), "cpu limits")
+			assert.Equal(t, tt.memoryRequests, memoryRequests.String(), "memory requests")
+			assert.Equal(t, tt.memoryLimits, memoryLimits.String(), "memory limits")
+		})
 	}
 }

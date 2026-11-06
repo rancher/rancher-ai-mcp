@@ -5,20 +5,14 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestGetClusterMachine(t *testing.T) {
 	tests := map[string]struct {
-		params        getClusterMachineParams
-		fakeClientset kubernetes.Interface
-		fakeDynClient *dynamicfake.FakeDynamicClient
+		params  getClusterMachineParams
+		objects []runtime.Object
 		// used in the CallToolRequest
 		requestURL string
 		// used in the creation of the Tools.
@@ -31,12 +25,9 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "test-cluster",
 				MachineName: "test-cluster-machine-1",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newCAPIMachineWithBootstrap("test-cluster-machine-1", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1", "RKEBootstrap", "test-cluster-machine-1"),
-				newCAPIMachine("test-cluster-machine-2", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1"),
-			),
+			requestURL: testURL,
+			objects: []runtime.Object{newCAPIMachineWithBootstrap("test-cluster-machine-1", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1", "RKEBootstrap", "test-cluster-machine-1"),
+				newCAPIMachine("test-cluster-machine-2", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1")},
 			expectedResult: `{
 				"llm": [
 					{
@@ -87,11 +78,8 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "test-cluster",
 				MachineName: "nonexistent-machine",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newCAPIMachine("test-cluster-machine-1", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1"),
-			),
+			requestURL:     testURL,
+			objects:        []runtime.Object{newCAPIMachine("test-cluster-machine-1", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1")},
 			expectedResult: `{"llm":"no resources found"}`,
 		},
 		"get machines from cluster with no machines": {
@@ -100,8 +88,7 @@ func TestGetClusterMachine(t *testing.T) {
 				MachineName: "",
 			},
 			requestURL:     testURL,
-			fakeClientset:  newFakeClientSet(),
-			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
+			objects:        nil,
 			expectedResult: `{"llm":"no resources found"}`,
 		},
 		"get machine without owner references": {
@@ -109,11 +96,8 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "standalone-cluster",
 				MachineName: "standalone-machine",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newCAPIMachine("standalone-machine", "fleet-default", "standalone-cluster", "", ""),
-			),
+			requestURL: testURL,
+			objects:    []runtime.Object{newCAPIMachine("standalone-machine", "fleet-default", "standalone-cluster", "", "")},
 			expectedResult: `{
 				"llm": [
 					{
@@ -147,12 +131,9 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "test-cluster",
 				MachineName: "test-cluster-machine-3",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newCAPIMachine("test-cluster-machine-3", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-2"),
-				newCAPIMachineSet("test-cluster-machineset-2", "fleet-default", "test-cluster", 3, 3, ""),
-			),
+			requestURL: testURL,
+			objects: []runtime.Object{newCAPIMachine("test-cluster-machine-3", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-2"),
+				newCAPIMachineSet("test-cluster-machineset-2", "fleet-default", "test-cluster", 3, 3, "")},
 			expectedResult: `{
 				"llm": [
 					{
@@ -222,13 +203,10 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "test-cluster",
 				MachineName: "test-cluster-machine-4",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newCAPIMachine("test-cluster-machine-4", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-3"),
+			requestURL: testURL,
+			objects: []runtime.Object{newCAPIMachine("test-cluster-machine-4", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-3"),
 				newCAPIMachineSet("test-cluster-machineset-3", "fleet-default", "test-cluster", 5, 5, "test-cluster-machinedeployment-1"),
-				newCAPIMachineDeployment("test-cluster-machinedeployment-1", "fleet-default", "test-cluster", 5, 5),
-			),
+				newCAPIMachineDeployment("test-cluster-machinedeployment-1", "fleet-default", "test-cluster", 5, 5)},
 			expectedResult: `{
 				"llm": [
 					{
@@ -337,27 +315,15 @@ func TestGetClusterMachine(t *testing.T) {
 				MachineName: "",
 			},
 			rancherURL:     testURL,
-			fakeClientset:  newFakeClientSet(),
-			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
+			objects:        nil,
 			expectedResult: `{"llm":"no resources found"}`,
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			c := &client.Client{
-				ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
-					return tt.fakeClientset, nil
-				},
-				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return tt.fakeDynClient, nil
-				},
-			}
-			tools := NewTools(test.WrapClient(c, testToken), false)
-			req := &mcp.CallToolRequest{}
-			req.Params = &mcp.CallToolParamsRaw{Name: "get-cluster-machine"}
-
-			result, _, err := tools.getClusterMachine(middleware.WithToken(t.Context(), testToken), req, tt.params)
+			tools := newTestProvisioningTools(tt.objects...)
+			result, _, err := tools.getClusterMachine(middleware.WithToken(t.Context(), testToken), newToolRequest("get-cluster-machine"), tt.params)
 			if tt.expectedError != "" {
 				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
