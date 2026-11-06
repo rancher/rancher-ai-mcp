@@ -69,6 +69,7 @@ func (t *Tools) analyzeCluster(ctx context.Context, toolReq *mcp.CallToolRequest
 		zap.String("provisioningCluster", provCluster.Name),
 		zap.String("clusterName", provCluster.Status.ClusterName))
 
+	removeMachinePoolSchemas(provClusterResource)
 	var resources []*unstructured.Unstructured
 	resources = append(resources, provClusterResource)
 

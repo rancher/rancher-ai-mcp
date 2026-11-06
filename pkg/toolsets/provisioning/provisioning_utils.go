@@ -4,19 +4,23 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"regexp"
 	"slices"
 	"strconv"
 	"strings"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 	provisioningV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"go.uber.org/zap"
+	jsonpatch "gopkg.in/evanphx/json-patch.v4"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -331,6 +335,25 @@ func (t *Tools) getProvisioningCluster(ctx context.Context, log *zap.Logger, ns,
 	return provisioningClusterResource, provCluster, nil
 }
 
+// removeMachinePoolSchemas removes the dynamicSchemaSpec field from the machine pools of a provisioning cluster
+// before it is returned to the LLM. The field holds a copy of the node driver schema that Rancher uses internally,
+// adds several kilobytes per machine pool, and is not useful for the LLM.
+func removeMachinePoolSchemas(provCluster *unstructured.Unstructured) {
+	pools, found, err := unstructured.NestedSlice(provCluster.Object, "spec", "rkeConfig", "machinePools")
+	if err != nil || !found {
+		return
+	}
+
+	for _, pool := range pools {
+		if p, ok := pool.(map[string]any); ok {
+			delete(p, "dynamicSchemaSpec")
+		}
+	}
+
+	// NestedSlice returns a copy, so the modified pools need to be set on the object.
+	_ = unstructured.SetNestedSlice(provCluster.Object, pools, "spec", "rkeConfig", "machinePools")
+}
+
 func (t *Tools) getMachinePoolConfigs(ctx context.Context, log *zap.Logger, provCluster provisioningV1.Cluster) ([]*unstructured.Unstructured, error) {
 	log.Debug("fetching machine pool configs",
 		zap.String("cluster", provCluster.Name))
@@ -471,6 +494,8 @@ func getKDMReleases(url, distro string) ([]string, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to get KDM releases: %w", err)
 	}
+	// The body has been read by the time it is closed, so a close error doesn't affect the result.
+	defer func() { _ = resp.Body.Close() }()
 
 	kdm := make(map[string]interface{})
 	b, err := io.ReadAll(resp.Body)
@@ -478,7 +503,6 @@ func getKDMReleases(url, distro string) ([]string, error) {
 		return nil, fmt.Errorf("failed to read KDM response body: %w", err)
 	}
 
-	resp.Body.Close()
 	err = json.Unmarshal(b, &kdm)
 	if err != nil {
 		return nil, fmt.Errorf("failed to unmarshal KDM response: %w", err)
@@ -536,7 +560,8 @@ func makeRancherRequest(ctx context.Context, rancherURL, method, path, token str
 	if err != nil {
 		return nil, 0, err
 	}
-	defer resp.Body.Close()
+	// The body has been read by the time it is closed, so a close error doesn't affect the result.
+	defer func() { _ = resp.Body.Close() }()
 
 	body, err := io.ReadAll(resp.Body)
 	if err != nil {
@@ -546,6 +571,113 @@ func makeRancherRequest(ctx context.Context, rancherURL, method, path, token str
 	}
 
 	return body, resp.StatusCode, nil
+}
+
+// testOp returns a JSON patch test operation, which makes the patch fail unless the value at path equals value.
+// Machine pools are read before they are patched, and plans can be applied some time after they are created,
+// so patches test the values they are based on to avoid overwriting changes made in the meantime.
+func testOp(path string, value any) map[string]any {
+	return map[string]any{"op": "test", "path": path, "value": value}
+}
+
+// testOptionalOp returns a JSON patch test operation for an optional field, which makes the patch fail unless
+// the field still has value, or is still unset if value is nil.
+// Unlike RFC 6902, the JSON patch implementation used by Kubernetes (gopkg.in/evanphx/json-patch.v4)
+// treats a missing field as equal to null, so testing for null also detects a field that was set in the meantime.
+func testOptionalOp(path string, value *int32) map[string]any {
+	if value == nil {
+		return testOp(path, nil)
+	}
+	return testOp(path, *value)
+}
+
+// staleNodePoolError returns a clearer error if a node pool patch failed because one of its test operations failed,
+// which means the node pool changed after it was read. Other errors are returned unchanged.
+func (t *Tools) staleNodePoolError(ctx context.Context, log *zap.Logger, namespace, cluster, nodePoolName string, patchBytes []byte, err error) error {
+	if !t.isStalePatch(ctx, log, namespace, cluster, patchBytes, err) {
+		return err
+	}
+	return fmt.Errorf("node pool %s changed after it was read, get its current configuration and try again: %w", nodePoolName, err)
+}
+
+// isStalePatch returns whether a patch of a provisioning cluster failed because one of its test operations failed.
+// The fake client returns the JSON patch error, but the API server only returns a generic 422 Unprocessable Entity
+// status without it, which is also used for validation errors. In that case, the test operations of the patch are
+// checked against the current cluster, so the result doesn't depend on the wording of the API server's error.
+func (t *Tools) isStalePatch(ctx context.Context, log *zap.Logger, namespace, cluster string, patchBytes []byte, err error) bool {
+	if errors.Is(err, jsonpatch.ErrTestFailed) {
+		return true
+	}
+	if !apierrors.IsInvalid(err) {
+		return false
+	}
+
+	current, _, getErr := t.getProvisioningCluster(ctx, log, namespace, cluster)
+	if getErr != nil {
+		log.Warn("failed to get provisioning cluster to check whether the patch was stale", zap.Error(getErr))
+		return false
+	}
+	return patchTestsFail(current, patchBytes)
+}
+
+// patchTestsFail returns whether any test operation of a JSON patch fails against obj.
+func patchTestsFail(obj *unstructured.Unstructured, patchBytes []byte) bool {
+	var ops []map[string]any
+	if err := json.Unmarshal(patchBytes, &ops); err != nil {
+		return false
+	}
+	tests := slices.DeleteFunc(ops, func(op map[string]any) bool { return op["op"] != "test" })
+	if len(tests) == 0 {
+		return false
+	}
+
+	testBytes, err := json.Marshal(tests)
+	if err != nil {
+		return false
+	}
+	patch, err := jsonpatch.DecodePatch(testBytes)
+	if err != nil {
+		return false
+	}
+	objBytes, err := obj.MarshalJSON()
+	if err != nil {
+		return false
+	}
+	_, err = patch.Apply(objBytes)
+	return errors.Is(err, jsonpatch.ErrTestFailed)
+}
+
+// relatedTool returns the name of a related tool to suggest in an error message.
+// The Plan variant is returned when the current tool is a Plan tool, so the suggestion matches the mode the tools are used in.
+func relatedTool(toolReq *mcp.CallToolRequest, name string) string {
+	if toolReq != nil && toolReq.Params != nil && strings.HasSuffix(toolReq.Params.Name, "Plan") {
+		return name + "Plan"
+	}
+	return name
+}
+
+// isAutoscaled returns whether a machine pool is managed by the cluster autoscaler,
+// which requires both a minimum and a maximum size.
+func isAutoscaled(pool provisioningV1.RKEMachinePool) bool {
+	return pool.AutoscalingMinSize != nil && pool.AutoscalingMaxSize != nil
+}
+
+// machinePoolQuantity returns the number of nodes in a machine pool.
+// Rancher creates a single node when the quantity isn't set.
+func machinePoolQuantity(pool provisioningV1.RKEMachinePool) int32 {
+	if pool.Quantity == nil {
+		return 1
+	}
+	return *pool.Quantity
+}
+
+// validateInt32 returns an error if value is outside the range of an int32, which is used for node counts in Kubernetes.
+// Values outside this range would wrap around when converted, possibly to a valid but unintended node count.
+func validateInt32(name string, value int) error {
+	if value < math.MinInt32 || value > math.MaxInt32 {
+		return fmt.Errorf("%s (%d) is out of range, it must be between %d and %d", name, value, math.MinInt32, math.MaxInt32)
+	}
+	return nil
 }
 
 // validateClusterName enforces the same naming validation that is done
