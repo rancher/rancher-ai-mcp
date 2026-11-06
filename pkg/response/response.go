@@ -190,3 +190,25 @@ func CreatePlanResponse(resources []PlanResource) (string, error) {
 
 	return string(bytes), nil
 }
+
+// NoChangesPlanType is the type of a plan response indicating that no resources need to be created, updated or deleted.
+const NoChangesPlanType = "no_changes"
+
+// NoChangesPlan is returned by a plan tool instead of a list of PlanResources when the requested
+// change is already in place, so that the agent can skip the confirmation and report the message.
+type NoChangesPlan struct {
+	// Type is always NoChangesPlanType.
+	Type string `json:"type"`
+	// Message explains why no changes are needed.
+	Message string `json:"message"`
+}
+
+// CreateNoChangesPlanResponse serializes a NoChangesPlan with the given message into a JSON string.
+func CreateNoChangesPlanResponse(message string) (string, error) {
+	bytes, err := json.Marshal(NoChangesPlan{Type: NoChangesPlanType, Message: message})
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal no changes plan response: %w", err)
+	}
+
+	return string(bytes), nil
+}

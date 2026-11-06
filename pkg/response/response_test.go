@@ -395,3 +395,10 @@ func TestCreateMcpResponseAny(t *testing.T) {
 		})
 	}
 }
+
+func TestCreateNoChangesPlanResponse(t *testing.T) {
+	result, err := CreateNoChangesPlanResponse("role 'project-member' is already granted, no changes needed")
+
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"type":"no_changes","message":"role 'project-member' is already granted, no changes needed"}`, result)
+}
