@@ -1,33 +1,27 @@
 package provisioning
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestCreateImportedClusterPlan(t *testing.T) {
 	tests := []struct {
 		name           string
-		fakeClientset  kubernetes.Interface
-		fakeDynClient  *dynamicfake.FakeDynamicClient
+		objects        []runtime.Object
 		params         createImportedClusterParams
 		expectedError  string
 		expectedResult string
 	}{
 		{
-			name:          "valid parameters",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
+			name:    "valid parameters",
+			objects: nil,
 			params: createImportedClusterParams{
 				Name:                     "test-cluster",
 				Description:              "A test cluster",
@@ -59,9 +53,8 @@ func TestCreateImportedClusterPlan(t *testing.T) {
 }`,
 		},
 		{
-			name:          "false version management",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
+			name:    "false version management",
+			objects: nil,
 			params: createImportedClusterParams{
 				Name:                     "test-cluster",
 				Description:              "A test cluster",
@@ -93,9 +86,8 @@ func TestCreateImportedClusterPlan(t *testing.T) {
 }`,
 		},
 		{
-			name:          "missing version management, uses default",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
+			name:    "missing version management, uses default",
+			objects: nil,
 			params: createImportedClusterParams{
 				Name:                     "test-cluster",
 				Description:              "A test cluster",
@@ -127,9 +119,8 @@ func TestCreateImportedClusterPlan(t *testing.T) {
 }`,
 		},
 		{
-			name:          "missing description",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
+			name:    "missing description",
+			objects: nil,
 			params: createImportedClusterParams{
 				Name:                     "test-cluster",
 				Description:              "",
@@ -161,9 +152,8 @@ func TestCreateImportedClusterPlan(t *testing.T) {
 }`,
 		},
 		{
-			name:          "missing cluster name",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClient(provisioningSchemes()),
+			name:    "missing cluster name",
+			objects: nil,
 			params: createImportedClusterParams{
 				Name:                     "",
 				Description:              "whats my name again",
@@ -176,21 +166,9 @@ func TestCreateImportedClusterPlan(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c := &client.Client{
-				ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
-					return test.fakeClientset, nil
-				},
-				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return test.fakeDynClient, nil
-				},
-			}
-			tools := Tools{client: c}
+			tools := newTestProvisioningTools(test.objects...)
 
-			result, _, err := tools.createImportedClusterPlan(context.Background(), &mcp.CallToolRequest{
-				Params: &mcp.CallToolParamsRaw{
-					Name: "createImportedClusterPlan",
-				},
-			}, test.params)
+			result, _, err := tools.createImportedClusterPlan(middleware.WithToken(t.Context(), testToken), newToolRequest("createImportedClusterPlan"), test.params)
 
 			if test.expectedError != "" {
 				require.Error(t, err)

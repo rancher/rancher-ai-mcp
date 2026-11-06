@@ -5,21 +5,15 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	provisioningV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 func TestAnalyzeCluster(t *testing.T) {
 	tests := map[string]struct {
-		params        inspectClusterParams
-		fakeClientset kubernetes.Interface
-		fakeDynClient *dynamicfake.FakeDynamicClient
+		params  inspectClusterParams
+		objects []runtime.Object
 		// used in the CallToolRequest
 		requestURL string
 		// used in the creation of the Tools.
@@ -32,16 +26,13 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
+			requestURL: testURL,
+			objects: []runtime.Object{newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
 				newCAPICluster("test-cluster", "fleet-default"),
 				newCAPIMachine("test-cluster-machine-1", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1"),
 				newCAPIMachineSet("test-cluster-machineset-1", "fleet-default", "test-cluster", 1, 1, "test-cluster-md-0"),
 				newCAPIMachineDeployment("test-cluster-md-0", "fleet-default", "test-cluster", 1, 1),
-				newManagementCluster("c-m-abc123", true),
-			),
+				newManagementCluster("c-m-abc123", true)},
 			expectedResult: `{
 				"llm": [
 					{
@@ -225,12 +216,9 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
-				newManagementCluster("c-m-abc123", true),
-			),
+			requestURL: testURL,
+			objects: []runtime.Object{newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
+				newManagementCluster("c-m-abc123", true)},
 			expectedResult: `{
 				"llm": [
 					{
@@ -289,13 +277,10 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
+			requestURL: testURL,
+			objects: []runtime.Object{newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
 				newCAPICluster("test-cluster", "fleet-default"),
-				newManagementCluster("c-m-abc123", true),
-			),
+				newManagementCluster("c-m-abc123", true)},
 			expectedResult: `{
 				"llm": [
 					{
@@ -384,12 +369,9 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "local",
 				Namespace: "",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningCluster("local", "fleet-local", "local"),
-				newManagementCluster("local", true),
-			),
+			requestURL: testURL,
+			objects: []runtime.Object{newProvisioningCluster("local", "fleet-local", "local"),
+				newManagementCluster("local", true)},
 			expectedResult: `{
 				"llm": [
 					{
@@ -449,8 +431,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				Namespace: "fleet-default",
 			},
 			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
+			objects:       nil,
 			expectedError: "provisioning cluster nonexistent-cluster not found in namespace fleet-default",
 		},
 		"analyze cluster with multiple machines and sets": {
@@ -458,10 +439,8 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "multi-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningCluster("multi-cluster", "fleet-default", "c-m-multi123"),
+			requestURL: testURL,
+			objects: []runtime.Object{newProvisioningCluster("multi-cluster", "fleet-default", "c-m-multi123"),
 				newManagementCluster("c-m-multi123", true),
 				newCAPICluster("multi-cluster", "fleet-default"),
 				newCAPIMachine("multi-cluster-machine-1", "fleet-default", "multi-cluster", "Running", "multi-cluster-machineset-1"),
@@ -470,8 +449,7 @@ func TestAnalyzeCluster(t *testing.T) {
 				newCAPIMachineSet("multi-cluster-machineset-1", "fleet-default", "multi-cluster", 2, 2, "multi-cluster-md-0"),
 				newCAPIMachineSet("multi-cluster-machineset-2", "fleet-default", "multi-cluster", 1, 0, "multi-cluster-md-1"),
 				newCAPIMachineDeployment("multi-cluster-md-0", "fleet-default", "multi-cluster", 2, 2),
-				newCAPIMachineDeployment("multi-cluster-md-1", "fleet-default", "multi-cluster", 1, 0),
-			),
+				newCAPIMachineDeployment("multi-cluster-md-1", "fleet-default", "multi-cluster", 1, 0)},
 			expectedResult: `{
 				"llm": [
 					{
@@ -782,12 +760,9 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "unhealthy-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningCluster("unhealthy-cluster", "fleet-default", "c-m-unhealthy"),
-				newManagementCluster("c-m-unhealthy", false),
-			),
+			requestURL: testURL,
+			objects: []runtime.Object{newProvisioningCluster("unhealthy-cluster", "fleet-default", "c-m-unhealthy"),
+				newManagementCluster("c-m-unhealthy", false)},
 			expectedResult: `{
 				"llm": [
 					{
@@ -846,19 +821,16 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "rke-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("rke-cluster", "fleet-default", "c-m-rke123", []provisioningV1.RKEMachinePool{
-					newMachinePool("pool1", "rke-cluster-pool1-config", "Amazonec2Config", 3),
-				}),
+			requestURL: testURL,
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("rke-cluster", "fleet-default", "c-m-rke123", []provisioningV1.RKEMachinePool{
+				newMachinePool("pool1", "rke-cluster-pool1-config", "Amazonec2Config", 3),
+			}),
 				newCAPICluster("rke-cluster", "fleet-default"),
 				newCAPIMachine("rke-cluster-machine-1", "fleet-default", "rke-cluster", "Running", "rke-cluster-machineset-1"),
 				newCAPIMachineSet("rke-cluster-machineset-1", "fleet-default", "rke-cluster", 1, 1, "rke-cluster-md-0"),
 				newCAPIMachineDeployment("rke-cluster-md-0", "fleet-default", "rke-cluster", 1, 1),
 				newMachineConfig("rke-cluster-pool1-config", "fleet-default", "Amazonec2Config"),
-				newManagementCluster("c-m-rke123", true),
-			),
+				newManagementCluster("c-m-rke123", true)},
 			expectedResult: `{
 				"llm": [
 					{
@@ -1095,13 +1067,10 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
+			requestURL: testURL,
+			objects: []runtime.Object{newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
 				newManagementCluster("c-m-abc123", true),
-				newCAPICluster("test-cluster", "fleet-default"),
-			),
+				newCAPICluster("test-cluster", "fleet-default")},
 			expectedResult: `{
 				"llm": [
 					{
@@ -1190,12 +1159,9 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "minimal-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningCluster("minimal-cluster", "fleet-default", "c-m-minimal"),
-				newManagementCluster("c-m-minimal", true),
-			),
+			requestURL: testURL,
+			objects: []runtime.Object{newProvisioningCluster("minimal-cluster", "fleet-default", "c-m-minimal"),
+				newManagementCluster("c-m-minimal", true)},
 			expectedResult: `{
 				"llm": [
 					{
@@ -1254,16 +1220,13 @@ func TestAnalyzeCluster(t *testing.T) {
 				Cluster:   "single-machine-cluster",
 				Namespace: "fleet-default",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningCluster("single-machine-cluster", "fleet-default", "c-m-single"),
+			requestURL: testURL,
+			objects: []runtime.Object{newProvisioningCluster("single-machine-cluster", "fleet-default", "c-m-single"),
 				newManagementCluster("c-m-single", true),
 				newCAPICluster("single-machine-cluster", "fleet-default"),
 				newCAPIMachine("single-machine-cluster-machine-1", "fleet-default", "single-machine-cluster", "Running", "single-machine-cluster-machineset-1"),
 				newCAPIMachineSet("single-machine-cluster-machineset-1", "fleet-default", "single-machine-cluster", 1, 1, "single-machine-cluster-md-0"),
-				newCAPIMachineDeployment("single-machine-cluster-md-0", "fleet-default", "single-machine-cluster", 1, 1),
-			),
+				newCAPIMachineDeployment("single-machine-cluster-md-0", "fleet-default", "single-machine-cluster", 1, 1)},
 			expectedResult: `{
 				"llm": [
 					{
@@ -1446,19 +1409,8 @@ func TestAnalyzeCluster(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			c := &client.Client{
-				ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
-					return tt.fakeClientset, nil
-				},
-				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return tt.fakeDynClient, nil
-				},
-			}
-			tools := NewTools(test.WrapClient(c, testToken), false)
-			req := &mcp.CallToolRequest{}
-			req.Params = &mcp.CallToolParamsRaw{Name: "analyze-cluster"}
-
-			result, _, err := tools.analyzeCluster(middleware.WithToken(t.Context(), testToken), req, tt.params)
+			tools := newTestProvisioningTools(tt.objects...)
+			result, _, err := tools.analyzeCluster(middleware.WithToken(t.Context(), testToken), newToolRequest("analyze-cluster"), tt.params)
 
 			if tt.expectedError != "" {
 				assert.ErrorContains(t, err, tt.expectedError)

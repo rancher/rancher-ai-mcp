@@ -5,14 +5,9 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"k8s.io/apimachinery/pkg/runtime"
 )
 
 var fakeCAPIMachine = &unstructured.Unstructured{
@@ -133,12 +128,10 @@ var fakeCAPIMachineDeployment = &unstructured.Unstructured{
 }
 
 func TestAnalyzeClusterMachines(t *testing.T) {
-	fakeToken := "fakeToken"
 
 	tests := map[string]struct {
 		params         inspectClusterMachinesParams
-		fakeClientset  kubernetes.Interface
-		fakeDynClient  *dynamicfake.FakeDynamicClient
+		objects        []runtime.Object
 		expectedResult string
 		expectedError  string
 	}{
@@ -147,9 +140,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				fakeCAPIMachine, fakeCAPIMachine2, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
+			objects: []runtime.Object{fakeCAPIMachine, fakeCAPIMachine2, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
 			expectedResult: `{
 				"llm": [
 					{
@@ -295,8 +286,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "empty-cluster",
 				Namespace: "fleet-default",
 			},
-			fakeClientset:  newFakeClientSet(),
-			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
+			objects:        nil,
 			expectedResult: `{"llm":"no resources found"}`,
 		},
 		"analyze cluster with default namespace": {
@@ -304,9 +294,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "",
 			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
+			objects: []runtime.Object{fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
 			expectedResult: `{
 				"llm": [
 					{
@@ -420,9 +408,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				fakeCAPIMachine),
+			objects: []runtime.Object{fakeCAPIMachine},
 			expectedResult: `{
 				"llm": [
 					{
@@ -473,30 +459,15 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "empty-cluster",
 				Namespace: "fleet-default",
 			},
-			fakeClientset:  newFakeClientSet(),
-			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
+			objects:        nil,
 			expectedResult: `{"llm":"no resources found"}`,
 		},
 	}
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			c := &client.Client{
-				ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
-					return tt.fakeClientset, nil
-				},
-				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return tt.fakeDynClient, nil
-				},
-			}
-
-			tools := NewTools(test.WrapClient(c, fakeToken), false)
-			req := &mcp.CallToolRequest{}
-			req.Params = &mcp.CallToolParamsRaw{
-				Name: "analyze-cluster-machines",
-			}
-
-			result, _, err := tools.analyzeClusterMachines(middleware.WithToken(t.Context(), fakeToken), req, tt.params)
+			tools := newTestProvisioningTools(tt.objects...)
+			result, _, err := tools.analyzeClusterMachines(middleware.WithToken(t.Context(), testToken), newToolRequest("analyze-cluster-machines"), tt.params)
 
 			if tt.expectedError != "" {
 				assert.ErrorContains(t, err, tt.expectedError)
