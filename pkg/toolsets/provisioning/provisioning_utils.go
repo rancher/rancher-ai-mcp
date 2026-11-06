@@ -32,6 +32,7 @@ const (
 	LocalCluster                     = "local"
 	DefaultClusterResourcesNamespace = "fleet-default"
 	LocalClusterResourcesNamespace   = "fleet-local"
+	DefaultRancherResourcesNamespace = "cattle-system"
 )
 
 var (
@@ -43,9 +44,48 @@ type getCAPIMachineResourcesParams struct {
 	namespace     string
 	targetCluster string
 	machineName   string
+	// kinds restricts the returned resources to the selected types. nil returns all types.
+	kinds *capiResourceKinds
 }
 
+type capiResourceKinds struct {
+	machines           bool
+	machineSets        bool
+	machineDeployments bool
+}
+
+func (p getCAPIMachineResourcesParams) wantsMachines() bool {
+	return p.kinds == nil || p.kinds.machines
+}
+
+func (p getCAPIMachineResourcesParams) wantsMachineSets() bool {
+	return p.kinds == nil || p.kinds.machineSets
+}
+
+func (p getCAPIMachineResourcesParams) wantsMachineDeployments() bool {
+	return p.kinds == nil || p.kinds.machineDeployments
+}
+
+// getCAPIMachineResourcesByName returns the named CAPI machine and its owning MachineSet and MachineDeployment.
+// Resource types not selected in params.kinds are returned as nil.
 func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, log *zap.Logger, params getCAPIMachineResourcesParams) (*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.Unstructured, error) {
+	machine, machineSet, machineDeployment, err := t.walkCAPIMachineOwners(ctx, log, params)
+	if !params.wantsMachines() {
+		machine = nil
+	}
+	if !params.wantsMachineSets() {
+		machineSet = nil
+	}
+	if !params.wantsMachineDeployments() {
+		machineDeployment = nil
+	}
+	return machine, machineSet, machineDeployment, err
+}
+
+// walkCAPIMachineOwners fetches the named machine and follows its owner references only as far as
+// needed to reach the deepest selected resource type. Parents are always fetched when a descendant
+// type is selected, since the owner chain is the only way to locate them.
+func (t *Tools) walkCAPIMachineOwners(ctx context.Context, log *zap.Logger, params getCAPIMachineResourcesParams) (*unstructured.Unstructured, *unstructured.Unstructured, *unstructured.Unstructured, error) {
 	if params.namespace == "" {
 		params.namespace = DefaultClusterResourcesNamespace
 	}
@@ -80,6 +120,10 @@ func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, log *zap.Logg
 	log.Debug("found CAPI machine",
 		zap.String("namespace", params.namespace),
 		zap.String("machine", params.machineName))
+
+	if !params.wantsMachineSets() && !params.wantsMachineDeployments() {
+		return capiMachine, nil, nil, nil
+	}
 
 	var capiMachineSet, capiMachineDeployment *unstructured.Unstructured
 	foundSetOwner := false
@@ -122,6 +166,10 @@ func (t *Tools) getCAPIMachineResourcesByName(ctx context.Context, log *zap.Logg
 		zap.String("namespace", params.namespace),
 		zap.String("machine", params.machineName),
 		zap.String("machineSet", capiMachineSet.GetName()))
+
+	if !params.wantsMachineDeployments() {
+		return capiMachine, capiMachineSet, nil, nil
+	}
 
 	foundDeploymentOwner := false
 	for _, ownerRef := range capiMachineSet.GetOwnerReferences() {
@@ -176,7 +224,7 @@ func (t *Tools) getAllCAPIMachineResources(ctx context.Context, log *zap.Logger,
 		params.namespace = DefaultClusterResourcesNamespace
 	}
 
-	log.Debug("fetching all CAPI machine resources",
+	log.Debug("fetching CAPI machine resources",
 		zap.String("namespace", params.namespace),
 		zap.String("targetCluster", params.targetCluster))
 
@@ -194,94 +242,61 @@ func (t *Tools) getAllCAPIMachineResources(ctx context.Context, log *zap.Logger,
 
 	var capiMachines, capiMachineSets, capiMachineDeployments []*unstructured.Unstructured
 
-	log.Debug("listing CAPI machine deployments",
-		zap.String("namespace", params.namespace),
-		zap.String("targetCluster", params.targetCluster))
-	deployments, err := t.client.GetResourcesAtAnyAPIVersion(ctx, client.ListParams{
-		Cluster:       LocalCluster,
-		Kind:          converter.CAPIMachineDeploymentResourceKind,
-		Namespace:     params.namespace,
-		LabelSelector: clusterSelector.String(),
-		Token:         middleware.Token(ctx),
-	})
-	if err != nil && !apierrors.IsNotFound(err) {
-		log.Error("failed to list CAPI machine deployments",
-			zap.String("namespace", params.namespace),
-			zap.String("targetCluster", params.targetCluster),
-			zap.Error(err))
-		return nil, nil, nil, fmt.Errorf("failed to list machine deployments: %w", err)
-	}
-	if err == nil {
-		capiMachineDeployments = deployments
-		log.Debug("found CAPI machine deployments",
-			zap.String("namespace", params.namespace),
-			zap.String("targetCluster", params.targetCluster),
-			zap.Int("count", len(capiMachineDeployments)))
-	} else {
-		log.Debug("no CAPI machine deployments found",
-			zap.String("namespace", params.namespace),
-			zap.String("targetCluster", params.targetCluster))
+	if params.wantsMachineDeployments() {
+		capiMachineDeployments, err = t.listCAPIResources(ctx, log, params, clusterSelector.String(), converter.CAPIMachineDeploymentResourceKind, "machine deployments")
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
-	log.Debug("listing CAPI machine sets",
-		zap.String("namespace", params.namespace),
-		zap.String("targetCluster", params.targetCluster))
-	machineSets, err := t.client.GetResourcesAtAnyAPIVersion(ctx, client.ListParams{
-		Cluster:       LocalCluster,
-		Kind:          converter.CAPIMachineSetResourceKind,
-		Namespace:     params.namespace,
-		LabelSelector: clusterSelector.String(),
-		Token:         middleware.Token(ctx),
-	})
-	if err != nil && !apierrors.IsNotFound(err) {
-		log.Error("failed to list CAPI machine sets",
-			zap.String("namespace", params.namespace),
-			zap.String("targetCluster", params.targetCluster),
-			zap.Error(err))
-		return nil, nil, nil, fmt.Errorf("failed to list machine sets: %w", err)
-	}
-	if err == nil {
-		capiMachineSets = machineSets
-		log.Debug("found CAPI machine sets",
-			zap.String("namespace", params.namespace),
-			zap.String("targetCluster", params.targetCluster),
-			zap.Int("count", len(capiMachineSets)))
-	} else {
-		log.Debug("no CAPI machine sets found",
-			zap.String("namespace", params.namespace),
-			zap.String("targetCluster", params.targetCluster))
+	if params.wantsMachineSets() {
+		capiMachineSets, err = t.listCAPIResources(ctx, log, params, clusterSelector.String(), converter.CAPIMachineSetResourceKind, "machine sets")
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
-	log.Debug("listing CAPI machines",
-		zap.String("namespace", params.namespace),
-		zap.String("targetCluster", params.targetCluster))
-	machines, err := t.client.GetResourcesAtAnyAPIVersion(ctx, client.ListParams{
-		Cluster:       LocalCluster,
-		Kind:          converter.CAPIMachineResourceKind,
-		Namespace:     params.namespace,
-		LabelSelector: clusterSelector.String(),
-		Token:         middleware.Token(ctx),
-	})
-	if err != nil && !apierrors.IsNotFound(err) {
-		log.Error("failed to list CAPI machines",
-			zap.String("namespace", params.namespace),
-			zap.String("targetCluster", params.targetCluster),
-			zap.Error(err))
-		return nil, nil, nil, fmt.Errorf("failed to list machines: %w", err)
-	}
-	if err == nil {
-		capiMachines = machines
-		log.Debug("found CAPI machines",
-			zap.String("namespace", params.namespace),
-			zap.String("targetCluster", params.targetCluster),
-			zap.Int("count", len(capiMachines)))
-	} else {
-		log.Debug("no CAPI machines found",
-			zap.String("namespace", params.namespace),
-			zap.String("targetCluster", params.targetCluster))
+	if params.wantsMachines() {
+		capiMachines, err = t.listCAPIResources(ctx, log, params, clusterSelector.String(), converter.CAPIMachineResourceKind, "machines")
+		if err != nil {
+			return nil, nil, nil, err
+		}
 	}
 
 	return capiMachines, capiMachineSets, capiMachineDeployments, nil
+}
+
+// listCAPIResources lists CAPI resources of the given kind for the target cluster. A NotFound error is treated as an empty result.
+func (t *Tools) listCAPIResources(ctx context.Context, log *zap.Logger, params getCAPIMachineResourcesParams, labelSelector, kind, label string) ([]*unstructured.Unstructured, error) {
+	log.Debug("listing CAPI "+label,
+		zap.String("namespace", params.namespace),
+		zap.String("targetCluster", params.targetCluster))
+	resources, err := t.client.GetResourcesAtAnyAPIVersion(ctx, client.ListParams{
+		Cluster:       LocalCluster,
+		Kind:          kind,
+		Namespace:     params.namespace,
+		LabelSelector: labelSelector,
+		Token:         middleware.Token(ctx),
+	})
+	if apierrors.IsNotFound(err) {
+		log.Debug("no CAPI "+label+" found",
+			zap.String("namespace", params.namespace),
+			zap.String("targetCluster", params.targetCluster))
+		return nil, nil
+	}
+	if err != nil {
+		log.Error("failed to list CAPI "+label,
+			zap.String("namespace", params.namespace),
+			zap.String("targetCluster", params.targetCluster),
+			zap.Error(err))
+		return nil, fmt.Errorf("failed to list %s: %w", label, err)
+	}
+
+	log.Debug("found CAPI "+label,
+		zap.String("namespace", params.namespace),
+		zap.String("targetCluster", params.targetCluster),
+		zap.Int("count", len(resources)))
+	return resources, nil
 }
 
 func (t *Tools) getProvisioningCluster(ctx context.Context, log *zap.Logger, ns, clusterName string) (*unstructured.Unstructured, provisioningV1.Cluster, error) {

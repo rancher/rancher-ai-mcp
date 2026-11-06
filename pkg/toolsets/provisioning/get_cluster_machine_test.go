@@ -28,8 +28,9 @@ func TestGetClusterMachine(t *testing.T) {
 	}{
 		"get specific machine by name": {
 			params: getClusterMachineParams{
-				Cluster:     "test-cluster",
-				MachineName: "test-cluster-machine-1",
+				Cluster:        "test-cluster",
+				MachineName:    "test-cluster-machine-1",
+				IncludeMachine: true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -84,8 +85,9 @@ func TestGetClusterMachine(t *testing.T) {
 		},
 		"get machine that doesn't exist returns empty": {
 			params: getClusterMachineParams{
-				Cluster:     "test-cluster",
-				MachineName: "nonexistent-machine",
+				Cluster:        "test-cluster",
+				MachineName:    "nonexistent-machine",
+				IncludeMachine: true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -96,8 +98,9 @@ func TestGetClusterMachine(t *testing.T) {
 		},
 		"get machines from cluster with no machines": {
 			params: getClusterMachineParams{
-				Cluster:     "empty-cluster",
-				MachineName: "",
+				Cluster:        "empty-cluster",
+				MachineName:    "",
+				IncludeMachine: true,
 			},
 			requestURL:     testURL,
 			fakeClientset:  newFakeClientSet(),
@@ -106,8 +109,9 @@ func TestGetClusterMachine(t *testing.T) {
 		},
 		"get machine without owner references": {
 			params: getClusterMachineParams{
-				Cluster:     "standalone-cluster",
-				MachineName: "standalone-machine",
+				Cluster:        "standalone-cluster",
+				MachineName:    "standalone-machine",
+				IncludeMachine: true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -144,8 +148,11 @@ func TestGetClusterMachine(t *testing.T) {
 		},
 		"get machine with machine set": {
 			params: getClusterMachineParams{
-				Cluster:     "test-cluster",
-				MachineName: "test-cluster-machine-3",
+				Cluster:                  "test-cluster",
+				MachineName:              "test-cluster-machine-3",
+				IncludeMachineDeployment: true,
+				IncludeMachineSet:        true,
+				IncludeMachine:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -219,8 +226,11 @@ func TestGetClusterMachine(t *testing.T) {
 		},
 		"get machine with machine set and machine deployment": {
 			params: getClusterMachineParams{
-				Cluster:     "test-cluster",
-				MachineName: "test-cluster-machine-4",
+				Cluster:                  "test-cluster",
+				MachineName:              "test-cluster-machine-4",
+				IncludeMachineDeployment: true,
+				IncludeMachineSet:        true,
+				IncludeMachine:           true,
 			},
 			requestURL:    testURL,
 			fakeClientset: newFakeClientSet(),
@@ -333,13 +343,214 @@ func TestGetClusterMachine(t *testing.T) {
 		},
 		"get machines from cluster when the tool is configured with a rancher URL": {
 			params: getClusterMachineParams{
-				Cluster:     "empty-cluster",
-				MachineName: "",
+				Cluster:        "empty-cluster",
+				MachineName:    "",
+				IncludeMachine: true,
 			},
 			rancherURL:     testURL,
 			fakeClientset:  newFakeClientSet(),
 			fakeDynClient:  dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds()),
 			expectedResult: `{"llm":"no resources found"}`,
+		},
+		"get only the owning machine deployment": {
+			params: getClusterMachineParams{
+				Cluster:                  "test-cluster",
+				MachineName:              "test-cluster-machine-4",
+				IncludeMachineDeployment: true,
+			},
+			requestURL:    testURL,
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
+				newCAPIMachine("test-cluster-machine-4", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-3"),
+				newCAPIMachineSet("test-cluster-machineset-3", "fleet-default", "test-cluster", 5, 5, "test-cluster-machinedeployment-1"),
+				newCAPIMachineDeployment("test-cluster-machinedeployment-1", "fleet-default", "test-cluster", 5, 5),
+			),
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "cluster.x-k8s.io/v1beta1",
+						"kind": "MachineDeployment",
+						"metadata": {
+							"labels": {
+								"cluster.x-k8s.io/cluster-name": "test-cluster"
+							},
+							"name": "test-cluster-machinedeployment-1",
+							"namespace": "fleet-default"
+						},
+						"spec": {
+							"replicas": 5,
+							"selector": {
+								"matchLabels": {
+									"cluster.x-k8s.io/cluster-name": "test-cluster"
+								}
+							}
+						},
+						"status": {
+							"readyReplicas": 5,
+							"replicas": 5
+						}
+					}
+				],
+				"uiContext": [
+					{
+						"cluster": "local",
+						"kind": "MachineDeployment",
+						"name": "test-cluster-machinedeployment-1",
+						"namespace": "fleet-default",
+						"type": "cluster.x-k8s.io.machinedeployment"
+					}
+				]
+			}`,
+		},
+		"get only the owning machine set": {
+			params: getClusterMachineParams{
+				Cluster:           "test-cluster",
+				MachineName:       "test-cluster-machine-4",
+				IncludeMachineSet: true,
+			},
+			requestURL:    testURL,
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
+				newCAPIMachine("test-cluster-machine-4", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-3"),
+				newCAPIMachineSet("test-cluster-machineset-3", "fleet-default", "test-cluster", 5, 5, "test-cluster-machinedeployment-1"),
+				newCAPIMachineDeployment("test-cluster-machinedeployment-1", "fleet-default", "test-cluster", 5, 5),
+			),
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "cluster.x-k8s.io/v1beta1",
+						"kind": "MachineSet",
+						"metadata": {
+							"labels": {
+								"cluster.x-k8s.io/cluster-name": "test-cluster"
+							},
+							"name": "test-cluster-machineset-3",
+							"namespace": "fleet-default",
+							"ownerReferences": [
+								{
+									"apiVersion": "cluster.x-k8s.io/v1beta1",
+									"controller": true,
+									"kind": "MachineDeployment",
+									"name": "test-cluster-machinedeployment-1"
+								}
+							]
+						},
+						"spec": {
+							"replicas": 5
+						},
+						"status": {
+							"readyReplicas": 5,
+							"replicas": 5
+						}
+					}
+				],
+				"uiContext": [
+					{
+						"cluster": "local",
+						"kind": "MachineSet",
+						"name": "test-cluster-machineset-3",
+						"namespace": "fleet-default",
+						"type": "cluster.x-k8s.io.machineset"
+					}
+				]
+			}`,
+		},
+		"get machine and machine deployment without machine set": {
+			params: getClusterMachineParams{
+				Cluster:                  "test-cluster",
+				MachineName:              "test-cluster-machine-4",
+				IncludeMachineDeployment: true,
+				IncludeMachine:           true,
+			},
+			requestURL:    testURL,
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
+				newCAPIMachine("test-cluster-machine-4", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-3"),
+				newCAPIMachineSet("test-cluster-machineset-3", "fleet-default", "test-cluster", 5, 5, "test-cluster-machinedeployment-1"),
+				newCAPIMachineDeployment("test-cluster-machinedeployment-1", "fleet-default", "test-cluster", 5, 5),
+			),
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "cluster.x-k8s.io/v1beta1",
+						"kind": "Machine",
+						"metadata": {
+							"labels": {
+								"cluster.x-k8s.io/cluster-name": "test-cluster"
+							},
+							"name": "test-cluster-machine-4",
+							"namespace": "fleet-default",
+							"ownerReferences": [
+								{
+									"apiVersion": "cluster.x-k8s.io/v1beta1",
+									"controller": true,
+									"kind": "MachineSet",
+									"name": "test-cluster-machineset-3"
+								}
+							]
+						},
+						"spec": {
+							"clusterName": "test-cluster"
+						},
+						"status": {
+							"phase": "Running"
+						}
+					},
+					{
+						"apiVersion": "cluster.x-k8s.io/v1beta1",
+						"kind": "MachineDeployment",
+						"metadata": {
+							"labels": {
+								"cluster.x-k8s.io/cluster-name": "test-cluster"
+							},
+							"name": "test-cluster-machinedeployment-1",
+							"namespace": "fleet-default"
+						},
+						"spec": {
+							"replicas": 5,
+							"selector": {
+								"matchLabels": {
+									"cluster.x-k8s.io/cluster-name": "test-cluster"
+								}
+							}
+						},
+						"status": {
+							"readyReplicas": 5,
+							"replicas": 5
+						}
+					}
+				],
+				"uiContext": [
+					{
+						"cluster": "local",
+						"kind": "Machine",
+						"name": "test-cluster-machine-4",
+						"namespace": "fleet-default",
+						"type": "cluster.x-k8s.io.machine"
+					},
+					{
+						"cluster": "local",
+						"kind": "MachineDeployment",
+						"name": "test-cluster-machinedeployment-1",
+						"namespace": "fleet-default",
+						"type": "cluster.x-k8s.io.machinedeployment"
+					}
+				]
+			}`,
+		},
+		"get machine with no resource types selected": {
+			params: getClusterMachineParams{
+				Cluster:     "test-cluster",
+				MachineName: "test-cluster-machine-4",
+			},
+			requestURL:    testURL,
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
+				newCAPIMachine("test-cluster-machine-4", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-3"),
+				newCAPIMachineSet("test-cluster-machineset-3", "fleet-default", "test-cluster", 5, 5, "test-cluster-machinedeployment-1"),
+				newCAPIMachineDeployment("test-cluster-machinedeployment-1", "fleet-default", "test-cluster", 5, 5),
+			),
+			expectedError: "at least one of includeMachineDeployment, includeMachineSet, or includeMachine must be true",
 		},
 	}
 

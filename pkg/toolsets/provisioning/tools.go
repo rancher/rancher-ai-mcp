@@ -2,12 +2,14 @@ package provisioning
 
 import (
 	"context"
+	"os"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 )
 
 const (
@@ -22,20 +24,23 @@ type toolsClient interface {
 	GetResourceByGVR(ctx context.Context, params client.GetParams, gvr schema.GroupVersionResource) (*unstructured.Unstructured, error)
 	GetResources(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
 	GetResourceInterface(ctx context.Context, token string, namespace string, cluster string, gvr schema.GroupVersionResource) (dynamic.ResourceInterface, error)
+	CreateClientSet(ctx context.Context, token string, cluster string) (kubernetes.Interface, error)
 	RancherURL() string
 }
 
 // Tools contains tools for accessing provisioning information.
 type Tools struct {
-	client   toolsClient
-	ReadOnly bool
+	client       toolsClient
+	toolboxImage string
+	ReadOnly     bool
 }
 
 // NewTools creates and returns a new Tools instance.
 func NewTools(client toolsClient, readOnly bool) *Tools {
 	return &Tools{
-		client:   client,
-		ReadOnly: readOnly,
+		client:       client,
+		ReadOnly:     readOnly,
+		toolboxImage: os.Getenv("TOOLBOX_IMAGE"),
 	}
 }
 
@@ -45,8 +50,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: ToolsSet,
 		},
-		Description: `Gets a cluster's complete configuration including provisioning and management clusters, the CAPI cluster, CAPI machines, and machine pool configs.
-This should be used when a complete overview of the clusters current state and its configuration is required.`},
+		Description: `Returns cluster configuration and status, including provisioning and management clusters, the CAPI cluster, and machine-pool configs. Optionally include CAPI MachineDeployments, MachineSets, and/or Machines with the corresponding include flags. Use for a cluster-wide overview. Use analyzeClusterMachines or getClusterMachine for focused machine inspection.`},
 		t.analyzeCluster)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -54,8 +58,7 @@ This should be used when a complete overview of the clusters current state and i
 		Meta: map[string]any{
 			toolsSetAnn: ToolsSet,
 		},
-		Description: `Gets all Machine related resources for a cluster including Machines, MachineSets, and MachineDeployments.
-This should be used when a summary or overview of just the existing machine resources is required.`},
+		Description: `Lists selected CAPI MachineDeployments, MachineSets, and/or Machines for a cluster. Set at least one include flag. Use when the machine name is unknown or an issue spans multiple machines; use getClusterMachine for a known machine.`},
 		t.analyzeClusterMachines)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -63,8 +66,7 @@ This should be used when a summary or overview of just the existing machine reso
 		Meta: map[string]any{
 			toolsSetAnn: ToolsSet,
 		},
-		Description: `Gets a specific machine and its parent MachineSet and MachineDeployment.
-This should be used when detailed information about a specific machine is required.`},
+		Description: `Gets a specific CAPI machine and optionally its owning MachineSet and MachineDeployment. Set at least one include flag. Use when the machine name is known. Use analyzeClusterMachines for issues spanning multiple machines.`},
 		t.getClusterMachine)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -97,6 +99,30 @@ This should only be used when information about the supported rke2 and k3s is ne
 		t.listSupportedKubernetesVersions)
 
 	if !t.ReadOnly {
+		if t.toolboxImage != "" {
+			// while investigateFailedPlanApplication doesn't create resources
+			// permanently, it needs to create a short-lived job to scrape
+			// downstream logs.
+			mcp.AddTool(mcpServer, &mcp.Tool{
+				Name: "investigateFailedProvisioningPlanApplication",
+				Meta: map[string]any{
+					toolsSetAnn: ToolsSet,
+				},
+				Description: `Diagnoses a failing machine plan on a single node. Deploys a short-lived privileged job that reads the node's rancher-system-agent journald logs.
+Only call this after a plan failure has been observed on that node.
+Returns log excerpts and plan fields (checksum, failure-count, last-apply-time, max-failures, plan-revision, plan-state, probe-statuses), not the full plan.
+Not available for the local cluster or non-CAPI clusters (aks, eks, gke, k3k, etc.). Do not show the logs unless explicitly asked.`},
+				t.investigateFailedPlanApplication)
+
+			mcp.AddTool(mcpServer, &mcp.Tool{
+				Name: "investigateFailedProvisioningPlanApplicationPlan",
+				Meta: map[string]any{
+					toolsSetAnn: ToolsSet,
+				},
+				Description: `Dry-run of investigateFailedProvisioningPlanApplication. Returns the JSON of the privileged log-gathering job that would be deployed, without deploying or running it.`},
+				t.investigateFailedPlanApplicationPlan)
+		}
+
 		mcp.AddTool(mcpServer, &mcp.Tool{
 			Name: "scaleClusterNodePool",
 			Meta: map[string]any{
