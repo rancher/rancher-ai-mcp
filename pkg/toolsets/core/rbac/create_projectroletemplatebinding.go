@@ -52,7 +52,9 @@ func (t *Tools) createProjectRoleTemplateBinding(ctx context.Context, toolReq *m
 		return nil, nil, err
 	}
 	if binding.existing != nil {
-		return existingBindingResult(binding.existing), nil, nil
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: existingBindingMessage(binding.existing)}},
+		}, nil, nil
 	}
 
 	resourceInterface, err := t.client.GetResourceInterface(ctx, middleware.Token(ctx), binding.prtb.GetNamespace(), "local", converter.K8sKindsToGVRs["projectroletemplatebinding"])
@@ -78,7 +80,8 @@ func (t *Tools) createProjectRoleTemplateBinding(ctx context.Context, toolReq *m
 }
 
 // createProjectRoleTemplateBindingPlan plans granting a user or group a role in a project.
-// It returns the JSON representation of the PRTB to be created without actually creating it.
+// It returns the JSON representation of the PRTB to be created without actually creating it,
+// or a no_changes plan if a PRTB already grants the requested access.
 func (t *Tools) createProjectRoleTemplateBindingPlan(ctx context.Context, toolReq *mcp.CallToolRequest, params createPRTBParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("createProjectRoleTemplateBindingPlan called", zap.String("cluster", params.Cluster), zap.String("project", params.Project))
 
@@ -88,7 +91,15 @@ func (t *Tools) createProjectRoleTemplateBindingPlan(ctx context.Context, toolRe
 		return nil, nil, err
 	}
 	if binding.existing != nil {
-		return existingBindingResult(binding.existing), nil, nil
+		mcpResponse, err := response.CreateNoChangesPlanResponse(existingBindingMessage(binding.existing))
+		if err != nil {
+			zap.L().Error("failed to create no changes plan response", zapCreateProjectRoleTemplateBindingPlan, zap.Error(err))
+			return nil, nil, err
+		}
+
+		return &mcp.CallToolResult{
+			Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
+		}, nil, nil
 	}
 
 	createResource := response.NewCreateResourceInput(binding.prtb, "local")
@@ -272,13 +283,10 @@ func prtbName(projectName, roleTemplateName, subject string) string {
 	return "prtb-" + hex.EncodeToString(sum[:])[:12]
 }
 
-func existingBindingResult(prtb *unstructured.Unstructured) *mcp.CallToolResult {
+// existingBindingMessage describes the existing PRTB that already grants the requested access.
+func existingBindingMessage(prtb *unstructured.Unstructured) string {
 	roleTemplateName, _, _ := unstructured.NestedString(prtb.Object, "roleTemplateName")
 	projectName, _, _ := unstructured.NestedString(prtb.Object, "projectName")
-	return &mcp.CallToolResult{
-		Content: []mcp.Content{&mcp.TextContent{
-			Text: fmt.Sprintf("role '%s' is already granted in project '%s' by project role template binding '%s/%s', no changes needed",
-				roleTemplateName, projectName, prtb.GetNamespace(), prtb.GetName()),
-		}},
-	}
+	return fmt.Sprintf("role '%s' is already granted in project '%s' by project role template binding '%s/%s', no changes needed",
+		roleTemplateName, projectName, prtb.GetNamespace(), prtb.GetName())
 }
