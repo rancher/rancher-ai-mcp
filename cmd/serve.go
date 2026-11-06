@@ -13,6 +13,7 @@ import (
 	"github.com/rancher/dynamiclistener/server"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/keepalivegate"
 	"github.com/rancher/rancher-ai-mcp/pkg/toolsets"
 	"github.com/rancher/wrangler/v3/pkg/generated/controllers/core"
 	"github.com/spf13/cobra"
@@ -64,6 +65,17 @@ func init() {
 
 func runServe(cmd *cobra.Command, args []string) error {
 	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "rancher mcp server", Version: "v1.0.0"}, nil)
+
+	// Install the elicitation-gated keepalive: while a confirmation dialog
+	// is open for a session, the gate pings the client every 30s on the
+	// real session, holding that POST's SSE response stream through
+	// proxy/ingress idle timeouts. When no dialog is open, no pings leave
+	// the server at all — so clients that never open the standalone SSE
+	// stream (and cannot pong) can never be disconnected for a missed pong.
+	// We deliberately do NOT use the SDK's ServerOptions.KeepAlive: its
+	// per-session pings are unconditional and it closes the session after
+	// one missed pong, which is fatal for POST-only clients.
+	mcpServer.AddSendingMiddleware(keepalivegate.Middleware())
 
 	var (
 		c     *client.Client
