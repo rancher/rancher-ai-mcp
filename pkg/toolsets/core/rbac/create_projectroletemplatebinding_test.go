@@ -178,7 +178,7 @@ func TestCreateProjectRoleTemplateBindingPlan(t *testing.T) {
 		},
 		"plan for existing binding": {
 			params:         createPRTBParams{Cluster: "local", Project: "web", User: "alice", RoleTemplate: "project-owner"},
-			expectedResult: existingBindingText,
+			expectedResult: fmt.Sprintf(`{"type": "no_changes", "message": %q}`, existingBindingText),
 		},
 	}
 
@@ -193,12 +193,7 @@ func TestCreateProjectRoleTemplateBindingPlan(t *testing.T) {
 			)
 
 			require.NoError(t, err)
-			text := result.Content[0].(*mcp.TextContent).Text
-			if tt.expectedResult == existingBindingText {
-				assert.Equal(t, tt.expectedResult, text)
-			} else {
-				assert.JSONEq(t, tt.expectedResult, text)
-			}
+			assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 
 			prtbs, err := fakeDynClient.Resource(converter.K8sKindsToGVRs["projectroletemplatebinding"]).
 				Namespace("local-p-web").List(t.Context(), metav1.ListOptions{})
