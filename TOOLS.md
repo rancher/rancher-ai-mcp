@@ -62,7 +62,7 @@ Each tool is exposed through the MCP protocol and can be invoked by the Rancher 
 | `listProjects` | Read-only | Returns a list of project resources for a specified cluster. |
 | `listRoleTemplates` | Read-only | List all role templates in a Rancher cluster.<br>Role templates define a set of permissions that can be assigned to users or groups. |
 | `moveNamespace` | Write | Moves a namespace to a project in the specified cluster. |
-| `moveNamespacePlan` | Write | Plans to move a namespace to a project in the specified cluster. It returns the JSON patch that would be applied to the namespace without actually applying it in the cluster. Only used for displaying the change when using human validation. |
+| `moveNamespacePlan` | Write | Plans to move a namespace to a project in the specified cluster. It returns the original namespace, the JSON patch and the patched namespace that would be applied without actually applying it in the cluster. Only used for displaying the change when using human validation. |
 | `patchKubernetesResource` | Write | Patches a Kubernetes resource using a JSON patch. Don't ask for confirmation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. Returns the modified resource. |
 | `patchKubernetesResourcePlan` | Write | Plans to patch a Kubernetes resource using a JSON patch. It returns the JSON representation of the planned update without actually applying it in the cluster. Only used for displaying the patch when using human validation. The namespace must be empty for cluster-wide resources. The content type used is application/json-patch+json. |
 
