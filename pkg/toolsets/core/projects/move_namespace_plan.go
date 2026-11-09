@@ -4,15 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
+	jsonpatch "github.com/evanphx/json-patch/v5"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	"go.uber.org/zap"
 )
 
 // moveNamespacePlan plans moving a namespace to a project.
-// It returns the JSON patch that would be applied to the namespace without actually applying it.
+// It returns the original namespace, the JSON patch, and what the namespace would look like after applying the patch,
+// without actually applying it.
 func (t *Tools) moveNamespacePlan(ctx context.Context, _ *mcp.CallToolRequest, params moveNamespaceParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("moveNamespacePlan called", zap.String("namespace", params.Namespace), zap.String("project", params.Project), zap.String("cluster", params.Cluster))
 
@@ -22,28 +23,57 @@ func (t *Tools) moveNamespacePlan(ctx context.Context, _ *mcp.CallToolRequest, p
 		return nil, nil, err
 	}
 
-	patch := append(
-		metadataMapPatch("labels", target.namespace.GetLabels(), projectIDKey, target.label),
-		metadataMapPatch("annotations", target.namespace.GetAnnotations(), projectIDKey, target.annotation)...,
-	)
-
-	patchBytes, err := json.Marshal(patch)
+	patchOps := target.patch()
+	patchBytes, err := json.Marshal(patchOps)
 	if err != nil {
 		zap.L().Error("failed to marshal patch", zap.String("tool", "moveNamespacePlan"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to marshal patch: %w", err)
 	}
 
-	updateResource := response.PlanResource{
-		Type:    response.OperationUpdate,
-		Payload: json.RawMessage(patchBytes),
-		Resource: response.Resource{
-			Name:    target.namespace.GetName(),
-			Kind:    "Namespace",
-			Cluster: target.clusterID,
+	originalBytes, err := json.Marshal(target.namespace.Object)
+	if err != nil {
+		zap.L().Error("failed to marshal original namespace", zap.String("tool", "moveNamespacePlan"), zap.Error(err))
+		return nil, nil, fmt.Errorf("failed to marshal original: %w", err)
+	}
+
+	// Apply the patch to show the future state (without persisting)
+	patch, err := jsonpatch.DecodePatch(patchBytes)
+	if err != nil {
+		zap.L().Error("failed to decode patch", zap.String("tool", "moveNamespacePlan"), zap.Error(err))
+		return nil, nil, fmt.Errorf("failed to decode patch: %w", err)
+	}
+
+	patchedBytes, err := patch.Apply(originalBytes)
+	if err != nil {
+		zap.L().Error("failed to apply patch", zap.String("tool", "moveNamespacePlan"), zap.Error(err))
+		return nil, nil, fmt.Errorf("failed to apply patch: %w", err)
+	}
+
+	var patchedObj map[string]any
+	if err := json.Unmarshal(patchedBytes, &patchedObj); err != nil {
+		zap.L().Error("failed to unmarshal patched namespace", zap.String("tool", "moveNamespacePlan"), zap.Error(err))
+		return nil, nil, fmt.Errorf("failed to unmarshal patched: %w", err)
+	}
+
+	payload := map[string]any{
+		"original": target.namespace.Object,
+		"patch":    patchOps,
+		"patched":  patchedObj,
+	}
+
+	planResources := []response.PlanResource{
+		{
+			Type:    response.OperationUpdate,
+			Payload: payload,
+			Resource: response.Resource{
+				Name:    target.namespace.GetName(),
+				Kind:    "Namespace",
+				Cluster: target.clusterID,
+			},
 		},
 	}
 
-	mcpResponse, err := response.CreatePlanResponse([]response.PlanResource{updateResource})
+	mcpResponse, err := response.CreatePlanResponse(planResources)
 	if err != nil {
 		zap.L().Error("failed to create plan response", zap.String("tool", "moveNamespacePlan"), zap.Error(err))
 		return nil, nil, err
@@ -52,32 +82,4 @@ func (t *Tools) moveNamespacePlan(ctx context.Context, _ *mcp.CallToolRequest, p
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
 	}, nil, nil
-}
-
-// metadataMapPatch builds JSON patch operations that set key=value in the given metadata map field
-// (e.g. labels or annotations). If the map does not exist yet, it is created.
-func metadataMapPatch(field string, current map[string]string, key, value string) []map[string]any {
-	if current == nil {
-		return []map[string]any{{
-			"op":    "add",
-			"path":  "/metadata/" + field,
-			"value": map[string]string{key: value},
-		}}
-	}
-
-	op := "add"
-	if _, ok := current[key]; ok {
-		op = "replace"
-	}
-
-	return []map[string]any{{
-		"op":    op,
-		"path":  fmt.Sprintf("/metadata/%s/%s", field, escapeJSONPointer(key)),
-		"value": value,
-	}}
-}
-
-// escapeJSONPointer escapes a JSON pointer reference token as defined in RFC 6901.
-func escapeJSONPointer(s string) string {
-	return strings.NewReplacer("~", "~0", "/", "~1").Replace(s)
 }

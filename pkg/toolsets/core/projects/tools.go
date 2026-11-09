@@ -98,7 +98,7 @@ The resource usage includes CPU and memory requests, limits and actual usage, as
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,
 			},
-			Description: `Plans to move a namespace to a project in the specified cluster. It returns the JSON patch that would be applied to the namespace without actually applying it in the cluster. Only used for displaying the change when using human validation.`},
+			Description: `Plans to move a namespace to a project in the specified cluster. It returns the original namespace, the JSON patch and the patched namespace that would be applied without actually applying it in the cluster. Only used for displaying the change when using human validation.`},
 			t.moveNamespacePlan)
 	}
 }

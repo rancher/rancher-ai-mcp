@@ -2,7 +2,9 @@ package projects
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
@@ -12,6 +14,7 @@ import (
 	"go.uber.org/zap"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/types"
 )
 
 const projectIDKey = "field.cattle.io/projectId"
@@ -70,21 +73,11 @@ func (t *Tools) moveNamespace(ctx context.Context, toolReq *mcp.CallToolRequest,
 	if err != nil {
 		return nil, nil, err
 	}
-	namespace := target.namespace
 
-	labels := namespace.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
+	patchBytes, err := json.Marshal(target.patch())
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to marshal patch: %w", err)
 	}
-	labels[projectIDKey] = target.label
-	namespace.SetLabels(labels)
-
-	annotations := namespace.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-	annotations[projectIDKey] = target.annotation
-	namespace.SetAnnotations(annotations)
 
 	resourceInterface, err := t.client.GetResourceInterface(
 		ctx, middleware.Token(ctx), "", target.clusterID, converter.K8sKindsToGVRs["namespace"])
@@ -92,7 +85,7 @@ func (t *Tools) moveNamespace(ctx context.Context, toolReq *mcp.CallToolRequest,
 		return nil, nil, err
 	}
 
-	updatedNamespace, err := resourceInterface.Update(ctx, namespace, metav1.UpdateOptions{})
+	updatedNamespace, err := resourceInterface.Patch(ctx, target.namespace.GetName(), types.JSONPatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to move namespace %q: %w", params.Namespace, err)
 	}
@@ -105,4 +98,40 @@ func (t *Tools) moveNamespace(ctx context.Context, toolReq *mcp.CallToolRequest,
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
 	}, nil, nil
+}
+
+// patch builds the JSON patch operations that set the project ID label and annotation on the namespace.
+func (t *moveNamespaceTarget) patch() []map[string]any {
+	return append(
+		metadataMapPatch("labels", t.namespace.GetLabels(), projectIDKey, t.label),
+		metadataMapPatch("annotations", t.namespace.GetAnnotations(), projectIDKey, t.annotation)...,
+	)
+}
+
+// metadataMapPatch builds JSON patch operations that set key=value in the given metadata map field
+// (e.g. labels or annotations). If the map does not exist yet, it is created.
+func metadataMapPatch(field string, current map[string]string, key, value string) []map[string]any {
+	if current == nil {
+		return []map[string]any{{
+			"op":    "add",
+			"path":  "/metadata/" + field,
+			"value": map[string]string{key: value},
+		}}
+	}
+
+	op := "add"
+	if _, ok := current[key]; ok {
+		op = "replace"
+	}
+
+	return []map[string]any{{
+		"op":    op,
+		"path":  fmt.Sprintf("/metadata/%s/%s", field, escapeJSONPointer(key)),
+		"value": value,
+	}}
+}
+
+// escapeJSONPointer escapes a JSON pointer reference token as defined in RFC 6901.
+func escapeJSONPointer(s string) string {
+	return strings.NewReplacer("~", "~0", "/", "~1").Replace(s)
 }

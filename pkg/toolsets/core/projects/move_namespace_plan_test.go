@@ -41,10 +41,34 @@ func TestMoveNamespacePlan(t *testing.T) {
 			},
 			expectedPlan: `[{
 				"type": "update",
-				"payload": [
-					{"op": "replace", "path": "/metadata/labels/field.cattle.io~1projectId", "value": "p-move-namespace"},
-					{"op": "replace", "path": "/metadata/annotations/field.cattle.io~1projectId", "value": "c-move-namespace:p-move-namespace"}
-				],
+				"payload": {
+					"original": {
+						"apiVersion": "v1",
+						"kind": "Namespace",
+						"metadata": {
+							"name": "workloads",
+							"labels": {"field.cattle.io/projectId": "p-previous", "team": "platform"},
+							"annotations": {"field.cattle.io/projectId": "c-previous:p-previous"}
+						},
+						"spec": {},
+						"status": {}
+					},
+					"patch": [
+						{"op": "replace", "path": "/metadata/labels/field.cattle.io~1projectId", "value": "p-move-namespace"},
+						{"op": "replace", "path": "/metadata/annotations/field.cattle.io~1projectId", "value": "c-move-namespace:p-move-namespace"}
+					],
+					"patched": {
+						"apiVersion": "v1",
+						"kind": "Namespace",
+						"metadata": {
+							"name": "workloads",
+							"labels": {"field.cattle.io/projectId": "p-move-namespace", "team": "platform"},
+							"annotations": {"field.cattle.io/projectId": "c-move-namespace:p-move-namespace"}
+						},
+						"spec": {},
+						"status": {}
+					}
+				},
 				"resource": {"name": "workloads", "kind": "Namespace", "cluster": "c-move-namespace", "namespace": ""}
 			}]`,
 		},
@@ -58,10 +82,33 @@ func TestMoveNamespacePlan(t *testing.T) {
 			},
 			expectedPlan: `[{
 				"type": "update",
-				"payload": [
-					{"op": "add", "path": "/metadata/labels/field.cattle.io~1projectId", "value": "p-move-namespace"},
-					{"op": "add", "path": "/metadata/annotations", "value": {"field.cattle.io/projectId": "c-move-namespace:p-move-namespace"}}
-				],
+				"payload": {
+					"original": {
+						"apiVersion": "v1",
+						"kind": "Namespace",
+						"metadata": {
+							"name": "workloads",
+							"labels": {"team": "platform"}
+						},
+						"spec": {},
+						"status": {}
+					},
+					"patch": [
+						{"op": "add", "path": "/metadata/labels/field.cattle.io~1projectId", "value": "p-move-namespace"},
+						{"op": "add", "path": "/metadata/annotations", "value": {"field.cattle.io/projectId": "c-move-namespace:p-move-namespace"}}
+					],
+					"patched": {
+						"apiVersion": "v1",
+						"kind": "Namespace",
+						"metadata": {
+							"name": "workloads",
+							"labels": {"field.cattle.io/projectId": "p-move-namespace", "team": "platform"},
+							"annotations": {"field.cattle.io/projectId": "c-move-namespace:p-move-namespace"}
+						},
+						"spec": {},
+						"status": {}
+					}
+				},
 				"resource": {"name": "workloads", "kind": "Namespace", "cluster": "c-move-namespace", "namespace": ""}
 			}]`,
 		},
