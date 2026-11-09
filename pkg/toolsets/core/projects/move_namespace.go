@@ -30,7 +30,6 @@ type moveNamespaceTarget struct {
 	clusterID  string
 	projectID  string
 	namespace  *unstructured.Unstructured
-	label      string
 	annotation string
 }
 
@@ -60,7 +59,6 @@ func (t *Tools) resolveMoveNamespace(ctx context.Context, params moveNamespacePa
 		clusterID:  clusterID,
 		projectID:  projectID,
 		namespace:  namespace,
-		label:      projectID,
 		annotation: fmt.Sprintf("%s:%s", clusterID, projectID),
 	}, nil
 }
@@ -103,7 +101,7 @@ func (t *Tools) moveNamespace(ctx context.Context, toolReq *mcp.CallToolRequest,
 // patch builds the JSON patch operations that set the project ID label and annotation on the namespace.
 func (t *moveNamespaceTarget) patch() []map[string]any {
 	return append(
-		metadataMapPatch("labels", t.namespace.GetLabels(), projectIDKey, t.label),
+		metadataMapPatch("labels", t.namespace.GetLabels(), projectIDKey, t.projectID),
 		metadataMapPatch("annotations", t.namespace.GetAnnotations(), projectIDKey, t.annotation)...,
 	)
 }
