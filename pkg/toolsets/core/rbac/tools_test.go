@@ -1,7 +1,6 @@
 package rbac
 
 import (
-	"context"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -106,14 +105,14 @@ func startMCPServer(t *testing.T, tools *Tools) (*mcp.ClientSession, func()) {
 	transport := &mcp.StreamableClientTransport{Endpoint: "http://" + listener.Addr().String()}
 
 	assert.Eventually(t, func() bool {
-		cs, err = mcpClient.Connect(context.Background(), transport, nil)
+		cs, err = mcpClient.Connect(t.Context(), transport, nil)
 		return err == nil
 	}, 2*time.Second, 100*time.Millisecond)
 
 	require.NotNil(t, cs)
 	return cs, func() {
 		cs.Close()
-		server.Shutdown(context.Background())
+		server.Shutdown(t.Context())
 		listener.Close()
 	}
 }
@@ -124,9 +123,9 @@ func TestAddTools(t *testing.T) {
 	cs, cleanup := startMCPServer(t, NewTools(c, false))
 	defer cleanup()
 
-	toolsResult, err := cs.ListTools(context.Background(), &mcp.ListToolsParams{})
+	toolsResult, err := cs.ListTools(t.Context(), &mcp.ListToolsParams{})
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 12, "incorrect number of RBAC tools registered")
+	assert.Len(t, toolsResult.Tools, 14, "incorrect number of RBAC tools registered")
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 	}
@@ -138,7 +137,7 @@ func TestAddToolsReadOnly(t *testing.T) {
 	cs, cleanup := startMCPServer(t, NewTools(c, true))
 	defer cleanup()
 
-	toolsResult, err := cs.ListTools(context.Background(), &mcp.ListToolsParams{})
+	toolsResult, err := cs.ListTools(t.Context(), &mcp.ListToolsParams{})
 	assert.NoError(t, err)
 	assert.Len(t, toolsResult.Tools, 8, "incorrect number of RBAC tools registered in read-only mode")
 	for _, tool := range toolsResult.Tools {
@@ -154,7 +153,7 @@ func TestUserParamDescriptions(t *testing.T) {
 	cs, cleanup := startMCPServer(t, NewTools(c, false))
 	defer cleanup()
 
-	toolsResult, err := cs.ListTools(context.Background(), &mcp.ListToolsParams{})
+	toolsResult, err := cs.ListTools(t.Context(), &mcp.ListToolsParams{})
 	require.NoError(t, err)
 
 	var checked []string
@@ -175,6 +174,7 @@ func TestUserParamDescriptions(t *testing.T) {
 	}
 	assert.ElementsMatch(t, []string{
 		"createGlobalRoleBinding", "createGlobalRoleBindingPlan",
+		"createProjectRoleTemplateBinding", "createProjectRoleTemplateBindingPlan",
 		"listClusterRoleTemplateBindings", "listGlobalRoleBindings", "listProjectRoleTemplateBindings",
 	}, checked)
 }
