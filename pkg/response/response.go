@@ -133,12 +133,12 @@ type Resource struct {
 }
 
 // PlanResource represents a single planned operation on a Kubernetes resource.
-// It pairs an operation type (CREATE, UPDATE, DELETE) with the target resource
+// It pairs an operation type (create, update or delete) with the target resource
 // metadata and the operation payload.
 type PlanResource struct {
 	// Type is the operation to perform on the resource.
-	Type OperationType `json:"type" jsonschema:"enum=CREATE,enum=UPDATE,enum=DELETE"`
-	// Payload holds the resource body for CREATE and DELETE operations or the patch data for UPDATE operations.
+	Type OperationType `json:"type" jsonschema:"the operation to perform on the resource: create, update or delete"`
+	// Payload holds the resource body for create and delete operations or the patch data for update operations.
 	Payload any `json:"payload"`
 	// Resource identifies the target Kubernetes resource.
 	Resource Resource `json:"resource"`

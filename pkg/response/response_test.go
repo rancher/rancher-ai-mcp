@@ -3,6 +3,7 @@ package response
 import (
 	"testing"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -401,4 +402,11 @@ func TestCreateNoChangesPlanResponse(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"type":"no_changes","message":"role 'project-member' is already granted, no changes needed"}`, result)
+}
+
+func TestPlanResourceSchema(t *testing.T) {
+	s, err := jsonschema.For[PlanResource](nil)
+	require.NoError(t, err)
+
+	assert.Equal(t, "the operation to perform on the resource: create, update or delete", s.Properties["type"].Description)
 }
