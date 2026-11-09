@@ -3,6 +3,7 @@ package cmd
 import (
 	"context"
 	"crypto/tls"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -136,7 +137,9 @@ func stdioConfig() (string, string, error) {
 
 // runStdio serves MCP over stdin/stdout, using token for all tool calls.
 func runStdio(ctx context.Context, mcpServer *mcp.Server, token string) error {
-	mcpServer.AddReceivingMiddleware(tokenMiddleware(token))
+	// uiContext is only used by the Rancher UI to build resource links, so
+	// there is no need to send it to stdio clients.
+	mcpServer.AddReceivingMiddleware(tokenMiddleware(token), stripUIContextMiddleware())
 
 	// stdout is reserved for the MCP protocol: keep a handle for the transport
 	// and redirect any other stdout writes to stderr.
@@ -157,6 +160,51 @@ func tokenMiddleware(token string) mcp.Middleware {
 			return next(middleware.WithToken(ctx, token), method, req)
 		}
 	}
+}
+
+// stripUIContextMiddleware returns an MCP middleware that removes the
+// uiContext field from the JSON text content of tools/call results.
+func stripUIContextMiddleware() mcp.Middleware {
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			result, err := next(ctx, method, req)
+			if err != nil {
+				return result, err
+			}
+
+			if toolResult, ok := result.(*mcp.CallToolResult); ok {
+				for _, content := range toolResult.Content {
+					if text, ok := content.(*mcp.TextContent); ok {
+						text.Text = stripUIContext(text.Text)
+					}
+				}
+			}
+
+			return result, nil
+		}
+	}
+}
+
+// stripUIContext removes the top-level uiContext field from a JSON object.
+// Text that is not a JSON object, or has no uiContext, is returned unchanged.
+func stripUIContext(text string) string {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(text), &fields); err != nil {
+		return text
+	}
+
+	if _, ok := fields["uiContext"]; !ok {
+		return text
+	}
+
+	delete(fields, "uiContext")
+
+	stripped, err := json.Marshal(fields)
+	if err != nil {
+		return text
+	}
+
+	return string(stripped)
 }
 
 func startInsecureServer(handler http.Handler) error {

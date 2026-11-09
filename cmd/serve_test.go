@@ -6,6 +6,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -114,4 +115,59 @@ func TestStdioConfig(t *testing.T) {
 			assert.Equal(t, test.expectedURL, url)
 		})
 	}
+}
+
+func TestStripUIContext(t *testing.T) {
+	tests := map[string]struct {
+		text     string
+		expected string
+	}{
+		"removes uiContext": {
+			text:     `{"llm":[{"kind":"Pod","metadata":{"name":"a"}}],"uiContext":[{"namespace":"ns","kind":"Pod","cluster":"local","name":"a"}]}`,
+			expected: `{"llm":[{"kind":"Pod","metadata":{"name":"a"}}]}`,
+		},
+		"no uiContext is unchanged": {
+			text:     `{"llm":"no resources found"}`,
+			expected: `{"llm":"no resources found"}`,
+		},
+		"non JSON text is unchanged": {
+			text:     "something went wrong",
+			expected: "something went wrong",
+		},
+		"JSON array is unchanged": {
+			text:     `[{"uiContext":[]}]`,
+			expected: `[{"uiContext":[]}]`,
+		},
+	}
+
+	for name, test := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, test.expected, stripUIContext(test.text))
+		})
+	}
+}
+
+func TestStripUIContextMiddleware(t *testing.T) {
+	ctx := context.Background()
+	server := mcp.NewServer(&mcp.Implementation{Name: "test-server", Version: "v1.0.0"}, nil)
+	mcp.AddTool(server, &mcp.Tool{Name: "resources"}, func(_ context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, any, error) {
+		text, err := response.CreateMcpResponseAny("data", response.UIContext{Namespace: "ns", Kind: "Pod", Cluster: "local", Name: "a"})
+		return &mcp.CallToolResult{Content: []mcp.Content{&mcp.TextContent{Text: text}}}, nil, err
+	})
+	server.AddReceivingMiddleware(stripUIContextMiddleware())
+
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
+	ss, err := server.Connect(ctx, serverTransport, nil)
+	require.NoError(t, err)
+	defer ss.Close()
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "v1.0.0"}, nil)
+	cs, err := client.Connect(ctx, clientTransport, nil)
+	require.NoError(t, err)
+	defer cs.Close()
+
+	result, err := cs.CallTool(ctx, &mcp.CallToolParams{Name: "resources"})
+	require.NoError(t, err)
+	require.Len(t, result.Content, 1)
+	assert.Equal(t, `{"llm":"data"}`, result.Content[0].(*mcp.TextContent).Text)
 }
