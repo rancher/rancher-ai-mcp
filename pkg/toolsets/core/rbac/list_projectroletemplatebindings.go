@@ -5,12 +5,12 @@ import (
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/core/projects"
 	"go.uber.org/zap"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/core/projects"
 )
 
 var zapListProjectRoleTemplateBindings = zap.String("tool", "listProjectRoleTemplateBindings")
@@ -24,17 +24,21 @@ type listPRTBParams struct {
 
 func filterPRTBsByCluster(prtbs []*unstructured.Unstructured, clusterName string) []*unstructured.Unstructured {
 	var filteredPRTBs []*unstructured.Unstructured
+
 	for _, prtb := range prtbs {
 		projectNameField, found, err := unstructured.NestedString(prtb.Object, "projectName")
 		if err != nil || !found {
 			zap.L().Error("failed to get projectName from PRTB", zapListProjectRoleTemplateBindings, zap.Error(err))
 		}
+
 		cluster, _, found := strings.Cut(projectNameField, ":")
 		if !found || cluster != clusterName {
 			continue
 		}
+
 		filteredPRTBs = append(filteredPRTBs, prtb)
 	}
+
 	return filteredPRTBs
 }
 
@@ -53,17 +57,20 @@ func (t *Tools) listProjectRoleTemplateBindings(ctx context.Context, toolReq *mc
 	}
 
 	namespace := ""
+
 	if params.ProjectID != "" {
 		_, projectResource, err := projects.GetProjectID(ctx, t.client, middleware.Token(ctx), clusterID, params.ProjectID)
 		if err != nil {
 			zap.L().Error("failed to get project by ID", zapListProjectRoleTemplateBindings, zap.Error(err))
 			return nil, nil, err
 		}
+
 		projectBackingNamespace, err := projects.GetProjectBackingNamespace(projectResource)
 		if err != nil {
 			zap.L().Error("failed to get project backing namespace", zapListProjectRoleTemplateBindings, zap.Error(err))
 			return nil, nil, err
 		}
+
 		namespace = projectBackingNamespace
 	}
 
@@ -80,12 +87,14 @@ func (t *Tools) listProjectRoleTemplateBindings(ctx context.Context, toolReq *mc
 
 	// Filter the resources to only include those for the specified user, or the groups the user belongs to
 	var notes []string
+
 	if params.User != "" {
 		subjects, err := t.getUserSubjects(ctx, params.User)
 		if err != nil {
 			zap.L().Error("failed to resolve user", zapListProjectRoleTemplateBindings, zap.Error(err))
 			return nil, nil, err
 		}
+
 		prtbs = filterBindingsForUser(prtbs, subjects)
 		notes = userGroupsNote(subjects.groups)
 	}
@@ -99,7 +108,7 @@ func (t *Tools) listProjectRoleTemplateBindings(ctx context.Context, toolReq *mc
 		prtbs = filterPRTBsByCluster(prtbs, clusterID)
 	}
 
-	mcpResponse, err := response.CreateMcpResponse(prtbs, "local", notes...)
+	mcpResponse, err := createResourcesResponse(prtbs, notes...)
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapListProjectRoleTemplateBindings, zap.Error(err))
 		return nil, nil, err

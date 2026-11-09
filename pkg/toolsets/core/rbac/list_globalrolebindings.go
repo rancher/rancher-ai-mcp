@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
+
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"go.uber.org/zap"
 )
 
 var zapListGlobalRoleBindings = zap.String("tool", "listGlobalRoleBindings")
@@ -38,12 +38,14 @@ func (t *Tools) listGlobalRoleBindings(ctx context.Context, toolReq *mcp.CallToo
 
 	// Filter the resources to only include those for the specified user, or the groups the user belongs to
 	var notes []string
+
 	if params.User != "" {
 		subjects, err := t.getUserSubjects(ctx, params.User)
 		if err != nil {
 			zap.L().Error("failed to resolve user", zapListGlobalRoleBindings, zap.Error(err))
 			return nil, nil, err
 		}
+
 		grbs = filterBindingsForUser(grbs, subjects)
 		notes = userGroupsNote(subjects.groups)
 	}
@@ -55,7 +57,8 @@ func (t *Tools) listGlobalRoleBindings(ctx context.Context, toolReq *mcp.CallToo
 	if params.GlobalRole != "" {
 		grbs = filterResourcesByField(grbs, "globalRoleName", params.GlobalRole)
 	}
-	mcpResponse, err := response.CreateMcpResponse(grbs, "local", notes...)
+
+	mcpResponse, err := createResourcesResponse(grbs, notes...)
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapListGlobalRoleBindings, zap.Error(err))
 		return nil, nil, err

@@ -7,47 +7,139 @@ import (
 	"slices"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var errUserAndGroup = errors.New("only one of user or group can be specified, bindings for the user's groups are included when a user is specified")
 
 func filterResourcesByField(resources []*unstructured.Unstructured, field, value string) []*unstructured.Unstructured {
 	var filteredResources []*unstructured.Unstructured
+
 	for _, resource := range resources {
 		resourceValue, found, err := unstructured.NestedString(resource.Object, field)
 		if err == nil && found && resourceValue == value {
 			filteredResources = append(filteredResources, resource)
 		}
 	}
+
 	return filteredResources
 }
 
+// serverMetadataFields are the metadata fields maintained by the API server and Rancher's controllers.
+var serverMetadataFields = []string{"managedFields", "uid", "resourceVersion", "generation", "finalizers", "ownerReferences"}
+
+// internalAnnotationPrefixes are the prefixes of annotations that Rancher's controllers use to
+// track their own state.
+var internalAnnotationPrefixes = []string{"lifecycle.cattle.io/", "authz.management.cattle.io/", "cleanup.cattle.io/"}
+
 // removeServerManagedFields removes fields maintained by the server, so responses and plans
-// only show what is relevant to the resource.
+// only show what is relevant to the resource. The status is reduced by summarizeStatus.
 func removeServerManagedFields(obj *unstructured.Unstructured) {
-	unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
-	unstructured.RemoveNestedField(obj.Object, "status")
-}
-
-type deletedResources struct {
-	Resources []map[string]any `json:"resources"`
-	Note      string           `json:"note"`
-}
-
-// createDeletedResourcesResponse creates an MCP response describing deleted resources.
-// It has no UI context because the resources no longer exist and cannot be linked to.
-func createDeletedResourcesResponse(objs []*unstructured.Unstructured, note string) (string, error) {
-	resources := make([]map[string]any, 0, len(objs))
-	for _, obj := range objs {
-		resources = append(resources, obj.Object)
+	for _, field := range serverMetadataFields {
+		unstructured.RemoveNestedField(obj.Object, "metadata", field)
+	}
+	// The generated name is only needed to identify a resource that has not been named yet.
+	if obj.GetName() != "" {
+		unstructured.RemoveNestedField(obj.Object, "metadata", "generateName")
 	}
 
-	return response.CreateMcpResponseAny(deletedResources{Resources: resources, Note: note})
+	annotations := obj.GetAnnotations()
+	for key := range annotations {
+		for _, prefix := range internalAnnotationPrefixes {
+			if strings.HasPrefix(key, prefix) {
+				delete(annotations, key)
+				break
+			}
+		}
+	}
+
+	obj.SetAnnotations(annotations)
+
+	summarizeStatus(obj)
+}
+
+// summarizeStatus reduces the status of a resource to what can explain a problem with it.
+// Conditions that are True are removed, as are timestamps and observed generations, so a
+// resource that has been reconciled keeps only its summary.
+func summarizeStatus(obj *unstructured.Unstructured) {
+	status, found, err := unstructured.NestedMap(obj.Object, "status")
+	if err != nil || !found {
+		return
+	}
+
+	for key, value := range status {
+		switch {
+		case key == "lastUpdateTime", strings.HasPrefix(key, "observedGeneration"):
+			delete(status, key)
+		case strings.HasSuffix(strings.ToLower(key), "conditions"):
+			conditions, ok := value.([]any)
+			if !ok {
+				continue
+			}
+
+			var problems []any
+
+			for _, condition := range conditions {
+				if conditionMap, ok := condition.(map[string]any); ok && conditionMap["status"] == "True" {
+					continue
+				}
+
+				problems = append(problems, condition)
+			}
+
+			if len(problems) == 0 {
+				delete(status, key)
+			} else {
+				status[key] = problems
+			}
+		default:
+			// Other status fields, such as the summary, are kept.
+		}
+	}
+
+	if len(status) == 0 {
+		unstructured.RemoveNestedField(obj.Object, "status")
+		return
+	}
+
+	_ = unstructured.SetNestedMap(obj.Object, status, "status")
+}
+
+// createResourcesResponse creates an MCP response for resources in the local cluster, with
+// server-managed fields removed.
+func createResourcesResponse(objs []*unstructured.Unstructured, notes ...string) (string, error) {
+	for _, obj := range objs {
+		removeServerManagedFields(obj)
+	}
+
+	return response.CreateMcpResponse(objs, "local", notes...)
+}
+
+// grbSubjectFields are the fields of a global role binding that record who it assigns the global role to.
+var grbSubjectFields = []string{"userName", "userPrincipalName", "groupPrincipalName"}
+
+// summarizeGlobalRoleBinding returns the name of a global role binding and who it assigns the global
+// role to, with the global role if includeGlobalRole is true.
+func summarizeGlobalRoleBinding(grb *unstructured.Unstructured, includeGlobalRole bool) map[string]any {
+	fields := grbSubjectFields
+	if includeGlobalRole {
+		fields = append([]string{"globalRoleName"}, fields...)
+	}
+
+	summary := map[string]any{"name": grb.GetName()}
+	for _, field := range fields {
+		if value, found, err := unstructured.NestedString(grb.Object, field); err == nil && found && value != "" {
+			summary[field] = value
+		}
+	}
+
+	return summary
 }
 
 // userSubjects identifies a user, and the groups they belong to, in the subjects of bindings.
@@ -93,6 +185,7 @@ func (t *Tools) getUserSubjects(ctx context.Context, nameOrID string) (*userSubj
 	if apierrors.IsNotFound(err) {
 		return subjects, nil
 	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get groups for user %q: %w", subjects.userID, err)
 	}
@@ -105,18 +198,22 @@ func (t *Tools) getUserSubjects(ctx context.Context, nameOrID string) (*userSubj
 		if !ok {
 			continue
 		}
+
 		items, _, _ := unstructured.NestedSlice(providerMap, "Items")
 		for _, item := range items {
 			itemMap, ok := item.(map[string]any)
 			if !ok {
 				continue
 			}
+
 			if name, found, err := unstructured.NestedString(itemMap, "metadata", "name"); err == nil && found && name != "" {
 				subjects.groups = append(subjects.groups, name)
 			}
 		}
 	}
+
 	slices.Sort(subjects.groups)
+
 	subjects.groups = slices.Compact(subjects.groups)
 	for _, group := range subjects.groups {
 		subjects.groupNames = append(subjects.groupNames, rbacGroupName(group))
@@ -129,11 +226,13 @@ func (t *Tools) getUserSubjects(ctx context.Context, nameOrID string) (*userSubj
 // Each binding is returned at most once.
 func filterBindingsForUser(bindings []*unstructured.Unstructured, subjects *userSubjects) []*unstructured.Unstructured {
 	var filtered []*unstructured.Unstructured
+
 	for _, binding := range bindings {
 		if bindingMatchesUser(binding, subjects) {
 			filtered = append(filtered, binding)
 		}
 	}
+
 	return filtered
 }
 
@@ -141,15 +240,19 @@ func bindingMatchesUser(binding *unstructured.Unstructured, subjects *userSubjec
 	if userName, found, err := unstructured.NestedString(binding.Object, "userName"); err == nil && found && userName == subjects.userID {
 		return true
 	}
+
 	if principal, found, err := unstructured.NestedString(binding.Object, "userPrincipalName"); err == nil && found && slices.Contains(subjects.principalIDs, principal) {
 		return true
 	}
+
 	if group, found, err := unstructured.NestedString(binding.Object, "groupPrincipalName"); err == nil && found && slices.Contains(subjects.groups, group) {
 		return true
 	}
+
 	if group, found, err := unstructured.NestedString(binding.Object, "groupName"); err == nil && found && slices.Contains(subjects.groupNames, group) {
 		return true
 	}
+
 	return false
 }
 
@@ -158,15 +261,18 @@ func bindingMatchesUser(binding *unstructured.Unstructured, subjects *userSubjec
 // Kubernetes group name in groupName.
 func filterBindingsForGroup(bindings []*unstructured.Unstructured, group string) []*unstructured.Unstructured {
 	var filtered []*unstructured.Unstructured
+
 	for _, binding := range bindings {
 		if value, found, err := unstructured.NestedString(binding.Object, "groupPrincipalName"); err == nil && found && value == group {
 			filtered = append(filtered, binding)
 			continue
 		}
+
 		if value, found, err := unstructured.NestedString(binding.Object, "groupName"); err == nil && found && value == rbacGroupName(group) {
 			filtered = append(filtered, binding)
 		}
 	}
+
 	return filtered
 }
 
@@ -175,5 +281,6 @@ func userGroupsNote(groups []string) []string {
 	if len(groups) == 0 {
 		return nil
 	}
+
 	return []string{"includes bindings for the groups the user belongs to: " + strings.Join(groups, ", ")}
 }

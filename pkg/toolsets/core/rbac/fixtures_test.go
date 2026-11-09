@@ -8,6 +8,8 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
 // managementObject returns a management.cattle.io/v3 resource with the given top-level fields.
@@ -17,9 +19,11 @@ func managementObject(kind, name, namespace string, fields map[string]any) *unst
 	obj.SetAPIVersion("management.cattle.io/v3")
 	obj.SetKind(kind)
 	obj.SetName(name)
+
 	if namespace != "" {
 		obj.SetNamespace(namespace)
 	}
+
 	return obj
 }
 
@@ -59,8 +63,39 @@ func user(name, username string, fields map[string]any) *unstructured.Unstructur
 	if fields == nil {
 		fields = map[string]any{}
 	}
+
 	fields["username"] = username
+
 	return managementObject("User", name, "", fields)
+}
+
+// withServerFields adds the fields that the API server and Rancher's controllers maintain on a
+// resource, which should be removed from responses, and returns the resource. The creator annotation
+// and the status summary are kept in responses.
+func withServerFields(obj *unstructured.Unstructured) *unstructured.Unstructured {
+	obj.SetUID("5f4bd8fc-80a6-4567-ad76-9706818d6a48")
+	obj.SetResourceVersion("133639")
+	obj.SetGeneration(2)
+	obj.SetGenerateName("grb-")
+	obj.SetFinalizers([]string{"controller.cattle.io/mgmt-auth-grb-controller"})
+	obj.SetOwnerReferences([]metav1.OwnerReference{{APIVersion: "management.cattle.io/v3", Kind: "GlobalRole", Name: "admin", UID: "9ee2d536"}})
+	obj.SetManagedFields([]metav1.ManagedFieldsEntry{{Manager: "rancher", Operation: metav1.ManagedFieldsOperationUpdate}})
+	obj.SetAnnotations(map[string]string{
+		"authz.management.cattle.io/crb-name":                 "cattle-globalrolebinding-grb-1",
+		"cleanup.cattle.io/grbUpgradeCluster":                 "true",
+		"lifecycle.cattle.io/create.mgmt-auth-grb-controller": "true",
+		"field.cattle.io/creatorId":                           "user-sdxtj",
+	})
+	obj.Object["status"] = map[string]any{
+		"lastUpdateTime":          "2026-11-04T14:38:09Z",
+		"observedGenerationLocal": int64(1),
+		"summary":                 "Completed",
+		"localConditions": []any{
+			map[string]any{"type": "SubjectReconciled", "status": "True", "reason": "SubjectExists", "lastTransitionTime": "2026-11-04T14:38:09Z"},
+		},
+	}
+
+	return obj
 }
 
 // resultSummary is the names of the resources in a tool response, and its note.
@@ -82,7 +117,9 @@ func summarizeResult(t *testing.T, result *mcp.CallToolResult) resultSummary {
 	require.NoError(t, json.Unmarshal([]byte(result.Content[0].(*mcp.TextContent).Text), &resp))
 
 	var summary resultSummary
+
 	resources := resp.LLM
+
 	var withNote struct {
 		Resources json.RawMessage `json:"resources"`
 		Note      string          `json:"note"`
@@ -97,15 +134,20 @@ func summarizeResult(t *testing.T, result *mcp.CallToolResult) resultSummary {
 		if summary.Note == "" {
 			summary.Note = message
 		}
+
 		return summary
 	}
 
-	var list []*unstructured.Unstructured
-	var objs []map[string]any
+	var (
+		list []*unstructured.Unstructured
+		objs []map[string]any
+	)
 	require.NoError(t, json.Unmarshal(resources, &objs))
+
 	for _, obj := range objs {
 		list = append(list, &unstructured.Unstructured{Object: obj})
 	}
+
 	for _, r := range list {
 		summary.Names = append(summary.Names, r.GetName())
 	}

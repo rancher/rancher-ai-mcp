@@ -347,6 +347,7 @@ func TestCreatePlanResponse(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
+
 			require.NoError(t, err)
 			assert.JSONEq(t, tc.expected, got)
 		})

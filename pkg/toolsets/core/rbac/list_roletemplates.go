@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
+
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"go.uber.org/zap"
 )
 
 var zapListRoleTemplates = zap.String("tool", "listRoleTemplates")
@@ -26,7 +26,7 @@ func (t *Tools) listRoleTemplates(ctx context.Context, toolReq *mcp.CallToolRequ
 		return nil, nil, err
 	}
 
-	mcpResponse, err := response.CreateMcpResponse(roleTemplates, "local")
+	mcpResponse, err := createResourcesResponse(roleTemplates)
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapListRoleTemplates, zap.Error(err))
 		return nil, nil, err

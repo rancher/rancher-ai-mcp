@@ -7,19 +7,20 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
-	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/rest"
-
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/rest"
+
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
+
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 )
 
 const (
@@ -83,6 +84,7 @@ func rbacScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
 	_ = metav1.AddMetaToScheme(scheme)
+
 	return scheme
 }
 
@@ -101,6 +103,7 @@ func startMCPServer(t *testing.T, tools *Tools) (*mcp.ClientSession, func()) {
 	go server.Serve(listener)
 
 	var cs *mcp.ClientSession
+
 	mcpClient := mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
 	transport := &mcp.StreamableClientTransport{Endpoint: "http://" + listener.Addr().String()}
 
@@ -110,6 +113,7 @@ func startMCPServer(t *testing.T, tools *Tools) (*mcp.ClientSession, func()) {
 	}, 2*time.Second, 100*time.Millisecond)
 
 	require.NotNil(t, cs)
+
 	return cs, func() {
 		cs.Close()
 		server.Shutdown(t.Context())
@@ -120,12 +124,14 @@ func startMCPServer(t *testing.T, tools *Tools) (*mcp.ClientSession, func()) {
 func TestAddTools(t *testing.T) {
 	c, err := client.NewClient(true, fakeURL)
 	require.NoError(t, err)
+
 	cs, cleanup := startMCPServer(t, NewTools(c, false))
 	defer cleanup()
 
 	toolsResult, err := cs.ListTools(t.Context(), &mcp.ListToolsParams{})
 	assert.NoError(t, err)
 	assert.Len(t, toolsResult.Tools, 18, "incorrect number of RBAC tools registered")
+
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 	}
@@ -134,12 +140,14 @@ func TestAddTools(t *testing.T) {
 func TestAddToolsReadOnly(t *testing.T) {
 	c, err := client.NewClient(true, fakeURL)
 	require.NoError(t, err)
+
 	cs, cleanup := startMCPServer(t, NewTools(c, true))
 	defer cleanup()
 
 	toolsResult, err := cs.ListTools(t.Context(), &mcp.ListToolsParams{})
 	assert.NoError(t, err)
 	assert.Len(t, toolsResult.Tools, 8, "incorrect number of RBAC tools registered in read-only mode")
+
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 	}
@@ -150,6 +158,7 @@ func TestAddToolsReadOnly(t *testing.T) {
 func TestUserParamDescriptions(t *testing.T) {
 	c, err := client.NewClient(true, fakeURL)
 	require.NoError(t, err)
+
 	cs, cleanup := startMCPServer(t, NewTools(c, false))
 	defer cleanup()
 
@@ -157,9 +166,11 @@ func TestUserParamDescriptions(t *testing.T) {
 	require.NoError(t, err)
 
 	var checked []string
+
 	for _, tool := range toolsResult.Tools {
 		schemaBytes, err := json.Marshal(tool.InputSchema)
 		require.NoError(t, err)
+
 		var schema struct {
 			Properties map[string]struct {
 				Description string `json:"description"`
@@ -172,6 +183,7 @@ func TestUserParamDescriptions(t *testing.T) {
 			checked = append(checked, tool.Name)
 		}
 	}
+
 	assert.ElementsMatch(t, []string{
 		"createGlobalRoleBinding", "createGlobalRoleBindingPlan",
 		"createProjectRoleTemplateBinding", "createProjectRoleTemplateBindingPlan",

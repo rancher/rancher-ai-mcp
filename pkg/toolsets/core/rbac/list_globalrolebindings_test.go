@@ -4,11 +4,13 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 )
 
 func listGlobalRoleBindingsObjects() []runtime.Object {
@@ -20,13 +22,22 @@ func listGlobalRoleBindingsObjects() []runtime.Object {
 }
 
 func TestListGlobalRoleBindingsResponse(t *testing.T) {
-	tools, _ := newTestTools(t, listGlobalRoleBindingsObjects()...)
+	objects := listGlobalRoleBindingsObjects()
+	withServerFields(objects[0].(*unstructured.Unstructured))
+	tools, _ := newTestTools(t, objects...)
 
 	result, _, err := tools.listGlobalRoleBindings(middleware.WithToken(t.Context(), fakeToken), test.NewCallToolRequest(fakeURL), listGRBParams{GlobalRole: "admin"})
 	require.NoError(t, err)
 	assert.JSONEq(t, `{
 		"llm": [
-			{"apiVersion": "management.cattle.io/v3", "kind": "GlobalRoleBinding", "metadata": {"name": "grb-1"}, "globalRoleName": "admin", "userName": "u-user1"}
+			{
+				"apiVersion": "management.cattle.io/v3",
+				"kind": "GlobalRoleBinding",
+				"metadata": {"name": "grb-1", "annotations": {"field.cattle.io/creatorId": "user-sdxtj"}},
+				"globalRoleName": "admin",
+				"userName": "u-user1",
+				"status": {"summary": "Completed"}
+			}
 		],
 		"uiContext": [
 			{"cluster": "local", "kind": "GlobalRoleBinding", "name": "grb-1", "namespace": "", "type": "globalrolebinding"}
@@ -88,6 +99,7 @@ func TestListGlobalRoleBindings(t *testing.T) {
 			if objects == nil {
 				objects = listGlobalRoleBindingsObjects()
 			}
+
 			tools, _ := newTestTools(t, objects...)
 
 			result, _, err := tools.listGlobalRoleBindings(middleware.WithToken(t.Context(), fakeToken), test.NewCallToolRequest(fakeURL), tt.params)
@@ -95,6 +107,7 @@ func TestListGlobalRoleBindings(t *testing.T) {
 				assert.ErrorContains(t, err, tt.expectedError)
 				return
 			}
+
 			require.NoError(t, err)
 			assert.Equal(t, tt.expected, summarizeResult(t, result))
 		})

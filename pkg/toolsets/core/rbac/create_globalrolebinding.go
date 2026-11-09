@@ -6,12 +6,14 @@ import (
 	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"go.uber.org/zap"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var zapCreateGlobalRoleBinding = zap.String("tool", "createGlobalRoleBinding")
@@ -43,7 +45,7 @@ func (t *Tools) createGlobalRoleBinding(ctx context.Context, toolReq *mcp.CallTo
 		return nil, nil, fmt.Errorf("failed to create global role binding: %w", err)
 	}
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, "local")
+	mcpResponse, err := createResourcesResponse([]*unstructured.Unstructured{obj})
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapCreateGlobalRoleBinding, zap.Error(err))
 		return nil, nil, err
@@ -82,11 +84,13 @@ func (t *Tools) resolveGlobalRoleBindingObj(ctx context.Context, params createGR
 	if err := validateGlobalRoleBindingParams(params); err != nil {
 		return nil, err
 	}
+
 	if params.User != "" {
 		userID, err := t.resolveUserID(ctx, params.User)
 		if err != nil {
 			return nil, err
 		}
+
 		params.User = userID
 	}
 
@@ -97,6 +101,7 @@ func validateGlobalRoleBindingParams(params createGRBParams) error {
 	if params.GlobalRole == "" {
 		return errors.New("globalRole must be specified")
 	}
+
 	if (params.User == "") == (params.Group == "") {
 		return errors.New("exactly one of user or group must be specified")
 	}
@@ -113,6 +118,7 @@ func createGlobalRoleBindingObj(params createGRBParams) *unstructured.Unstructur
 	grb.SetKind("GlobalRoleBinding")
 	grb.SetAPIVersion(converter.ManagementGroup + "/v3")
 	grb.SetGenerateName("grb-")
+
 	if params.User != "" {
 		grb.Object["userName"] = params.User
 	} else {

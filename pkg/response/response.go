@@ -5,8 +5,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 )
 
 // UIContext holds the contextual information for a Kubernetes resource. Used to build links by the UI.
@@ -35,11 +36,13 @@ type MCPResponse struct {
 // and optional notes. When notes are provided, the LLM field is wrapped as {"resources": ..., "note": "..."}.
 func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes ...string) (string, error) {
 	var uiContext []UIContext
+
 	for _, obj := range objs {
 		unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
 		unstructured.RemoveNestedField(obj.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
 
 		gvk := obj.GetObjectKind().GroupVersionKind()
+
 		lowerKind := strings.ToLower(gvk.Kind)
 		if lowerKind == "" {
 			continue
@@ -49,6 +52,7 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes 
 		// (e.g. cluster.x-k8s.io.cluster vs provisioning.cattle.io.cluster)
 		lookupKind := lowerKind
 		steveType := lowerKind
+
 		switch gvk.Group {
 		case converter.CAPIGroup:
 			lookupKind = converter.CAPIKindPrefix + lookupKind
@@ -184,7 +188,7 @@ func NewUpdateResourceInput(obj *unstructured.Unstructured, patch []byte, cluste
 // It extracts the resource metadata from the given unstructured object and
 // sets the full object as the payload so the resource being deleted can be displayed.
 func NewDeleteResourceInput(obj *unstructured.Unstructured, cluster string) PlanResource {
-	plan_resource := PlanResource{
+	planResource := PlanResource{
 		Type: OperationDelete,
 		Resource: Resource{
 			Name:      obj.GetName(),
@@ -195,7 +199,7 @@ func NewDeleteResourceInput(obj *unstructured.Unstructured, cluster string) Plan
 		Payload: obj,
 	}
 
-	return plan_resource
+	return planResource
 }
 
 // CreatePlanResponse serializes a slice of PlanResource into a JSON string.
