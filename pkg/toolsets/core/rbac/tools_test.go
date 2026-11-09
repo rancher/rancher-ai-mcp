@@ -125,7 +125,7 @@ func TestAddTools(t *testing.T) {
 
 	toolsResult, err := cs.ListTools(t.Context(), &mcp.ListToolsParams{})
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 14, "incorrect number of RBAC tools registered")
+	assert.Len(t, toolsResult.Tools, 18, "incorrect number of RBAC tools registered")
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 	}

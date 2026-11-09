@@ -138,7 +138,7 @@ type Resource struct {
 type PlanResource struct {
 	// Type is the operation to perform on the resource.
 	Type OperationType `json:"type" jsonschema:"enum=CREATE,enum=UPDATE,enum=DELETE"`
-	// Payload holds the resource body for CREATE operations or the patch data for UPDATE operations.
+	// Payload holds the resource body for CREATE and DELETE operations or the patch data for UPDATE operations.
 	Payload any `json:"payload"`
 	// Resource identifies the target Kubernetes resource.
 	Resource Resource `json:"resource"`
@@ -175,6 +175,24 @@ func NewUpdateResourceInput(obj *unstructured.Unstructured, patch []byte, cluste
 			Namespace: obj.GetNamespace(),
 		},
 		Payload: patch,
+	}
+
+	return plan_resource
+}
+
+// NewDeleteResourceInput constructs a PlanResource for a DELETE operation.
+// It extracts the resource metadata from the given unstructured object and
+// sets the full object as the payload so the resource being deleted can be displayed.
+func NewDeleteResourceInput(obj *unstructured.Unstructured, cluster string) PlanResource {
+	plan_resource := PlanResource{
+		Type: OperationDelete,
+		Resource: Resource{
+			Name:      obj.GetName(),
+			Kind:      obj.GetKind(),
+			Cluster:   cluster,
+			Namespace: obj.GetNamespace(),
+		},
+		Payload: obj,
 	}
 
 	return plan_resource

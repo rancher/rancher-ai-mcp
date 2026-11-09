@@ -9,6 +9,7 @@ import (
 
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
@@ -24,6 +25,29 @@ func filterResourcesByField(resources []*unstructured.Unstructured, field, value
 		}
 	}
 	return filteredResources
+}
+
+// removeServerManagedFields removes fields maintained by the server, so responses and plans
+// only show what is relevant to the resource.
+func removeServerManagedFields(obj *unstructured.Unstructured) {
+	unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
+	unstructured.RemoveNestedField(obj.Object, "status")
+}
+
+type deletedResources struct {
+	Resources []map[string]any `json:"resources"`
+	Note      string           `json:"note"`
+}
+
+// createDeletedResourcesResponse creates an MCP response describing deleted resources.
+// It has no UI context because the resources no longer exist and cannot be linked to.
+func createDeletedResourcesResponse(objs []*unstructured.Unstructured, note string) (string, error) {
+	resources := make([]map[string]any, 0, len(objs))
+	for _, obj := range objs {
+		resources = append(resources, obj.Object)
+	}
+
+	return response.CreateMcpResponseAny(deletedResources{Resources: resources, Note: note})
 }
 
 // userSubjects identifies a user, and the groups they belong to, in the subjects of bindings.

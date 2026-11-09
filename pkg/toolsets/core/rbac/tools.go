@@ -151,6 +151,24 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			t.createGlobalRolePlan)
 
 		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "deleteGlobalRole",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Deletes a global role by name. Built-in global roles cannot be deleted.
+			Rancher also deletes every global role binding (GRB) for the global role, so all users and groups assigned the role lose it.
+			Use getGlobalRole to find the name from a display name.`},
+			t.deleteGlobalRole)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "deleteGlobalRolePlan",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Plans to delete a global role. It returns the JSON representation of the global role and the global role bindings that will be deleted with it, without actually deleting them. Only used for displaying the resources when using human validation.`},
+			t.deleteGlobalRolePlan)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
 			Name: "createGlobalRoleBinding",
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,
@@ -196,5 +214,22 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			Description: `Plans to grant a user or group a role in a project. It returns the JSON representation of the project role template binding (PRTB) to be created without actually creating it in the cluster. Only used for displaying the resource when using human validation.`},
 			t.createProjectRoleTemplateBindingPlan,
 		)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "deleteGlobalRoleBinding",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Removes a global role from a user or group by deleting the global role binding (GRB) with the given name.
+			Use listGlobalRoleBindings to find the name of the binding to delete.`},
+			t.deleteGlobalRoleBinding)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "deleteGlobalRoleBindingPlan",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Plans to remove a global role from a user or group. It returns the JSON representation of the global role binding to be deleted without actually deleting it. Only used for displaying the resource when using human validation.`},
+			t.deleteGlobalRoleBindingPlan)
 	}
 }
