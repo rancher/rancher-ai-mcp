@@ -101,3 +101,47 @@ func TestMoveNamespace(t *testing.T) {
 		}]
 	}`, result.Content[0].(*mcp.TextContent).Text)
 }
+
+func TestMoveNamespaceMissingNamespace(t *testing.T) {
+	const (
+		clusterID   = "c-move-namespace"
+		projectID   = "p-move-namespace"
+		projectName = "Destination Project"
+		fakeToken   = "fakeToken"
+	)
+
+	cluster := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "management.cattle.io/v3",
+		"kind":       "Cluster",
+		"metadata":   map[string]any{"name": clusterID},
+	}}
+	project := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "management.cattle.io/v3",
+		"kind":       "Project",
+		"metadata":   map[string]any{"name": projectID, "namespace": clusterID},
+		"spec":       map[string]any{"displayName": projectName},
+	}}
+
+	scheme := runtime.NewScheme()
+	require.NoError(t, corev1.AddToScheme(scheme))
+	require.NoError(t, metav1.AddMetaToScheme(scheme))
+	fakeDynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, map[schema.GroupVersionResource]string{
+		{Group: "management.cattle.io", Version: "v3", Resource: "clusters"}: "ClusterList",
+		{Group: "management.cattle.io", Version: "v3", Resource: "projects"}: "ProjectList",
+	}, cluster, project)
+
+	c := &client.Client{DynClientCreator: func(*rest.Config) (dynamic.Interface, error) {
+		return fakeDynClient, nil
+	}}
+	tools := NewTools(newFakeToolsClient(c, fakeToken), false)
+
+	result, _, err := tools.moveNamespace(middleware.WithToken(t.Context(), fakeToken), &mcp.CallToolRequest{}, moveNamespaceParams{
+		Namespace: "missing",
+		Project:   projectName,
+		Cluster:   clusterID,
+	})
+
+	require.Error(t, err)
+	assert.ErrorContains(t, err, `failed to get namespace "missing"`)
+	assert.Nil(t, result)
+}

@@ -50,7 +50,7 @@ func TestAddTools(t *testing.T) {
 
 	toolsResult, err := session.ListTools(context.Background(), &mcp.ListToolsParams{})
 	require.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 6, "incorrect number of project tools registered")
+	assert.Len(t, toolsResult.Tools, 7, "incorrect number of project tools registered")
 
 	toolNames := make(map[string]bool)
 	for _, tool := range toolsResult.Tools {
@@ -58,6 +58,7 @@ func TestAddTools(t *testing.T) {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 	}
 	assert.True(t, toolNames["moveNamespace"])
+	assert.True(t, toolNames["moveNamespacePlan"])
 }
 
 func TestAddToolsReadOnly(t *testing.T) {
@@ -73,5 +74,6 @@ func TestAddToolsReadOnly(t *testing.T) {
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 		assert.NotEqual(t, "moveNamespace", tool.Name)
+		assert.NotEqual(t, "moveNamespacePlan", tool.Name)
 	}
 }
