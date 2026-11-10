@@ -483,9 +483,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Namespace:                 "fleet-default",
 				IncludeMachineDeployments: true,
 			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
+			objects: []runtime.Object{fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
 			expectedResult: `{
 				"llm": [
 					{
@@ -529,9 +527,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Namespace:          "fleet-default",
 				IncludeMachineSets: true,
 			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
+			objects: []runtime.Object{fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
 			expectedResult: `{
 				"llm": [
 					{
@@ -578,9 +574,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Namespace:       "fleet-default",
 				IncludeMachines: true,
 			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
+			objects: []runtime.Object{fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
 			expectedResult: `{
 				"llm": [
 					{
@@ -631,9 +625,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				Cluster:   "test-cluster",
 				Namespace: "fleet-default",
 			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment),
+			objects:       []runtime.Object{fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
 			expectedError: "at least one of includeMachineDeployments, includeMachineSets, or includeMachines must be true",
 		},
 	}

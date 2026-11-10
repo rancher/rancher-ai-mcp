@@ -1495,7 +1495,7 @@ func TestAnalyzeClusterMachineResourceSelection(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			fakeDynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
+			tools := newTestProvisioningTools(
 				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
 				newCAPICluster("test-cluster", "fleet-default"),
 				newCAPIMachine("test-cluster-machine-1", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1"),
@@ -1503,19 +1503,7 @@ func TestAnalyzeClusterMachineResourceSelection(t *testing.T) {
 				newCAPIMachineDeployment("test-cluster-md-0", "fleet-default", "test-cluster", 1, 1),
 				newManagementCluster("c-m-abc123", true),
 			)
-			c := &client.Client{
-				ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
-					return newFakeClientSet(), nil
-				},
-				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return fakeDynClient, nil
-				},
-			}
-			tools := NewTools(test.WrapClient(c, testToken), false)
-			req := &mcp.CallToolRequest{}
-			req.Params = &mcp.CallToolParamsRaw{Name: "analyze-cluster"}
-
-			result, _, err := tools.analyzeCluster(middleware.WithToken(t.Context(), testToken), req, tt.params)
+			result, _, err := tools.analyzeCluster(middleware.WithToken(t.Context(), testToken), newToolRequest("analyze-cluster"), tt.params)
 			assert.NoError(t, err)
 
 			text, ok := result.Content[0].(*mcp.TextContent)

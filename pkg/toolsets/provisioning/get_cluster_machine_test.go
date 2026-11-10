@@ -335,13 +335,12 @@ func TestGetClusterMachine(t *testing.T) {
 				MachineName:              "test-cluster-machine-4",
 				IncludeMachineDeployment: true,
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
+			requestURL: testURL,
+			objects: []runtime.Object{
 				newCAPIMachine("test-cluster-machine-4", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-3"),
 				newCAPIMachineSet("test-cluster-machineset-3", "fleet-default", "test-cluster", 5, 5, "test-cluster-machinedeployment-1"),
 				newCAPIMachineDeployment("test-cluster-machinedeployment-1", "fleet-default", "test-cluster", 5, 5),
-			),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -385,13 +384,12 @@ func TestGetClusterMachine(t *testing.T) {
 				MachineName:       "test-cluster-machine-4",
 				IncludeMachineSet: true,
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
+			requestURL: testURL,
+			objects: []runtime.Object{
 				newCAPIMachine("test-cluster-machine-4", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-3"),
 				newCAPIMachineSet("test-cluster-machineset-3", "fleet-default", "test-cluster", 5, 5, "test-cluster-machinedeployment-1"),
 				newCAPIMachineDeployment("test-cluster-machinedeployment-1", "fleet-default", "test-cluster", 5, 5),
-			),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -439,13 +437,12 @@ func TestGetClusterMachine(t *testing.T) {
 				IncludeMachineDeployment: true,
 				IncludeMachine:           true,
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
+			requestURL: testURL,
+			objects: []runtime.Object{
 				newCAPIMachine("test-cluster-machine-4", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-3"),
 				newCAPIMachineSet("test-cluster-machineset-3", "fleet-default", "test-cluster", 5, 5, "test-cluster-machinedeployment-1"),
 				newCAPIMachineDeployment("test-cluster-machinedeployment-1", "fleet-default", "test-cluster", 5, 5),
-			),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -520,13 +517,12 @@ func TestGetClusterMachine(t *testing.T) {
 				Cluster:     "test-cluster",
 				MachineName: "test-cluster-machine-4",
 			},
-			requestURL:    testURL,
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
+			requestURL: testURL,
+			objects: []runtime.Object{
 				newCAPIMachine("test-cluster-machine-4", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-3"),
 				newCAPIMachineSet("test-cluster-machineset-3", "fleet-default", "test-cluster", 5, 5, "test-cluster-machinedeployment-1"),
 				newCAPIMachineDeployment("test-cluster-machinedeployment-1", "fleet-default", "test-cluster", 5, 5),
-			),
+			},
 			expectedError: "at least one of includeMachineDeployment, includeMachineSet, or includeMachine must be true",
 		},
 	}
