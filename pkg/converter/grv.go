@@ -170,6 +170,14 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 	"bundlenamespacemapping": {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "bundlenamespacemappings"},
 	"imagescan":              {Group: "fleet.cattle.io", Version: "v1alpha1", Resource: "imagescans"},
 
+	// --- KUBEVIRT Resources (Group: "kubevirt.io") ---
+	"virtualmachine":         {Group: "kubevirt.io", Version: "v1", Resource: "virtualmachines"},
+	"virtualmachineinstance": {Group: "kubevirt.io", Version: "v1", Resource: "virtualmachineinstances"},
+
+	// --- KUBEVIRT INSTANCETYPE Resources (Group: "instancetype.kubevirt.io") ---
+	"virtualmachinepreference":        {Group: "instancetype.kubevirt.io", Version: "v1beta1", Resource: "virtualmachinepreferences"},
+	"virtualmachineclusterpreference": {Group: "instancetype.kubevirt.io", Version: "v1beta1", Resource: "virtualmachineclusterpreferences"},
+
 	// --- RANCHER CATTLE Resources (Group: "cattle.io") ---
 	"setting": {Group: ManagementGroup, Version: "v3", Resource: "settings"},
 
