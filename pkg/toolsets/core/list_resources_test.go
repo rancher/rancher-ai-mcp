@@ -1,16 +1,20 @@
 package core
 
 import (
+	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
+	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
@@ -390,6 +394,75 @@ func TestListKubernetesResources(t *testing.T) {
 				require.Len(t, result.Content, 1, "expected a single content entry with valid JSON")
 				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 			}
+		})
+	}
+}
+
+func TestListKubernetesResourcesKubeVirt(t *testing.T) {
+	fakeToken := "fakeToken"
+
+	tests := map[string]struct {
+		kind      string
+		gvr       schema.GroupVersionResource
+		namespace string
+	}{
+		"virtual machines": {
+			kind:      "VirtualMachine",
+			gvr:       schema.GroupVersionResource{Group: "kubevirt.io", Version: "v1", Resource: "virtualmachines"},
+			namespace: "default",
+		},
+		"virtual machine instances": {
+			kind:      "VirtualMachineInstance",
+			gvr:       schema.GroupVersionResource{Group: "kubevirt.io", Version: "v1", Resource: "virtualmachineinstances"},
+			namespace: "default",
+		},
+		"virtual machine preferences": {
+			kind:      "VirtualMachinePreference",
+			gvr:       schema.GroupVersionResource{Group: "instancetype.kubevirt.io", Version: "v1beta1", Resource: "virtualmachinepreferences"},
+			namespace: "default",
+		},
+		"virtual machine cluster preferences": {
+			kind: "VirtualMachineClusterPreference",
+			gvr:  schema.GroupVersionResource{Group: "instancetype.kubevirt.io", Version: "v1beta1", Resource: "virtualmachineclusterpreferences"},
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			metadata := map[string]any{"name": "test-1"}
+			if tt.namespace != "" {
+				metadata["namespace"] = tt.namespace
+			}
+			obj := &unstructured.Unstructured{Object: map[string]any{
+				"apiVersion": tt.gvr.GroupVersion().String(),
+				"kind":       tt.kind,
+				"metadata":   metadata,
+			}}
+			fakeDynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), map[schema.GroupVersionResource]string{
+				tt.gvr: tt.kind + "List",
+			}, obj)
+			c := &client.Client{
+				DynClientCreator: func(*rest.Config) (dynamic.Interface, error) { return fakeDynClient, nil },
+			}
+			tools := NewTools(test.WrapClient(c, fakeToken), false)
+
+			result, _, err := tools.listKubernetesResources(middleware.WithToken(t.Context(), fakeToken), test.NewCallToolRequest(""),
+				listKubernetesResourcesParams{Kind: tt.kind, Cluster: "local"})
+
+			require.NoError(t, err)
+			require.Len(t, result.Content, 1)
+			want, err := json.Marshal(map[string]any{
+				"llm": []any{obj.Object},
+				"uiContext": []response.UIContext{{
+					Namespace: tt.namespace,
+					Kind:      tt.kind,
+					Cluster:   "local",
+					Name:      "test-1",
+					Type:      tt.gvr.Group + "." + strings.ToLower(tt.kind),
+				}},
+			})
+			require.NoError(t, err)
+			assert.JSONEq(t, string(want), result.Content[0].(*mcp.TextContent).Text)
 		})
 	}
 }
