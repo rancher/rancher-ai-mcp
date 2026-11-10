@@ -3,6 +3,9 @@ package provisioning
 import (
 	"encoding/json"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	provisioningV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -11,8 +14,11 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/discovery"
 	fakediscovery "k8s.io/client-go/discovery/fake"
+	"k8s.io/client-go/dynamic"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	"k8s.io/client-go/rest"
 )
 
 // Test constants
@@ -20,6 +26,29 @@ const (
 	testURL   = "https://localhost:8080"
 	testToken = "fakeToken"
 )
+
+// newTestTools returns Tools backed by the given fake dynamic client and a fake clientset.
+func newTestTools(fakeDynClient dynamic.Interface) *Tools {
+	c := &client.Client{
+		ClientSetCreator: func(*rest.Config) (kubernetes.Interface, error) {
+			return newFakeClientSet(), nil
+		},
+		DynClientCreator: func(*rest.Config) (dynamic.Interface, error) {
+			return fakeDynClient, nil
+		},
+	}
+	return NewTools(test.WrapClient(c, testToken), false)
+}
+
+// newTestProvisioningTools returns Tools for a fake dynamic client containing the given objects.
+func newTestProvisioningTools(objects ...runtime.Object) *Tools {
+	return newTestTools(dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(), objects...))
+}
+
+// newToolRequest returns a tool call request for the named tool.
+func newToolRequest(name string) *mcp.CallToolRequest {
+	return &mcp.CallToolRequest{Params: &mcp.CallToolParamsRaw{Name: name}}
+}
 
 // provisioningSchemes returns a runtime scheme with core API types registered
 func provisioningSchemes() *runtime.Scheme {

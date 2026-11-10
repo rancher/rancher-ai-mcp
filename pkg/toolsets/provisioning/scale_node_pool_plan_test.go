@@ -1,43 +1,38 @@
 package provisioning
 
 import (
-	"context"
+	"fmt"
 	"testing"
 
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/utils/ptr"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	provisioningV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/stretchr/testify/assert"
-	"k8s.io/client-go/dynamic"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
+	"github.com/stretchr/testify/require"
 )
 
 func TestScaleNodePoolPlan(t *testing.T) {
 	tests := []struct {
 		name           string
-		fakeClientset  kubernetes.Interface
-		fakeDynClient  *dynamicfake.FakeDynamicClient
+		objects        []runtime.Object
 		params         scaleNodePoolParameters
 		expectedError  string
 		expectedResult string
 	}{
 		{
-			name:          "scale node pool with desired size",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: true,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](1),
-					},
-				})),
+			name: "scale node pool with desired size",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         true,
+					ControlPlaneRole: true,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](1),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:      "test-cluster",
 				Namespace:    "fleet-default",
@@ -49,6 +44,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
   {
     "type": "update",
     "payload": [
+` + expectedScaleTestOps(0, "test-nodepool", 1) + `
       {
         "op": "replace",
         "path": "/spec/rkeConfig/machinePools/0/quantity",
@@ -65,25 +61,23 @@ func TestScaleNodePoolPlan(t *testing.T) {
 ]`,
 		},
 		{
-			name:          "refuse to scale etcd node pool below 3 nodes",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: true,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](5),
-					},
-					{
-						EtcdRole:         false,
-						ControlPlaneRole: false,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](1),
-					},
-				})),
+			name: "refuse to scale etcd node pool below 3 nodes",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         true,
+					ControlPlaneRole: true,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](5),
+				},
+				{
+					EtcdRole:         false,
+					ControlPlaneRole: false,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](1),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:      "test-cluster",
 				Namespace:    "fleet-default",
@@ -94,25 +88,23 @@ func TestScaleNodePoolPlan(t *testing.T) {
 			expectedResult: "",
 		},
 		{
-			name:          "scale non-etcd pool to less than three nodes",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: true,
-						WorkerRole:       true,
-						Name:             "test-nodepool-etcd",
-						Quantity:         ptr.To[int32](3),
-					},
-					{
-						EtcdRole:         false,
-						ControlPlaneRole: false,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](5),
-					},
-				})),
+			name: "scale non-etcd pool to less than three nodes",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         true,
+					ControlPlaneRole: true,
+					WorkerRole:       true,
+					Name:             "test-nodepool-etcd",
+					Quantity:         ptr.To[int32](3),
+				},
+				{
+					EtcdRole:         false,
+					ControlPlaneRole: false,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](5),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:      "test-cluster",
 				Namespace:    "fleet-default",
@@ -124,6 +116,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
   {
     "type": "update",
     "payload": [
+` + expectedScaleTestOps(1, "test-nodepool", 5) + `
       {
         "op": "replace",
         "path": "/spec/rkeConfig/machinePools/1/quantity",
@@ -140,18 +133,16 @@ func TestScaleNodePoolPlan(t *testing.T) {
 ]`,
 		},
 		{
-			name:          "fail to provide desired size or amount to add/subtract",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: true,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](1),
-					},
-				})),
+			name: "fail to provide desired size or amount to add/subtract",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         true,
+					ControlPlaneRole: true,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](1),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -164,18 +155,16 @@ func TestScaleNodePoolPlan(t *testing.T) {
 			expectedResult: "",
 		},
 		{
-			name:          "try to scale to negative nodes",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         false,
-						ControlPlaneRole: true,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](1),
-					},
-				})),
+			name: "try to scale to negative nodes",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         false,
+					ControlPlaneRole: true,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](1),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -188,18 +177,16 @@ func TestScaleNodePoolPlan(t *testing.T) {
 			expectedResult: "",
 		},
 		{
-			name:          "add a single node",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         false,
-						ControlPlaneRole: false,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](1),
-					},
-				})),
+			name: "add a single node",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         false,
+					ControlPlaneRole: false,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](1),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -213,6 +200,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
   {
     "type": "update",
     "payload": [
+` + expectedScaleTestOps(0, "test-nodepool", 1) + `
       {
         "op": "replace",
         "path": "/spec/rkeConfig/machinePools/0/quantity",
@@ -229,18 +217,16 @@ func TestScaleNodePoolPlan(t *testing.T) {
 ]`,
 		},
 		{
-			name:          "try to scale an etcd pool to an even number of nodes",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: true,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](1),
-					},
-				})),
+			name: "try to scale an etcd pool to an even number of nodes",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         true,
+					ControlPlaneRole: true,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](1),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -252,18 +238,16 @@ func TestScaleNodePoolPlan(t *testing.T) {
 			expectedError: "etcd node pools should have an odd number of nodes to ensure fault tolerance and maintain quorum. Scaling to an even number of nodes can lead to split-brain scenarios and potential data loss",
 		},
 		{
-			name:          "try to scale an etcd pool to more than 7 nodes",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: true,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](1),
-					},
-				})),
+			name: "try to scale an etcd pool to more than 7 nodes",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         true,
+					ControlPlaneRole: true,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](1),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -275,18 +259,16 @@ func TestScaleNodePoolPlan(t *testing.T) {
 			expectedError: "it is not recommended to have more than 7 etcd nodes in a cluster as it can lead to performance issues",
 		},
 		{
-			name:          "add two node to an etcd pool with less than three initial nodes",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: true,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](1),
-					},
-				})),
+			name: "add two node to an etcd pool with less than three initial nodes",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         true,
+					ControlPlaneRole: true,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](1),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -300,6 +282,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
   {
     "type": "update",
     "payload": [
+` + expectedScaleTestOps(0, "test-nodepool", 1) + `
       {
         "op": "replace",
         "path": "/spec/rkeConfig/machinePools/0/quantity",
@@ -316,18 +299,16 @@ func TestScaleNodePoolPlan(t *testing.T) {
 ]`,
 		},
 		{
-			name:          "subtract a single node",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         false,
-						ControlPlaneRole: false,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](2),
-					},
-				})),
+			name: "subtract a single node",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         false,
+					ControlPlaneRole: false,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](2),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -341,6 +322,7 @@ func TestScaleNodePoolPlan(t *testing.T) {
   {
     "type": "update",
     "payload": [
+` + expectedScaleTestOps(0, "test-nodepool", 2) + `
       {
         "op": "replace",
         "path": "/spec/rkeConfig/machinePools/0/quantity",
@@ -357,18 +339,16 @@ func TestScaleNodePoolPlan(t *testing.T) {
 ]`,
 		},
 		{
-			name:          "refuse to subtract a node if it would scale pool to zero nodes",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         false,
-						ControlPlaneRole: false,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](1),
-					},
-				})),
+			name: "refuse to subtract a node if it would scale pool to zero nodes",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         false,
+					ControlPlaneRole: false,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](1),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -377,22 +357,20 @@ func TestScaleNodePoolPlan(t *testing.T) {
 				AmountToSubtract: 1,
 				AmountToAdd:      0,
 			},
-			expectedError:  "A node pool cannot be scaled to 0 nodes or a negative number of nodes",
+			expectedError:  "a node pool cannot be scaled to 0 nodes or a negative number of nodes",
 			expectedResult: "",
 		},
 		{
-			name:          "refuse to subtract a node if it would scale pool to negative nodes",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         false,
-						ControlPlaneRole: false,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](1),
-					},
-				})),
+			name: "refuse to subtract a node if it would scale pool to negative nodes",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         false,
+					ControlPlaneRole: false,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](1),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -401,22 +379,20 @@ func TestScaleNodePoolPlan(t *testing.T) {
 				AmountToSubtract: 3,
 				AmountToAdd:      0,
 			},
-			expectedError:  "A node pool cannot be scaled to 0 nodes or a negative number of nodes",
+			expectedError:  "a node pool cannot be scaled to 0 nodes or a negative number of nodes",
 			expectedResult: "",
 		},
 		{
-			name:          "refuse to subtract a node if it would result in etcd quorum loss",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: false,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](3),
-					},
-				})),
+			name: "refuse to subtract a node if it would result in etcd quorum loss",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         true,
+					ControlPlaneRole: false,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](3),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -429,18 +405,16 @@ func TestScaleNodePoolPlan(t *testing.T) {
 			expectedResult: "",
 		},
 		{
-			name:          "scale a pool that doesn't exist",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: false,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](3),
-					},
-				})),
+			name: "scale a pool that doesn't exist",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         true,
+					ControlPlaneRole: false,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](3),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -453,10 +427,8 @@ func TestScaleNodePoolPlan(t *testing.T) {
 			expectedResult: "",
 		},
 		{
-			name:          "scale a cluster that doesn't have pools",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{})),
+			name:    "scale a cluster that doesn't have pools",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -469,18 +441,16 @@ func TestScaleNodePoolPlan(t *testing.T) {
 			expectedResult: "",
 		},
 		{
-			name:          "attempt to both add and remove nodes",
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
-				newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
-					{
-						EtcdRole:         true,
-						ControlPlaneRole: false,
-						WorkerRole:       true,
-						Name:             "test-nodepool",
-						Quantity:         ptr.To[int32](3),
-					},
-				})),
+			name: "attempt to both add and remove nodes",
+			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{
+				{
+					EtcdRole:         true,
+					ControlPlaneRole: false,
+					WorkerRole:       true,
+					Name:             "test-nodepool",
+					Quantity:         ptr.To[int32](3),
+				},
+			})},
 			params: scaleNodePoolParameters{
 				Cluster:          "test-cluster",
 				Namespace:        "fleet-default",
@@ -496,21 +466,9 @@ func TestScaleNodePoolPlan(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			c := &client.Client{
-				ClientSetCreator: func(inConfig *rest.Config) (kubernetes.Interface, error) {
-					return test.fakeClientset, nil
-				},
-				DynClientCreator: func(inConfig *rest.Config) (dynamic.Interface, error) {
-					return test.fakeDynClient, nil
-				},
-			}
-			tools := Tools{client: c}
+			tools := newTestProvisioningTools(test.objects...)
 
-			result, _, err := tools.scaleClusterNodePoolPlan(context.Background(), &mcp.CallToolRequest{
-				Params: &mcp.CallToolParamsRaw{
-					Name: "scaleClusterNodePoolPlan",
-				},
-			}, test.params)
+			result, _, err := tools.scaleClusterNodePoolPlan(middleware.WithToken(t.Context(), testToken), newToolRequest("scaleClusterNodePoolPlan"), test.params)
 
 			if test.expectedError != "" {
 				assert.ErrorContains(t, err, test.expectedError)
@@ -525,4 +483,51 @@ func TestScaleNodePoolPlan(t *testing.T) {
 			}
 		})
 	}
+}
+
+// expectedScaleTestOps returns the JSON patch test operations that a scale patch starts with, followed by a comma,
+// for a pool at index with the given name and quantity that isn't autoscaled.
+func expectedScaleTestOps(index int, name string, quantity int) string {
+	path := fmt.Sprintf("/spec/rkeConfig/machinePools/%d", index)
+	return fmt.Sprintf(`{"op": "test", "path": "%[1]s/name", "value": %[2]q},
+      {"op": "test", "path": "%[1]s/quantity", "value": %[3]d},
+      {"op": "test", "path": "%[1]s/autoscalingMinSize", "value": null},
+      {"op": "test", "path": "%[1]s/autoscalingMaxSize", "value": null},`, path, name, quantity)
+}
+
+func TestScaleNodePoolPlanWithoutQuantity(t *testing.T) {
+	// Rancher creates a single node when the quantity isn't set.
+	tools := newTestProvisioningTools(newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123",
+		[]provisioningV1.RKEMachinePool{{Name: "worker", WorkerRole: true}}))
+
+	result, _, err := tools.scaleClusterNodePoolPlan(middleware.WithToken(t.Context(), testToken), newToolRequest("scaleClusterNodePoolPlan"),
+		scaleNodePoolParameters{Cluster: "test-cluster", Namespace: "fleet-default", NodePoolName: "worker", AmountToAdd: 1})
+	require.NoError(t, err)
+
+	text, ok := result.Content[0].(*mcp.TextContent)
+	require.True(t, ok, "expected type *mcp.TextContent")
+	assert.JSONEq(t, `[{
+		"type": "update",
+		"payload": [
+			{"op": "test", "path": "/spec/rkeConfig/machinePools/0/name", "value": "worker"},
+			{"op": "test", "path": "/spec/rkeConfig/machinePools/0/quantity", "value": null},
+			{"op": "test", "path": "/spec/rkeConfig/machinePools/0/autoscalingMinSize", "value": null},
+			{"op": "test", "path": "/spec/rkeConfig/machinePools/0/autoscalingMaxSize", "value": null},
+			{"op": "add", "path": "/spec/rkeConfig/machinePools/0/quantity", "value": 2}
+		],
+		"resource": {"name": "test-cluster", "kind": "provisioningcluster", "cluster": "local", "namespace": "fleet-default"}
+	}]`, text.Text)
+}
+
+func TestScaleNodePoolPlanAutoscaledPool(t *testing.T) {
+	tools := newTestProvisioningTools(newProvisioningClusterWithRKEConfig("test-cluster", "fleet-default", "c-m-abc123", []provisioningV1.RKEMachinePool{{
+		Name: "worker", WorkerRole: true, Quantity: ptr.To[int32](2),
+		AutoscalingMinSize: ptr.To[int32](1), AutoscalingMaxSize: ptr.To[int32](5),
+	}}))
+
+	_, _, err := tools.scaleClusterNodePoolPlan(middleware.WithToken(t.Context(), testToken), newToolRequest("scaleClusterNodePoolPlan"),
+		scaleNodePoolParameters{Cluster: "test-cluster", Namespace: "fleet-default", NodePoolName: "worker", DesiredSize: 3})
+
+	// The Plan variant of the autoscaling tool is suggested when planning.
+	assert.EqualError(t, err, "node pool worker is managed by the cluster autoscaler, which scales it between 1 and 5 nodes, so it cannot be scaled manually. Use updateNodePoolAutoscalingPlan to change its minimum and maximum size, or to disable autoscaling for the node pool")
 }

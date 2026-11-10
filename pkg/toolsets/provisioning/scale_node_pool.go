@@ -54,6 +54,23 @@ func (params *scaleNodePoolParameters) validate(toolReq *mcp.CallToolRequest) (*
 		return nil, fmt.Errorf("scaling node pools in the local cluster is not supported")
 	}
 
+	for _, size := range []struct {
+		name  string
+		value int
+	}{{"desiredSize", params.DesiredSize}, {"amountToAdd", params.AmountToAdd}, {"amountToSubtract", params.AmountToSubtract}} {
+		if err := validateInt32(size.name, size.value); err != nil {
+			return nil, err
+		}
+	}
+
+	// A negative amount would scale the node pool in the opposite direction to the one requested.
+	if params.AmountToAdd < 0 {
+		return nil, fmt.Errorf("amountToAdd must not be negative, use amountToSubtract to remove nodes")
+	}
+	if params.AmountToSubtract < 0 {
+		return nil, fmt.Errorf("amountToSubtract must not be negative, use amountToAdd to add nodes")
+	}
+
 	return log, nil
 }
 
@@ -81,12 +98,14 @@ func (t *Tools) scaleClusterNodePool(ctx context.Context, toolReq *mcp.CallToolR
 	patchObj, err := resourceInterface.Patch(ctx, params.Cluster, types.JSONPatchType, patchBytes, metav1.PatchOptions{})
 	if err != nil {
 		log.Error("failed to patch provisioning cluster with new node pool size", zap.Error(err))
-		return nil, nil, err
+		return nil, nil, t.staleNodePoolError(ctx, log, params.Namespace, params.Cluster, params.NodePoolName, patchBytes, err)
 	}
 
 	log.Debug("Successfully patched provisioning cluster with new node pool size")
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{patchObj}, params.Cluster)
+	removeMachinePoolSchemas(patchObj)
+	// The provisioning cluster object is stored in the local cluster.
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{patchObj}, LocalCluster)
 	if err != nil {
 		log.Error("failed to create mcp response", zap.Error(err))
 		return nil, nil, err
@@ -135,60 +154,69 @@ func (t *Tools) scaleClusterNodePoolPatch(ctx context.Context, toolReq *mcp.Call
 		return nil, fmt.Errorf("cannot specify both amountToAdd and amountToSubtract")
 	}
 
-	poolIndex := -1
-	for i := range provCluster.Spec.RKEConfig.MachinePools {
-		pool := &provCluster.Spec.RKEConfig.MachinePools[i]
-		// accept either the concrete node pool name, or the node pool name prefixed with the cluster name (as seen in the Rancher UI)
-		if params.NodePoolName != pool.Name && params.NodePoolName != provCluster.Name+"-"+pool.Name {
-			continue
-		}
-
-		log.Debug("node pool found in cluster RKEConfig, updating desired size", zap.Int32("current_size", *pool.Quantity))
-		poolIndex = i
-		oldQuantity := *pool.Quantity
-
-		if amountToAdd != 0 {
-			desiredSize = *pool.Quantity + amountToAdd
-		}
-
-		if amountToSubtract != 0 {
-			desiredSize = *pool.Quantity - amountToSubtract
-		}
-
-		if pool.EtcdRole {
-			if desiredSize < 3 && desiredSize < oldQuantity {
-				log.Error("Refusing to scale etcd node pool to less than 3 nodes to prevent loss of quorum")
-				return nil, fmt.Errorf("scaling an etcd node pool to less than 3 nodes can result in a loss of quorum and potential data loss")
-			}
-
-			if desiredSize > 7 {
-				log.Error("Refusing to scale etcd node pool to more than 7 nodes")
-				return nil, fmt.Errorf("it is not recommended to have more than 7 etcd nodes in a cluster as it can lead to performance issues")
-			}
-
-			if desiredSize%2 == 0 {
-				log.Error("Refusing to scale etcd node pool to an even number of nodes.")
-				return nil, fmt.Errorf("etcd node pools should have an odd number of nodes to ensure fault tolerance and maintain quorum. Scaling to an even number of nodes can lead to split-brain scenarios and potential data loss")
-			}
-		}
-
-		if desiredSize <= 0 {
-			log.Error("Refusing to scale a node pool to 0 or a negative number of nodes")
-			return nil, fmt.Errorf("A node pool cannot be scaled to 0 nodes or a negative number of nodes")
-		}
-		break
-	}
-
-	if poolIndex == -1 {
+	poolIndex, pool := findMachinePool(provCluster, params.NodePoolName)
+	if pool == nil {
 		err = fmt.Errorf("node pool %s not found in cluster %s", params.NodePoolName, params.Cluster)
 		log.Error(err.Error())
 		return nil, err
 	}
 
+	// The cluster autoscaler adjusts the size of autoscaled pools, and would override a manual change.
+	if isAutoscaled(*pool) {
+		log.Error("Refusing to manually scale a node pool managed by the cluster autoscaler")
+		return nil, fmt.Errorf("node pool %s is managed by the cluster autoscaler, which scales it between %d and %d nodes, so it cannot be scaled manually. Use %s to change its minimum and maximum size, or to disable autoscaling for the node pool", pool.Name, *pool.AutoscalingMinSize, *pool.AutoscalingMaxSize, relatedTool(toolReq, "updateNodePoolAutoscaling"))
+	}
+
+	oldQuantity := machinePoolQuantity(*pool)
+	log.Debug("node pool found in cluster RKEConfig, updating desired size", zap.Int32("current_size", oldQuantity))
+
+	if amountToAdd != 0 {
+		desiredSize = oldQuantity + amountToAdd
+	}
+
+	if amountToSubtract != 0 {
+		desiredSize = oldQuantity - amountToSubtract
+	}
+
+	if pool.EtcdRole {
+		if desiredSize < 3 && desiredSize < oldQuantity {
+			log.Error("Refusing to scale etcd node pool to less than 3 nodes to prevent loss of quorum")
+			return nil, fmt.Errorf("scaling an etcd node pool to less than 3 nodes can result in a loss of quorum and potential data loss")
+		}
+
+		if desiredSize > 7 {
+			log.Error("Refusing to scale etcd node pool to more than 7 nodes")
+			return nil, fmt.Errorf("it is not recommended to have more than 7 etcd nodes in a cluster as it can lead to performance issues")
+		}
+
+		if desiredSize%2 == 0 {
+			log.Error("Refusing to scale etcd node pool to an even number of nodes.")
+			return nil, fmt.Errorf("etcd node pools should have an odd number of nodes to ensure fault tolerance and maintain quorum. Scaling to an even number of nodes can lead to split-brain scenarios and potential data loss")
+		}
+	}
+
+	if desiredSize <= 0 {
+		log.Error("Refusing to scale a node pool to 0 or a negative number of nodes")
+		return nil, fmt.Errorf("a node pool cannot be scaled to 0 nodes or a negative number of nodes")
+	}
+
+	poolPath := fmt.Sprintf("/spec/rkeConfig/machinePools/%d", poolIndex)
+	// "replace" requires the field to exist, so an unset quantity is added instead.
+	quantityOp := "replace"
+	if pool.Quantity == nil {
+		quantityOp = "add"
+	}
 	patch := []map[string]any{
+		// The pool is patched by index, so make sure the index still refers to the same pool when the patch is applied.
+		testOp(poolPath+"/name", pool.Name),
+		// The new size can be based on the current size, which may have changed after it was read.
+		testOptionalOp(poolPath+"/quantity", pool.Quantity),
+		// Make sure autoscaling wasn't enabled after the pool was read, as the cluster autoscaler would override the new size.
+		testOptionalOp(poolPath+"/autoscalingMinSize", pool.AutoscalingMinSize),
+		testOptionalOp(poolPath+"/autoscalingMaxSize", pool.AutoscalingMaxSize),
 		{
-			"op":    "replace",
-			"path":  fmt.Sprintf("/spec/rkeConfig/machinePools/%d/quantity", poolIndex),
+			"op":    quantityOp,
+			"path":  poolPath + "/quantity",
 			"value": desiredSize,
 		},
 	}

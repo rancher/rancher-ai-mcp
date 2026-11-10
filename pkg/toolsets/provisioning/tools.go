@@ -68,6 +68,16 @@ This should be used when detailed information about a specific machine is requir
 		t.getClusterMachine)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "getClusterAutoscaling",
+		Meta: map[string]any{
+			toolsSetAnn: ToolsSet,
+		},
+		Description: `Returns whether cluster autoscaling is supported, enabled and paused for an rke2 or k3s cluster, the state of the cluster-autoscaler deployment, and the autoscaling configuration (current size, minimum and maximum size) of each node pool, with a warning for node pools with an incomplete configuration.
+This should be used when the user wants to know if a cluster has the autoscaler enabled, or before changing the size or autoscaling configuration of a node pool.
+Autoscaling is only supported for clusters provisioned by Rancher with machine pools; it is not supported for the local cluster, or for custom, imported or k3k clusters.`},
+		t.getClusterAutoscaling)
+
+	mcp.AddTool(mcpServer, &mcp.Tool{
 		Name: "listK3kClusters",
 		Meta: map[string]any{
 			toolsSetAnn: ToolsSet,
@@ -105,6 +115,7 @@ This should only be used when information about the supported rke2 and k3s is ne
 			Description: `Changes the size of an existing node pool for an rke2 or k3s cluster.
 This should be used when the user wants to change the size of an existing node pool for an rke2 or k3s cluster.
 Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.
+Node pools managed by the cluster autoscaler cannot be scaled manually; use updateNodePoolAutoscaling to change their minimum and maximum size instead.
 The local cluster does not support node pool scaling.`},
 			t.scaleClusterNodePool)
 
@@ -116,8 +127,32 @@ The local cluster does not support node pool scaling.`},
 			Description: `Plans to change the size of an existing node pool for an rke2 or k3s cluster. It returns the JSON representation of the updated node pool resource without actually applying the change in the cluster.
 Only used for displaying the resource when using human validation. This should be used when the user wants to change the size of an existing node pool for an rke2 or k3s cluster.
 Pools cannot be scaled to zero nodes, and etcd node pools cannot be scaled below 3 nodes to prevent loss of quorum.
+Node pools managed by the cluster autoscaler cannot be scaled manually; use updateNodePoolAutoscalingPlan to change their minimum and maximum size instead.
 The local cluster does not support node pool scaling.`},
 			t.scaleClusterNodePoolPlan)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "updateNodePoolAutoscaling",
+			Meta: map[string]any{
+				toolsSetAnn: ToolsSet,
+			},
+			Description: `Enables, changes or disables cluster autoscaling for an existing node pool of an rke2 or k3s cluster, by setting the minimum and maximum number of nodes the cluster autoscaler can scale the node pool to.
+This should be used when the user wants to enable, adjust or disable the autoscaler for a node pool. Use getClusterAutoscaling first to see the current autoscaling configuration.
+If the current size of the node pool is outside the new range, the node pool is resized to the nearest bound. The minimum size must be at least 1.
+The response includes a note if the cluster-autoscaling feature is disabled in Rancher or the autoscaler is paused for the cluster, as the node pool won't be scaled until then.
+Autoscaling is not supported for etcd node pools, as it could leave the cluster with an even number of etcd nodes. The local cluster does not support autoscaling.`},
+			t.updateNodePoolAutoscaling)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "updateNodePoolAutoscalingPlan",
+			Meta: map[string]any{
+				toolsSetAnn: ToolsSet,
+			},
+			Description: `Plans to enable, change or disable cluster autoscaling for an existing node pool of an rke2 or k3s cluster. It returns the JSON patch for the cluster without actually applying the change in the cluster.
+Only used for displaying the resource when using human validation. This should be used when the user wants to enable, adjust or disable the autoscaler for a node pool.
+If the current size of the node pool is outside the new range, the node pool is resized to the nearest bound. The minimum size must be at least 1.
+Autoscaling is not supported for etcd node pools, as it could leave the cluster with an even number of etcd nodes. The local cluster does not support autoscaling.`},
+			t.updateNodePoolAutoscalingPlan)
 
 		mcp.AddTool(mcpServer, &mcp.Tool{
 			Name: "createK3kCluster",

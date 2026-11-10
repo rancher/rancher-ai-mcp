@@ -68,6 +68,20 @@ The resource usage includes CPU and memory requests, limits and actual usage, as
 		t.getResourceUsage,
 	)
 
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "getClusterResourceUsage",
+		Meta: map[string]any{
+			toolsSetAnn: toolsSet,
+		},
+		Description: `Returns the overall resource usage of a cluster, as totals for the entire cluster as well as broken down by node.
+For CPU, memory and pods it includes the capacity and allocatable resources of the nodes, the requests and limits of the pods scheduled on them, and the actual usage when the metrics server is available, with percentages relative to the allocatable resources.
+If node metrics can't be retrieved, metricsUnavailableReason explains why, e.g. because the user isn't allowed to read metrics or the metrics server isn't installed.
+Nodes without metrics, such as nodes that have just joined or are not ready, are listed in nodesWithoutMetrics, and cluster-wide actual usage is then omitted because it would be understated.
+It also reports the number of ready nodes and the number of pending pods that could not be scheduled, which indicates that the cluster is running out of capacity.
+Use this tool to check how much of a cluster's capacity is used, or whether a cluster needs to be scaled.`},
+		t.getClusterResourceUsage,
+	)
+
 	if !t.ReadOnly {
 		mcp.AddTool(mcpServer, &mcp.Tool{
 			Name: "createProject",
