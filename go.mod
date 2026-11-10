@@ -21,13 +21,14 @@ require (
 	github.com/rancher/fleet v0.16.0
 	github.com/rancher/fleet/pkg/apis v0.16.0
 	github.com/rancher/rancher/pkg/apis v0.0.0-20260304125340-d81ccc23a894
+	github.com/rancher/rancher/pkg/plan v0.0.0-20261109152716-530efc74aedf
 	github.com/rancher/wrangler/v3 v3.7.2
 	github.com/spf13/cobra v1.10.2
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/zap v1.28.0
 	gopkg.in/evanphx/json-patch.v4 v4.13.0
-	k8s.io/api v0.36.4
-	k8s.io/apimachinery v0.36.4
+	k8s.io/api v0.36.6
+	k8s.io/apimachinery v0.36.6
 	k8s.io/client-go v12.0.0+incompatible
 	k8s.io/component-helpers v0.36.4
 	k8s.io/metrics v0.36.4
