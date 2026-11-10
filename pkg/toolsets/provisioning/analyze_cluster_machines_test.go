@@ -137,8 +137,11 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 	}{
 		"analyze cluster with machines, machine sets, and deployments": {
 			params: inspectClusterMachinesParams{
-				Cluster:   "test-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "test-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			objects: []runtime.Object{fakeCAPIMachine, fakeCAPIMachine2, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
 			expectedResult: `{
@@ -283,16 +286,22 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 		},
 		"analyze cluster with no machines": {
 			params: inspectClusterMachinesParams{
-				Cluster:   "empty-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "empty-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			objects:        nil,
 			expectedResult: `{"llm":"no resources found"}`,
 		},
 		"analyze cluster with default namespace": {
 			params: inspectClusterMachinesParams{
-				Cluster:   "test-cluster",
-				Namespace: "",
+				Cluster:                   "test-cluster",
+				Namespace:                 "",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			objects: []runtime.Object{fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
 			expectedResult: `{
@@ -405,8 +414,11 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 		},
 		"analyze cluster with only machines (no sets or deployments, custom cluster)": {
 			params: inspectClusterMachinesParams{
-				Cluster:   "test-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "test-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			objects: []runtime.Object{fakeCAPIMachine},
 			expectedResult: `{
@@ -456,11 +468,165 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 		},
 		"analyze cluster machines when the tool is configured with a rancher URL": {
 			params: inspectClusterMachinesParams{
-				Cluster:   "empty-cluster",
-				Namespace: "fleet-default",
+				Cluster:                   "empty-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+				IncludeMachineSets:        true,
+				IncludeMachines:           true,
 			},
 			objects:        nil,
 			expectedResult: `{"llm":"no resources found"}`,
+		},
+		"analyze cluster with only machine deployments selected": {
+			params: inspectClusterMachinesParams{
+				Cluster:                   "test-cluster",
+				Namespace:                 "fleet-default",
+				IncludeMachineDeployments: true,
+			},
+			objects: []runtime.Object{fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "cluster.x-k8s.io/v1beta1",
+						"kind": "MachineDeployment",
+						"metadata": {
+							"labels": {
+								"cluster.x-k8s.io/cluster-name": "test-cluster"
+							},
+							"name": "test-cluster-md-0",
+							"namespace": "fleet-default"
+						},
+						"spec": {
+							"replicas": 2,
+							"selector": {
+								"matchLabels": {
+									"cluster.x-k8s.io/cluster-name": "test-cluster"
+								}
+							}
+						},
+						"status": {
+							"readyReplicas": 1,
+							"replicas": 2
+						}
+					}
+				],
+				"uiContext": [
+					{
+						"cluster": "local",
+						"kind": "MachineDeployment",
+						"name": "test-cluster-md-0",
+						"namespace": "fleet-default",
+						"type": "cluster.x-k8s.io.machinedeployment"
+					}
+				]
+			}`,
+		},
+		"analyze cluster with only machine sets selected": {
+			params: inspectClusterMachinesParams{
+				Cluster:            "test-cluster",
+				Namespace:          "fleet-default",
+				IncludeMachineSets: true,
+			},
+			objects: []runtime.Object{fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "cluster.x-k8s.io/v1beta1",
+						"kind": "MachineSet",
+						"metadata": {
+							"labels": {
+								"cluster.x-k8s.io/cluster-name": "test-cluster"
+							},
+							"name": "test-cluster-machineset-1",
+							"namespace": "fleet-default",
+							"ownerReferences": [
+								{
+									"apiVersion": "cluster.x-k8s.io/v1beta1",
+									"controller": true,
+									"kind": "MachineDeployment",
+									"name": "test-cluster-md-0"
+								}
+							]
+						},
+						"spec": {
+							"replicas": 2
+						},
+						"status": {
+							"readyReplicas": 1,
+							"replicas": 2
+						}
+					}
+				],
+				"uiContext": [
+					{
+						"cluster": "local",
+						"kind": "MachineSet",
+						"name": "test-cluster-machineset-1",
+						"namespace": "fleet-default",
+						"type": "cluster.x-k8s.io.machineset"
+					}
+				]
+			}`,
+		},
+		"analyze cluster with only machines selected": {
+			params: inspectClusterMachinesParams{
+				Cluster:         "test-cluster",
+				Namespace:       "fleet-default",
+				IncludeMachines: true,
+			},
+			objects: []runtime.Object{fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "cluster.x-k8s.io/v1beta1",
+						"kind": "Machine",
+						"metadata": {
+							"labels": {
+								"cluster.x-k8s.io/cluster-name": "test-cluster"
+							},
+							"name": "test-cluster-machine-1",
+							"namespace": "fleet-default",
+							"ownerReferences": [
+								{
+									"apiVersion": "cluster.x-k8s.io/v1beta1",
+									"controller": true,
+									"kind": "MachineSet",
+									"name": "test-cluster-machineset-1"
+								}
+							]
+						},
+						"spec": {
+							"bootstrap": {
+								"configRef": {
+									"kind": "RKEBootstrap",
+									"name": "test-cluster-machine-1"
+								}
+							},
+							"clusterName": "test-cluster"
+						},
+						"status": {
+							"phase": "Running"
+						}
+					}
+				],
+				"uiContext": [
+					{
+						"cluster": "local",
+						"kind": "Machine",
+						"name": "test-cluster-machine-1",
+						"namespace": "fleet-default",
+						"type": "cluster.x-k8s.io.machine"
+					}
+				]
+			}`,
+		},
+		"analyze cluster with no resource types selected": {
+			params: inspectClusterMachinesParams{
+				Cluster:   "test-cluster",
+				Namespace: "fleet-default",
+			},
+			objects:       []runtime.Object{fakeCAPIMachine, fakeCAPIMachineSet, fakeCAPIMachineDeployment},
+			expectedError: "at least one of includeMachineDeployments, includeMachineSets, or includeMachines must be true",
 		},
 	}
 
