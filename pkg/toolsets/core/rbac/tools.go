@@ -177,7 +177,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,
 			},
-			Description: `Plans to delete a global role. It returns the JSON representation of the global role and the global role bindings that will be deleted with it, without actually deleting them. Only used for displaying the resources when using human validation.`,
+			Description: `Plans to delete a global role. It returns the JSON representation of the global role to be deleted without actually deleting it, with a caution giving the number of users and groups bound to the global role. Only used for displaying the resource when using human validation.`,
 		},
 			t.deleteGlobalRolePlan)
 

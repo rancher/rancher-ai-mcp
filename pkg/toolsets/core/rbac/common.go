@@ -31,24 +31,14 @@ func filterResourcesByField(resources []*unstructured.Unstructured, field, value
 	return filteredResources
 }
 
-// serverMetadataFields are the metadata fields maintained by the API server and Rancher's controllers.
-var serverMetadataFields = []string{"managedFields", "uid", "resourceVersion", "generation", "finalizers", "ownerReferences"}
-
 // internalAnnotationPrefixes are the prefixes of annotations that Rancher's controllers use to
 // track their own state.
 var internalAnnotationPrefixes = []string{"lifecycle.cattle.io/", "authz.management.cattle.io/", "cleanup.cattle.io/"}
 
-// removeServerManagedFields removes fields maintained by the server, so responses and plans
-// only show what is relevant to the resource. The status is reduced by summarizeStatus.
-func removeServerManagedFields(obj *unstructured.Unstructured) {
-	for _, field := range serverMetadataFields {
-		unstructured.RemoveNestedField(obj.Object, "metadata", field)
-	}
-	// The generated name is only needed to identify a resource that has not been named yet.
-	if obj.GetName() != "" {
-		unstructured.RemoveNestedField(obj.Object, "metadata", "generateName")
-	}
-
+// removeInternalFields removes the annotations Rancher's controllers use to track their own state,
+// and reduces the status with summarizeStatus. Fields maintained by the API server are removed by
+// response.RemoveServerManagedFields.
+func removeInternalFields(obj *unstructured.Unstructured) {
 	annotations := obj.GetAnnotations()
 	for key := range annotations {
 		for _, prefix := range internalAnnotationPrefixes {
@@ -111,11 +101,11 @@ func summarizeStatus(obj *unstructured.Unstructured) {
 	_ = unstructured.SetNestedMap(obj.Object, status, "status")
 }
 
-// createResourcesResponse creates an MCP response for resources in the local cluster, with
-// server-managed fields removed.
+// createResourcesResponse creates an MCP response for resources in the local cluster, with Rancher's
+// internal fields removed. CreateMcpResponse removes the fields maintained by the API server.
 func createResourcesResponse(objs []*unstructured.Unstructured, notes ...string) (string, error) {
 	for _, obj := range objs {
-		removeServerManagedFields(obj)
+		removeInternalFields(obj)
 	}
 
 	return response.CreateMcpResponse(objs, "local", notes...)

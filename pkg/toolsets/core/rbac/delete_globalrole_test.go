@@ -7,6 +7,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -128,30 +129,116 @@ func TestDeleteGlobalRoleWithoutBindings(t *testing.T) {
 }
 
 func TestDeleteGlobalRolePlan(t *testing.T) {
-	tools, fakeDynClient := newTestTools(t, deleteGlobalRoleObjects()...)
-	ctx := middleware.WithToken(t.Context(), fakeToken)
+	tests := map[string]struct {
+		name           string
+		expectedDetail string
+	}{
+		"global role bound to a user": {
+			name:           "gr-test",
+			expectedDetail: "There is 1 user bound to the role(s) about to be deleted.",
+		},
+		"global role bound to a user and a group": {
+			name:           "gr-shared",
+			expectedDetail: "There is 1 user and 1 group bound to the role(s) about to be deleted.",
+		},
+		"global role without bindings": {
+			name: "gr-unused",
+		},
+	}
 
-	result, _, err := tools.deleteGlobalRolePlan(ctx, test.NewCallToolRequest(fakeURL), deleteGlobalRoleParams{Name: "gr-test"})
-	require.NoError(t, err)
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tools, fakeDynClient := newTestTools(t, append(deleteGlobalRoleObjects(), globalRole("gr-unused", nil))...)
 
-	var planResources []response.PlanResource
-	require.NoError(t, json.Unmarshal([]byte(result.Content[0].(*mcp.TextContent).Text), &planResources))
-	require.Len(t, planResources, 2)
-	assert.Equal(t, response.OperationDelete, planResources[0].Type)
-	assert.Equal(t, "GlobalRole", planResources[0].Resource.Kind)
-	assert.Equal(t, "gr-test", planResources[0].Resource.Name)
-	assert.NotContains(t, planResources[0].Payload, "status")
-	assert.NotContains(t, planResources[0].Payload.(map[string]any)["metadata"], "managedFields")
-	assert.NotContains(t, planResources[0].Payload.(map[string]any)["metadata"], "finalizers")
-	assert.Equal(t, response.OperationDelete, planResources[1].Type)
-	assert.Equal(t, "GlobalRoleBinding", planResources[1].Resource.Kind)
-	assert.Equal(t, "grb-1", planResources[1].Resource.Name)
+			result, _, err := tools.deleteGlobalRolePlan(middleware.WithToken(t.Context(), fakeToken), test.NewCallToolRequest(fakeURL), deleteGlobalRoleParams{Name: tt.name})
+			require.NoError(t, err)
 
-	// The plan must not delete the global role.
-	remaining, err := fakeDynClient.Resource(globalRolesGVR).List(t.Context(), metav1.ListOptions{})
-	require.NoError(t, err)
-	assert.Len(t, remaining.Items, 3)
+			// The plan only includes the global role, not the bindings Rancher deletes with it.
+			var planResources []response.PlanResource
+			require.NoError(t, json.Unmarshal([]byte(result.Content[0].(*mcp.TextContent).Text), &planResources))
+			require.Len(t, planResources, 1)
+			assert.Equal(t, response.OperationDelete, planResources[0].Type)
+			assert.Equal(t, "GlobalRole", planResources[0].Resource.Kind)
+			assert.Equal(t, tt.name, planResources[0].Resource.Name)
+			assert.Equal(t, tt.expectedDetail, planResources[0].Detail)
 
-	_, _, err = tools.deleteGlobalRolePlan(ctx, test.NewCallToolRequest(fakeURL), deleteGlobalRoleParams{Name: "admin"})
+			payload, ok := planResources[0].Payload.(map[string]any)
+			require.True(t, ok, "the payload should be an object")
+			assert.NotContains(t, payload, "status")
+			assert.NotContains(t, payload["metadata"], "managedFields")
+			assert.NotContains(t, payload["metadata"], "finalizers")
+
+			// The plan must not delete the global role.
+			remaining, err := fakeDynClient.Resource(globalRolesGVR).List(t.Context(), metav1.ListOptions{})
+			require.NoError(t, err)
+			assert.Len(t, remaining.Items, 4)
+		})
+	}
+}
+
+func TestDeleteGlobalRolePlanBuiltIn(t *testing.T) {
+	tools, _ := newTestTools(t, deleteGlobalRoleObjects()...)
+
+	_, _, err := tools.deleteGlobalRolePlan(middleware.WithToken(t.Context(), fakeToken), test.NewCallToolRequest(fakeURL), deleteGlobalRoleParams{Name: "admin"})
 	assert.ErrorContains(t, err, "is built-in and cannot be deleted")
+}
+
+func TestBoundSubjectsCaution(t *testing.T) {
+	tests := map[string]struct {
+		grbs     []*unstructured.Unstructured
+		expected string
+	}{
+		"no bindings": {
+			expected: "",
+		},
+		"one user": {
+			grbs:     []*unstructured.Unstructured{globalRoleBinding("grb-1", "gr", "userName", "u-user1")},
+			expected: "There is 1 user bound to the role(s) about to be deleted.",
+		},
+		"one group": {
+			grbs:     []*unstructured.Unstructured{globalRoleBinding("grb-1", "gr", "groupPrincipalName", "github_team://1234")},
+			expected: "There is 1 group bound to the role(s) about to be deleted.",
+		},
+		"users and groups": {
+			grbs: []*unstructured.Unstructured{
+				globalRoleBinding("grb-1", "gr", "userName", "u-user1"),
+				globalRoleBinding("grb-2", "gr", "userName", "u-user2"),
+				globalRoleBinding("grb-3", "gr", "groupPrincipalName", "github_team://1234"),
+				globalRoleBinding("grb-4", "gr", "groupPrincipalName", "github_team://5678"),
+			},
+			expected: "There are 2 users and 2 groups bound to the role(s) about to be deleted.",
+		},
+		"one user and several groups": {
+			grbs: []*unstructured.Unstructured{
+				globalRoleBinding("grb-1", "gr", "userName", "u-user1"),
+				globalRoleBinding("grb-2", "gr", "groupPrincipalName", "github_team://1234"),
+				globalRoleBinding("grb-3", "gr", "groupPrincipalName", "github_team://5678"),
+			},
+			expected: "There is 1 user and 2 groups bound to the role(s) about to be deleted.",
+		},
+		"several groups": {
+			grbs: []*unstructured.Unstructured{
+				globalRoleBinding("grb-1", "gr", "groupPrincipalName", "github_team://1234"),
+				globalRoleBinding("grb-2", "gr", "groupPrincipalName", "github_team://5678"),
+			},
+			expected: "There are 2 groups bound to the role(s) about to be deleted.",
+		},
+		"a user with more than one binding is counted once": {
+			grbs: []*unstructured.Unstructured{
+				globalRoleBinding("grb-1", "gr", "userName", "u-user1"),
+				globalRoleBinding("grb-2", "gr", "userName", "u-user1"),
+			},
+			expected: "There is 1 user bound to the role(s) about to be deleted.",
+		},
+		"a user bound by principal is counted": {
+			grbs:     []*unstructured.Unstructured{globalRoleBinding("grb-1", "gr", "userPrincipalName", "github_user://99")},
+			expected: "There is 1 user bound to the role(s) about to be deleted.",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, boundSubjectsCaution(tt.grbs))
+		})
+	}
 }

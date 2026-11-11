@@ -32,14 +32,33 @@ type MCPResponse struct {
 	UIContext []UIContext `json:"uiContext,omitempty"`
 }
 
+// serverMetadataFields are the metadata fields maintained by the API server and controllers.
+// They are not relevant to the resource itself, so they are removed from responses.
+var serverMetadataFields = []string{"managedFields", "uid", "resourceVersion", "generation", "finalizers", "ownerReferences"}
+
+// RemoveServerManagedFields removes the metadata fields maintained by the API server and controllers,
+// and the last applied configuration annotation, so responses only show what is relevant to the resource.
+// The generated name is also removed once the resource has a name.
+func RemoveServerManagedFields(obj *unstructured.Unstructured) {
+	for _, field := range serverMetadataFields {
+		unstructured.RemoveNestedField(obj.Object, "metadata", field)
+	}
+
+	// The generated name is only needed to identify a resource that has not been named yet.
+	if obj.GetName() != "" {
+		unstructured.RemoveNestedField(obj.Object, "metadata", "generateName")
+	}
+
+	unstructured.RemoveNestedField(obj.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
+}
+
 // CreateMcpResponse constructs an MCPResponse object. It takes a slice of unstructured Kubernetes objects, cluster,
 // and optional notes. When notes are provided, the LLM field is wrapped as {"resources": ..., "note": "..."}.
 func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes ...string) (string, error) {
 	var uiContext []UIContext
 
 	for _, obj := range objs {
-		unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
-		unstructured.RemoveNestedField(obj.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
+		RemoveServerManagedFields(obj)
 
 		gvk := obj.GetObjectKind().GroupVersionKind()
 
@@ -146,6 +165,9 @@ type PlanResource struct {
 	Payload any `json:"payload"`
 	// Resource identifies the target Kubernetes resource.
 	Resource Resource `json:"resource"`
+	// Detail is shown to the user with the confirmation of the operation, e.g. to warn
+	// about the effects of the operation on other resources.
+	Detail string `json:"detail,omitempty" jsonschema:"text to show to the user with the confirmation of the operation"`
 }
 
 // NewCreateResourceInput constructs a PlanResource for a CREATE operation.

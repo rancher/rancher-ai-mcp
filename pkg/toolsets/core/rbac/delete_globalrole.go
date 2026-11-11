@@ -3,6 +3,7 @@ package rbac
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
@@ -81,8 +82,9 @@ func (t *Tools) deleteGlobalRole(ctx context.Context, toolReq *mcp.CallToolReque
 }
 
 // deleteGlobalRolePlan plans the deletion of a global role.
-// It returns the JSON representation of the global role, and the global role bindings that
-// Rancher deletes with it, without actually deleting them.
+// It returns the JSON representation of the global role without actually deleting it. Rancher
+// deletes the global role bindings for the global role with it, so the plan includes a caution
+// with the number of users and groups bound to the global role, rather than every binding.
 func (t *Tools) deleteGlobalRolePlan(ctx context.Context, _ *mcp.CallToolRequest, params deleteGlobalRoleParams) (*mcp.CallToolResult, any, error) {
 	zap.L().Debug("deleteGlobalRolePlan called", zap.String("name", params.Name))
 
@@ -92,10 +94,9 @@ func (t *Tools) deleteGlobalRolePlan(ctx context.Context, _ *mcp.CallToolRequest
 		return nil, nil, err
 	}
 
-	planResources := []response.PlanResource{response.NewDeleteResourceInput(globalRole, "local")}
-	for _, grb := range grbs {
-		planResources = append(planResources, response.NewDeleteResourceInput(grb, "local"))
-	}
+	planResource := response.NewDeleteResourceInput(globalRole, "local")
+	planResource.Detail = boundSubjectsCaution(grbs)
+	planResources := []response.PlanResource{planResource}
 
 	mcpResponse, err := response.CreatePlanResponse(planResources)
 	if err != nil {
@@ -106,6 +107,65 @@ func (t *Tools) deleteGlobalRolePlan(ctx context.Context, _ *mcp.CallToolRequest
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
 	}, nil, nil
+}
+
+// boundSubjectsCaution returns a caution with the number of users and groups that the global role
+// bindings assign the global role to, or an empty string if there are none.
+func boundSubjectsCaution(grbs []*unstructured.Unstructured) string {
+	users := map[string]bool{}
+	groups := map[string]bool{}
+
+	for _, grb := range grbs {
+		if group, _, _ := unstructured.NestedString(grb.Object, "groupPrincipalName"); group != "" {
+			groups[group] = true
+
+			continue
+		}
+
+		user, _, _ := unstructured.NestedString(grb.Object, "userName")
+		if user == "" {
+			user, _, _ = unstructured.NestedString(grb.Object, "userPrincipalName")
+		}
+
+		if user != "" {
+			users[user] = true
+		}
+	}
+
+	var subjects []string
+	if len(users) > 0 {
+		subjects = append(subjects, countNoun(len(users), "user"))
+	}
+
+	if len(groups) > 0 {
+		subjects = append(subjects, countNoun(len(groups), "group"))
+	}
+
+	if len(subjects) == 0 {
+		return ""
+	}
+
+	// The verb agrees with the first count, as in "There is 1 user and 2 groups".
+	first := len(users)
+	if first == 0 {
+		first = len(groups)
+	}
+
+	verb := "are"
+	if first == 1 {
+		verb = "is"
+	}
+
+	return fmt.Sprintf("There %s %s bound to the role(s) about to be deleted.", verb, strings.Join(subjects, " and "))
+}
+
+// countNoun returns the count followed by the noun, pluralized if the count is not one.
+func countNoun(count int, noun string) string {
+	if count == 1 {
+		return fmt.Sprintf("1 %s", noun)
+	}
+
+	return fmt.Sprintf("%d %ss", count, noun)
 }
 
 // getGlobalRoleForDeletion retrieves a global role and the global role bindings that assign it,
@@ -129,7 +189,8 @@ func (t *Tools) getGlobalRoleForDeletion(ctx context.Context, name string) (*uns
 		return nil, nil, fmt.Errorf("global role %q is built-in and cannot be deleted", name)
 	}
 
-	removeServerManagedFields(globalRole)
+	response.RemoveServerManagedFields(globalRole)
+	removeInternalFields(globalRole)
 	unstructured.RemoveNestedField(globalRole.Object, "status")
 
 	grbs, err := t.client.GetResources(ctx, client.ListParams{
@@ -143,7 +204,8 @@ func (t *Tools) getGlobalRoleForDeletion(ctx context.Context, name string) (*uns
 
 	grbs = filterResourcesByField(grbs, "globalRoleName", name)
 	for _, grb := range grbs {
-		removeServerManagedFields(grb)
+		response.RemoveServerManagedFields(grb)
+		removeInternalFields(grb)
 		unstructured.RemoveNestedField(grb.Object, "status")
 	}
 

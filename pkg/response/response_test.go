@@ -411,3 +411,66 @@ func TestPlanResourceSchema(t *testing.T) {
 
 	assert.Equal(t, "the operation to perform on the resource: create, update or delete", s.Properties["type"].Description)
 }
+
+func TestPlanResourceDetail(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "cm"}}}
+
+	withoutText, err := CreatePlanResponse([]PlanResource{NewDeleteResourceInput(obj, "local")})
+	require.NoError(t, err)
+	assert.NotContains(t, withoutText, `"detail"`)
+
+	planResource := NewDeleteResourceInput(obj, "local")
+	planResource.Detail = "Other resources are affected."
+	withText, err := CreatePlanResponse([]PlanResource{planResource})
+	require.NoError(t, err)
+	assert.Contains(t, withText, `"detail":"Other resources are affected."`)
+}
+
+func TestRemoveServerManagedFields(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]any{
+			"name":              "cm",
+			"namespace":         "default",
+			"generateName":      "cm-",
+			"uid":               "5f4bd8fc-80a6-4567-ad76-9706818d6a48",
+			"resourceVersion":   "133639",
+			"generation":        int64(2),
+			"creationTimestamp": "2026-11-04T14:38:09Z",
+			"finalizers":        []any{"example.com/finalizer"},
+			"ownerReferences":   []any{map[string]any{"apiVersion": "v1", "kind": "Secret", "name": "owner", "uid": "9ee2d536"}},
+			"managedFields":     []any{map[string]any{"manager": "kubectl"}},
+			"labels":            map[string]any{"app": "example"},
+			"annotations": map[string]any{
+				"kubectl.kubernetes.io/last-applied-configuration": "{}",
+				"example.com/note": "kept",
+			},
+		},
+		"data": map[string]any{"key": "value"},
+	}}
+
+	RemoveServerManagedFields(obj)
+
+	assert.Equal(t, map[string]any{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]any{
+			"name":              "cm",
+			"namespace":         "default",
+			"creationTimestamp": "2026-11-04T14:38:09Z",
+			"labels":            map[string]any{"app": "example"},
+			"annotations":       map[string]any{"example.com/note": "kept"},
+		},
+		"data": map[string]any{"key": "value"},
+	}, obj.Object)
+}
+
+func TestRemoveServerManagedFieldsKeepsGenerateNameWithoutName(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "ConfigMap"}}
+	obj.SetGenerateName("cm-")
+
+	RemoveServerManagedFields(obj)
+
+	assert.Equal(t, "cm-", obj.GetGenerateName())
+}

@@ -127,16 +127,7 @@ func TestInspectPod(t *testing.T) {
 						"kind": "Pod",
 						"metadata": {
 							"name": "nginx-pod-abc123",
-							"namespace": "default",
-							"ownerReferences": [
-								{
-									"apiVersion": "apps/v1",
-									"controller": true,
-									"kind": "ReplicaSet",
-									"name": "nginx-replicaset",
-									"uid": ""
-								}
-							]
+							"namespace": "default"
 						},
 						"spec": {
 							"containers": [
@@ -221,16 +212,7 @@ func TestInspectPod(t *testing.T) {
 						"kind": "Pod",
 						"metadata": {
 							"name": "nginx-pod-abc123",
-							"namespace": "default",
-							"ownerReferences": [
-								{
-									"apiVersion": "apps/v1",
-									"controller": true,
-									"kind": "ReplicaSet",
-									"name": "nginx-replicaset",
-									"uid": ""
-								}
-							]
+							"namespace": "default"
 						},
 						"spec": {
 							"containers": [
@@ -359,16 +341,7 @@ func TestInspectPod(t *testing.T) {
 						"kind": "Pod",
 						"metadata": {
 							"name": "stateful-pod-abc",
-							"namespace": "default",
-							"ownerReferences": [
-								{
-									"apiVersion": "apps/v1",
-									"controller": true,
-									"kind": "ReplicaSet",
-									"name": "stateful-rs",
-									"uid": ""
-								}
-							]
+							"namespace": "default"
 						},
 						"spec": {
 							"containers": [
@@ -476,16 +449,7 @@ func TestInspectPod(t *testing.T) {
 						"kind": "Pod",
 						"metadata": {
 							"name": "daemon-pod-xyz",
-							"namespace": "default",
-							"ownerReferences": [
-								{
-									"apiVersion": "apps/v1",
-									"controller": true,
-									"kind": "ReplicaSet",
-									"name": "daemon-rs",
-									"uid": ""
-								}
-							]
+							"namespace": "default"
 						},
 						"spec": {
 							"containers": [
