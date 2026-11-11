@@ -7,7 +7,7 @@ import (
 
 	"testing"
 
-	jsonpatch "gopkg.in/evanphx/json-patch.v4"
+	jsonpatch "gopkg.in/evanphx/json-patch.v5"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
