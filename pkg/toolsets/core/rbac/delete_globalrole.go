@@ -190,7 +190,6 @@ func (t *Tools) getGlobalRoleForDeletion(ctx context.Context, name string) (*uns
 	}
 
 	response.RemoveServerManagedFields(globalRole)
-	removeInternalFields(globalRole)
 	unstructured.RemoveNestedField(globalRole.Object, "status")
 
 	grbs, err := t.client.GetResources(ctx, client.ListParams{
@@ -205,7 +204,6 @@ func (t *Tools) getGlobalRoleForDeletion(ctx context.Context, name string) (*uns
 	grbs = filterResourcesByField(grbs, "globalRoleName", name)
 	for _, grb := range grbs {
 		response.RemoveServerManagedFields(grb)
-		removeInternalFields(grb)
 		unstructured.RemoveNestedField(grb.Object, "status")
 	}
 

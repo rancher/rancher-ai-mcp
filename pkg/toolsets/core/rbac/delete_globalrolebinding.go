@@ -106,7 +106,6 @@ func (t *Tools) getGlobalRoleBindingObj(ctx context.Context, name string) (*unst
 	}
 
 	response.RemoveServerManagedFields(grb)
-	removeInternalFields(grb)
 	unstructured.RemoveNestedField(grb.Object, "status")
 
 	return grb, nil

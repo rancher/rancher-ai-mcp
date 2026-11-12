@@ -31,29 +31,6 @@ func filterResourcesByField(resources []*unstructured.Unstructured, field, value
 	return filteredResources
 }
 
-// internalAnnotationPrefixes are the prefixes of annotations that Rancher's controllers use to
-// track their own state.
-var internalAnnotationPrefixes = []string{"lifecycle.cattle.io/", "authz.management.cattle.io/", "cleanup.cattle.io/"}
-
-// removeInternalFields removes the annotations Rancher's controllers use to track their own state,
-// and reduces the status with summarizeStatus. Fields maintained by the API server are removed by
-// response.RemoveServerManagedFields.
-func removeInternalFields(obj *unstructured.Unstructured) {
-	annotations := obj.GetAnnotations()
-	for key := range annotations {
-		for _, prefix := range internalAnnotationPrefixes {
-			if strings.HasPrefix(key, prefix) {
-				delete(annotations, key)
-				break
-			}
-		}
-	}
-
-	obj.SetAnnotations(annotations)
-
-	summarizeStatus(obj)
-}
-
 // summarizeStatus reduces the status of a resource to what can explain a problem with it.
 // Conditions that are True are removed, as are timestamps and observed generations, so a
 // resource that has been reconciled keeps only its summary.
@@ -101,11 +78,11 @@ func summarizeStatus(obj *unstructured.Unstructured) {
 	_ = unstructured.SetNestedMap(obj.Object, status, "status")
 }
 
-// createResourcesResponse creates an MCP response for resources in the local cluster, with Rancher's
-// internal fields removed. CreateMcpResponse removes the fields maintained by the API server.
+// createResourcesResponse creates an MCP response for resources in the local cluster, with their
+// status reduced by summarizeStatus. CreateMcpResponse removes the fields maintained by the server.
 func createResourcesResponse(objs []*unstructured.Unstructured, notes ...string) (string, error) {
 	for _, obj := range objs {
-		removeInternalFields(obj)
+		summarizeStatus(obj)
 	}
 
 	return response.CreateMcpResponse(objs, "local", notes...)

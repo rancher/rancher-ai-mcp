@@ -80,7 +80,7 @@ func TestCreateMCPResponse(t *testing.T) {
 			namespace:      "default",
 			cluster:        "local",
 			additionalInfo: []string{},
-			expected:       `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"annotations":{},"name":"test-pod","namespace":"default"}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"test-pod","type":"pod"}]}`,
+			expected:       `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test-pod","namespace":"default"}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"test-pod","type":"pod"}]}`,
 			expectError:    false,
 		},
 		"multiple pods": {
@@ -443,8 +443,12 @@ func TestRemoveServerManagedFields(t *testing.T) {
 			"managedFields":     []any{map[string]any{"manager": "kubectl"}},
 			"labels":            map[string]any{"app": "example"},
 			"annotations": map[string]any{
-				"kubectl.kubernetes.io/last-applied-configuration": "{}",
-				"example.com/note": "kept",
+				"kubectl.kubernetes.io/last-applied-configuration":    "{}",
+				"lifecycle.cattle.io/create.mgmt-auth-grb-controller": "true",
+				"authz.management.cattle.io/crb-name":                 "cattle-globalrolebinding-grb-1",
+				"cleanup.cattle.io/grbUpgradeCluster":                 "true",
+				"field.cattle.io/creatorId":                           "user-sdxtj",
+				"example.com/note":                                    "kept",
 			},
 		},
 		"data": map[string]any{"key": "value"},
@@ -460,7 +464,7 @@ func TestRemoveServerManagedFields(t *testing.T) {
 			"namespace":         "default",
 			"creationTimestamp": "2026-11-04T14:38:09Z",
 			"labels":            map[string]any{"app": "example"},
-			"annotations":       map[string]any{"example.com/note": "kept"},
+			"annotations":       map[string]any{"field.cattle.io/creatorId": "user-sdxtj", "example.com/note": "kept"},
 		},
 		"data": map[string]any{"key": "value"},
 	}, obj.Object)
@@ -473,4 +477,17 @@ func TestRemoveServerManagedFieldsKeepsGenerateNameWithoutName(t *testing.T) {
 	RemoveServerManagedFields(obj)
 
 	assert.Equal(t, "cm-", obj.GetGenerateName())
+}
+
+func TestRemoveServerManagedFieldsRemovesEmptyAnnotations(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "ConfigMap"}}
+	obj.SetName("cm")
+	obj.SetAnnotations(map[string]string{
+		"kubectl.kubernetes.io/last-applied-configuration":    "{}",
+		"lifecycle.cattle.io/create.mgmt-auth-grb-controller": "true",
+	})
+
+	RemoveServerManagedFields(obj)
+
+	assert.NotContains(t, obj.Object["metadata"], "annotations")
 }

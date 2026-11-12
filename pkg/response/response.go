@@ -36,8 +36,13 @@ type MCPResponse struct {
 // They are not relevant to the resource itself, so they are removed from responses.
 var serverMetadataFields = []string{"managedFields", "uid", "resourceVersion", "generation", "finalizers", "ownerReferences"}
 
+// internalAnnotationPrefixes are the prefixes of annotations that Rancher's controllers use to
+// track their own state.
+var internalAnnotationPrefixes = []string{"lifecycle.cattle.io/", "authz.management.cattle.io/", "cleanup.cattle.io/"}
+
 // RemoveServerManagedFields removes the metadata fields maintained by the API server and controllers,
-// and the last applied configuration annotation, so responses only show what is relevant to the resource.
+// the last applied configuration annotation, and the annotations Rancher's controllers use to track
+// their own state, so responses only show what is relevant to the resource.
 // The generated name is also removed once the resource has a name.
 func RemoveServerManagedFields(obj *unstructured.Unstructured) {
 	for _, field := range serverMetadataFields {
@@ -49,7 +54,30 @@ func RemoveServerManagedFields(obj *unstructured.Unstructured) {
 		unstructured.RemoveNestedField(obj.Object, "metadata", "generateName")
 	}
 
-	unstructured.RemoveNestedField(obj.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
+	annotations, found, err := unstructured.NestedMap(obj.Object, "metadata", "annotations")
+	if err != nil || !found {
+		return
+	}
+
+	delete(annotations, "kubectl.kubernetes.io/last-applied-configuration")
+
+	for key := range annotations {
+		for _, prefix := range internalAnnotationPrefixes {
+			if strings.HasPrefix(key, prefix) {
+				delete(annotations, key)
+
+				break
+			}
+		}
+	}
+
+	if len(annotations) == 0 {
+		unstructured.RemoveNestedField(obj.Object, "metadata", "annotations")
+
+		return
+	}
+
+	_ = unstructured.SetNestedMap(obj.Object, annotations, "metadata", "annotations")
 }
 
 // CreateMcpResponse constructs an MCPResponse object. It takes a slice of unstructured Kubernetes objects, cluster,

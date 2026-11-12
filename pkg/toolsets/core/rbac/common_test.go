@@ -73,18 +73,7 @@ func TestFilterBindingsForGroup(t *testing.T) {
 	assert.Equal(t, []string{"by-principal", "by-group-name"}, names)
 }
 
-func TestRemoveInternalFields(t *testing.T) {
-	grb := withServerFields(globalRoleBinding("grb-1", "admin", "userName", "u-user1"))
-
-	removeInternalFields(grb)
-
-	assert.Equal(t, map[string]string{"field.cattle.io/creatorId": "user-sdxtj"}, grb.GetAnnotations())
-	assert.Equal(t, map[string]any{"summary": "Completed"}, grb.Object["status"])
-	// Fields maintained by the API server are removed by response.RemoveServerManagedFields.
-	assert.Equal(t, "133639", grb.GetResourceVersion())
-}
-
-func TestRBACResponsesRemoveServerAndInternalFields(t *testing.T) {
+func TestCreateResourcesResponse(t *testing.T) {
 	grb := withServerFields(globalRoleBinding("grb-1", "admin", "userName", "u-user1"))
 
 	_, err := createResourcesResponse([]*unstructured.Unstructured{grb})
