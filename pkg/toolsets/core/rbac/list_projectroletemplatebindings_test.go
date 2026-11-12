@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 )
 
 func TestListProjectRoleTemplateBindings(t *testing.T) {
@@ -94,18 +95,21 @@ func TestListProjectRoleTemplateBindings(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tools, _ := newTestTools(t, append(tt.objects, testUsers()...)...)
+			tools, _ := newFakeTools(t, withObjects(append(tt.objects, testUsers()...)...))
 
 			result, _, err := tools.listProjectRoleTemplateBindings(middleware.WithToken(t.Context(), fakeToken), test.NewCallToolRequest(fakeURL), tt.params)
 			if tt.expectedError != "" {
 				assert.ErrorContains(t, err, tt.expectedError)
 				return
 			}
+
 			require.NoError(t, err)
+
 			if tt.expectedResult != "" {
 				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 				return
 			}
+
 			assert.Equal(t, tt.expected, summarizeResult(t, result))
 		})
 	}

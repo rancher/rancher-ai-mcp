@@ -595,3 +595,16 @@ func TestCreateMcpResponseWithNotes(t *testing.T) {
 	require.NoError(t, err)
 	assert.Contains(t, resp, `"note":"first\nsecond\nthird"`)
 }
+
+// TestUIContextAlwaysIncludesNamespace checks that cluster-scoped resources are linked with an empty namespace
+// rather than no namespace field: the Rancher AI UI rejects uiContext entries without one, so their resource
+// buttons would disappear (validateActionResource in rancher-ai-ui's utils/validator.ts).
+func TestUIContextAlwaysIncludesNamespace(t *testing.T) {
+	resp, err := CreateMcpResponseAny("data", UIContext{Kind: "User", Cluster: "local", Name: "u-abc", Type: "management.cattle.io.user"})
+	require.NoError(t, err)
+
+	assert.JSONEq(t, `{
+		"llm": "data",
+		"uiContext": [{"namespace": "", "kind": "User", "cluster": "local", "name": "u-abc", "type": "management.cattle.io.user"}]
+	}`, resp)
+}

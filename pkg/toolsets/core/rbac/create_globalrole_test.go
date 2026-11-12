@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestCreateGlobalRole(t *testing.T) {
@@ -78,7 +79,7 @@ func TestCreateGlobalRole(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tools, _ := newTestTools(t)
+			tools, _ := newFakeTools(t)
 
 			result, _, err := tools.createGlobalRole(
 				middleware.WithToken(t.Context(), fakeToken),
@@ -89,6 +90,7 @@ func TestCreateGlobalRole(t *testing.T) {
 				assert.ErrorContains(t, err, tt.expectedError)
 				return
 			}
+
 			require.NoError(t, err)
 
 			var resp struct {
@@ -118,7 +120,8 @@ func TestCreateGlobalRolePlan(t *testing.T) {
 	assert.Equal(t, response.OperationCreate, planResources[0].Type)
 	assert.Equal(t, "GlobalRole", planResources[0].Resource.Kind)
 	assert.Equal(t, "local", planResources[0].Resource.Cluster)
-	payload := planResources[0].Payload.(map[string]any)
+	payload, ok := planResources[0].Payload.(map[string]any)
+	require.True(t, ok, "payload should be an object")
 	assert.Equal(t, "Test Role", payload["displayName"])
 	assert.Equal(t, "Testing Role", payload["description"])
 
