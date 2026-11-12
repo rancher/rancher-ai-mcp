@@ -3,8 +3,10 @@ package response
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
+	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
 	"github.com/rancher/rancher-ai-mcp/pkg/converter"
@@ -281,6 +283,20 @@ type PlanResource struct {
 	// Detail is shown to the user with the confirmation of the operation, e.g. to warn
 	// about the effects of the operation on other resources.
 	Detail string `json:"detail,omitempty" jsonschema:"text to show to the user with the confirmation of the operation"`
+}
+
+// PlanResourceSchema returns the JSON schema of PlanResource, with the operation type limited to the
+// supported operations. The enum is provided through ForOptions.TypeSchemas because jsonschema-go
+// only uses the jsonschema struct tag as a description.
+func PlanResourceSchema() (*jsonschema.Schema, error) {
+	return jsonschema.For[PlanResource](&jsonschema.ForOptions{
+		TypeSchemas: map[reflect.Type]*jsonschema.Schema{
+			reflect.TypeFor[OperationType](): {
+				Type: "string",
+				Enum: []any{string(OperationCreate), string(OperationUpdate), string(OperationDelete)},
+			},
+		},
+	})
 }
 
 // NewCreateResourceInput constructs a PlanResource for a CREATE operation.

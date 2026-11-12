@@ -3,7 +3,6 @@ package response
 import (
 	"testing"
 
-	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
@@ -406,10 +405,35 @@ func TestCreateNoChangesPlanResponse(t *testing.T) {
 }
 
 func TestPlanResourceSchema(t *testing.T) {
-	s, err := jsonschema.For[PlanResource](nil)
+	s, err := PlanResourceSchema()
 	require.NoError(t, err)
 
-	assert.Equal(t, "the operation to perform on the resource: create, update or delete", s.Properties["type"].Description)
+	typeSchema := s.Properties["type"]
+	assert.Equal(t, "string", typeSchema.Type)
+	assert.Equal(t, []any{string(OperationCreate), string(OperationUpdate), string(OperationDelete)}, typeSchema.Enum)
+	assert.Equal(t, "the operation to perform on the resource: create, update or delete", typeSchema.Description)
+}
+
+func TestPlanResourceSchemaValidatesType(t *testing.T) {
+	s, err := PlanResourceSchema()
+	require.NoError(t, err)
+	resolved, err := s.Resolve(nil)
+	require.NoError(t, err)
+
+	plan := func(operation string) map[string]any {
+		return map[string]any{
+			"type":     operation,
+			"payload":  map[string]any{},
+			"resource": map[string]any{"name": "cm", "kind": "ConfigMap", "cluster": "local", "namespace": "default"},
+		}
+	}
+
+	for _, operation := range []OperationType{OperationCreate, OperationUpdate, OperationDelete} {
+		assert.NoError(t, resolved.Validate(plan(string(operation))), operation)
+	}
+
+	assert.Error(t, resolved.Validate(plan("DELETE")), "the operation type is lowercase")
+	assert.Error(t, resolved.Validate(plan("rename")))
 }
 
 func TestPlanResourceDetail(t *testing.T) {
