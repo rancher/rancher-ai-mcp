@@ -7,11 +7,12 @@ import (
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"go.uber.org/zap"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var zapGetUser = zap.String("tool", "getUser")
@@ -34,7 +35,7 @@ func (t *Tools) getUser(ctx context.Context, toolReq *mcp.CallToolRequest, param
 		matchedUser = append(matchedUser, user)
 	}
 
-	mcpResponse, err := response.CreateMcpResponse(matchedUser, "local")
+	mcpResponse, err := response.CreateMcpResponse(matchedUser, "local", response.WithSummarizedStatus())
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapGetUser, zap.Error(err))
 		return nil, nil, err
@@ -60,10 +61,12 @@ func (t *Tools) findUser(ctx context.Context, nameOrID string) (*unstructured.Un
 	}
 
 	var usernameMatches []*unstructured.Unstructured
+
 	for _, u := range users {
 		if u.GetName() == nameOrID {
 			return u, nil
 		}
+
 		if userName, found, err := unstructured.NestedString(u.Object, "username"); err == nil && found && userName == nameOrID {
 			usernameMatches = append(usernameMatches, u)
 		}
@@ -79,7 +82,9 @@ func (t *Tools) findUser(ctx context.Context, nameOrID string) (*unstructured.Un
 		for _, u := range usernameMatches {
 			ids = append(ids, u.GetName())
 		}
+
 		slices.Sort(ids)
+
 		return nil, fmt.Errorf("more than one user has the username %q, specify one of the user IDs: %s", nameOrID, strings.Join(ids, ", "))
 	}
 }
@@ -90,6 +95,7 @@ func (t *Tools) resolveUser(ctx context.Context, nameOrID string) (*unstructured
 	if err != nil {
 		return nil, err
 	}
+
 	if user == nil {
 		return nil, fmt.Errorf("user %q not found, specify a username or user ID", nameOrID)
 	}

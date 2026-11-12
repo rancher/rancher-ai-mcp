@@ -7,13 +7,15 @@ import (
 
 	"github.com/google/jsonschema-go/jsonschema"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	"github.com/rancher/rancher-ai-mcp/pkg/utils"
-	"go.uber.org/zap"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var zapCreateGlobalRole = zap.String("tool", "createGlobalRole")
@@ -39,6 +41,7 @@ func createGlobalRoleInputSchema() *jsonschema.Schema {
 	if err != nil {
 		panic(fmt.Errorf("failed to build create global role input schema: %w", err))
 	}
+
 	utils.ForceArrayTypes(s)
 
 	return s
@@ -65,7 +68,7 @@ func (t *Tools) createGlobalRole(ctx context.Context, toolReq *mcp.CallToolReque
 		return nil, nil, fmt.Errorf("failed to create global role: %w", err)
 	}
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, "local")
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, "local", response.WithSummarizedStatus())
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapCreateGlobalRole, zap.Error(err))
 		return nil, nil, err
@@ -102,6 +105,7 @@ func createGlobalRoleObj(params createGlobalRoleParams) (*unstructured.Unstructu
 	if params.DisplayName == "" {
 		return nil, errors.New("displayName must be specified")
 	}
+
 	if len(params.Rules) == 0 && len(params.InheritedClusterRoles) == 0 {
 		return nil, errors.New("at least one rule or inherited cluster role must be specified")
 	}
@@ -113,11 +117,13 @@ func createGlobalRoleObj(params createGlobalRoleParams) (*unstructured.Unstructu
 	}
 	globalRole.SetKind("GlobalRole")
 	globalRole.SetAPIVersion(converter.ManagementGroup + "/v3")
+
 	if params.Name != "" {
 		globalRole.SetName(params.Name)
 	} else {
 		globalRole.SetGenerateName("gr-")
 	}
+
 	if params.Description != "" {
 		globalRole.Object["description"] = params.Description
 	}
@@ -128,10 +134,12 @@ func createGlobalRoleObj(params createGlobalRoleParams) (*unstructured.Unstructu
 			if len(r.Resources) == 0 || len(r.Verbs) == 0 {
 				return nil, fmt.Errorf("rule %d must specify at least one resource and one verb", i)
 			}
+
 			apiGroups := r.APIGroups
 			if len(apiGroups) == 0 {
 				apiGroups = []string{""}
 			}
+
 			rule := map[string]any{
 				"apiGroups": toAnySlice(apiGroups),
 				"resources": toAnySlice(r.Resources),
@@ -140,10 +148,13 @@ func createGlobalRoleObj(params createGlobalRoleParams) (*unstructured.Unstructu
 			if len(r.ResourceNames) > 0 {
 				rule["resourceNames"] = toAnySlice(r.ResourceNames)
 			}
+
 			rules = append(rules, rule)
 		}
+
 		globalRole.Object["rules"] = rules
 	}
+
 	if len(params.InheritedClusterRoles) > 0 {
 		globalRole.Object["inheritedClusterRoles"] = toAnySlice(params.InheritedClusterRoles)
 	}
@@ -156,5 +167,6 @@ func toAnySlice(values []string) []any {
 	for i, v := range values {
 		result[i] = v
 	}
+
 	return result
 }

@@ -7,23 +7,48 @@ import (
 	"slices"
 	"strings"
 
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var errUserAndGroup = errors.New("only one of user or group can be specified, bindings for the user's groups are included when a user is specified")
 
 func filterResourcesByField(resources []*unstructured.Unstructured, field, value string) []*unstructured.Unstructured {
 	var filteredResources []*unstructured.Unstructured
+
 	for _, resource := range resources {
 		resourceValue, found, err := unstructured.NestedString(resource.Object, field)
 		if err == nil && found && resourceValue == value {
 			filteredResources = append(filteredResources, resource)
 		}
 	}
+
 	return filteredResources
+}
+
+// grbSubjectFields are the fields of a global role binding that record who it assigns the global role to.
+var grbSubjectFields = []string{"userName", "userPrincipalName", "groupPrincipalName"}
+
+// summarizeGlobalRoleBinding returns the name of a global role binding and who it assigns the global
+// role to, with the global role if includeGlobalRole is true.
+func summarizeGlobalRoleBinding(grb *unstructured.Unstructured, includeGlobalRole bool) map[string]any {
+	fields := grbSubjectFields
+	if includeGlobalRole {
+		fields = append([]string{"globalRoleName"}, fields...)
+	}
+
+	summary := map[string]any{"name": grb.GetName()}
+	for _, field := range fields {
+		if value, found, err := unstructured.NestedString(grb.Object, field); err == nil && found && value != "" {
+			summary[field] = value
+		}
+	}
+
+	return summary
 }
 
 // userSubjects identifies a user, and the groups they belong to, in the subjects of bindings.
@@ -69,6 +94,7 @@ func (t *Tools) getUserSubjects(ctx context.Context, nameOrID string) (*userSubj
 	if apierrors.IsNotFound(err) {
 		return subjects, nil
 	}
+
 	if err != nil {
 		return nil, fmt.Errorf("failed to get groups for user %q: %w", subjects.userID, err)
 	}
@@ -81,18 +107,22 @@ func (t *Tools) getUserSubjects(ctx context.Context, nameOrID string) (*userSubj
 		if !ok {
 			continue
 		}
+
 		items, _, _ := unstructured.NestedSlice(providerMap, "Items")
 		for _, item := range items {
 			itemMap, ok := item.(map[string]any)
 			if !ok {
 				continue
 			}
+
 			if name, found, err := unstructured.NestedString(itemMap, "metadata", "name"); err == nil && found && name != "" {
 				subjects.groups = append(subjects.groups, name)
 			}
 		}
 	}
+
 	slices.Sort(subjects.groups)
+
 	subjects.groups = slices.Compact(subjects.groups)
 	for _, group := range subjects.groups {
 		subjects.groupNames = append(subjects.groupNames, rbacGroupName(group))
@@ -105,11 +135,13 @@ func (t *Tools) getUserSubjects(ctx context.Context, nameOrID string) (*userSubj
 // Each binding is returned at most once.
 func filterBindingsForUser(bindings []*unstructured.Unstructured, subjects *userSubjects) []*unstructured.Unstructured {
 	var filtered []*unstructured.Unstructured
+
 	for _, binding := range bindings {
 		if bindingMatchesUser(binding, subjects) {
 			filtered = append(filtered, binding)
 		}
 	}
+
 	return filtered
 }
 
@@ -117,15 +149,19 @@ func bindingMatchesUser(binding *unstructured.Unstructured, subjects *userSubjec
 	if userName, found, err := unstructured.NestedString(binding.Object, "userName"); err == nil && found && userName == subjects.userID {
 		return true
 	}
+
 	if principal, found, err := unstructured.NestedString(binding.Object, "userPrincipalName"); err == nil && found && slices.Contains(subjects.principalIDs, principal) {
 		return true
 	}
+
 	if group, found, err := unstructured.NestedString(binding.Object, "groupPrincipalName"); err == nil && found && slices.Contains(subjects.groups, group) {
 		return true
 	}
+
 	if group, found, err := unstructured.NestedString(binding.Object, "groupName"); err == nil && found && slices.Contains(subjects.groupNames, group) {
 		return true
 	}
+
 	return false
 }
 
@@ -134,15 +170,18 @@ func bindingMatchesUser(binding *unstructured.Unstructured, subjects *userSubjec
 // Kubernetes group name in groupName.
 func filterBindingsForGroup(bindings []*unstructured.Unstructured, group string) []*unstructured.Unstructured {
 	var filtered []*unstructured.Unstructured
+
 	for _, binding := range bindings {
 		if value, found, err := unstructured.NestedString(binding.Object, "groupPrincipalName"); err == nil && found && value == group {
 			filtered = append(filtered, binding)
 			continue
 		}
+
 		if value, found, err := unstructured.NestedString(binding.Object, "groupName"); err == nil && found && value == rbacGroupName(group) {
 			filtered = append(filtered, binding)
 		}
 	}
+
 	return filtered
 }
 
@@ -151,5 +190,6 @@ func userGroupsNote(groups []string) []string {
 	if len(groups) == 0 {
 		return nil
 	}
+
 	return []string{"includes bindings for the groups the user belongs to: " + strings.Join(groups, ", ")}
 }

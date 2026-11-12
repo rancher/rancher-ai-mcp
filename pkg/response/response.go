@@ -3,10 +3,13 @@ package response
 import (
 	"encoding/json"
 	"fmt"
+	"reflect"
 	"strings"
 
-	"github.com/rancher/rancher-ai-mcp/pkg/converter"
+	"github.com/google/jsonschema-go/jsonschema"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 )
 
 // UIContext holds the contextual information for a Kubernetes resource. Used to build links by the UI.
@@ -31,15 +34,103 @@ type MCPResponse struct {
 	UIContext []UIContext `json:"uiContext,omitempty"`
 }
 
-// CreateMcpResponse constructs an MCPResponse object. It takes a slice of unstructured Kubernetes objects, cluster,
-// and optional notes. When notes are provided, the LLM field is wrapped as {"resources": ..., "note": "..."}.
-func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes ...string) (string, error) {
+// serverMetadataFields are the metadata fields maintained by the API server and controllers.
+// They are not relevant to the resource itself, so they are removed from responses.
+var serverMetadataFields = []string{"managedFields", "uid", "resourceVersion", "generation", "finalizers", "ownerReferences"}
+
+// internalAnnotationPrefixes are the prefixes of annotations that Rancher's controllers use to
+// track their own state.
+var internalAnnotationPrefixes = []string{"lifecycle.cattle.io/", "authz.management.cattle.io/", "cleanup.cattle.io/"}
+
+// RemoveServerManagedFields removes the metadata fields maintained by the API server and controllers,
+// the last applied configuration annotation, and the annotations Rancher's controllers use to track
+// their own state, so responses only show what is relevant to the resource.
+// The generated name is also removed once the resource has a name.
+func RemoveServerManagedFields(obj *unstructured.Unstructured) {
+	for _, field := range serverMetadataFields {
+		unstructured.RemoveNestedField(obj.Object, "metadata", field)
+	}
+
+	// The generated name is only needed to identify a resource that has not been named yet.
+	if obj.GetName() != "" {
+		unstructured.RemoveNestedField(obj.Object, "metadata", "generateName")
+	}
+
+	annotations, found, err := unstructured.NestedMap(obj.Object, "metadata", "annotations")
+	if err != nil || !found {
+		return
+	}
+
+	delete(annotations, "kubectl.kubernetes.io/last-applied-configuration")
+
+	for key := range annotations {
+		for _, prefix := range internalAnnotationPrefixes {
+			if strings.HasPrefix(key, prefix) {
+				delete(annotations, key)
+
+				break
+			}
+		}
+	}
+
+	if len(annotations) == 0 {
+		unstructured.RemoveNestedField(obj.Object, "metadata", "annotations")
+
+		return
+	}
+
+	_ = unstructured.SetNestedMap(obj.Object, annotations, "metadata", "annotations")
+}
+
+// Option configures the response built by CreateMcpResponse.
+type Option func(*responseOptions)
+
+type responseOptions struct {
+	notes           []string
+	summarizeStatus bool
+}
+
+// WithNotes adds notes to the response. When notes are provided, the LLM field is wrapped as
+// {"resources": ..., "note": "..."}, with the notes joined by newlines.
+func WithNotes(notes ...string) Option {
+	return func(o *responseOptions) {
+		o.notes = append(o.notes, notes...)
+	}
+}
+
+// WithSummarizedStatus reduces the status of each resource to what can explain a problem with it.
+// Conditions that are True are removed, as are timestamps and observed generations, so a resource
+// that has been reconciled keeps only its summary.
+//
+// This is only suitable for resources whose conditions are True when the resource is healthy.
+// For some resources a True condition reports a problem, e.g. a Job's Failed condition or a
+// Node's DiskPressure condition, so this would remove it.
+func WithSummarizedStatus() Option {
+	return func(o *responseOptions) {
+		o.summarizeStatus = true
+	}
+}
+
+// CreateMcpResponse constructs an MCPResponse object. It takes a slice of unstructured Kubernetes objects,
+// the cluster they are in, and options. The fields maintained by the server are removed from each object
+// with RemoveServerManagedFields, and the objects are modified in place.
+func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, opts ...Option) (string, error) {
+	var options responseOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	var uiContext []UIContext
+
 	for _, obj := range objs {
-		unstructured.RemoveNestedField(obj.Object, "metadata", "managedFields")
-		unstructured.RemoveNestedField(obj.Object, "metadata", "annotations", "kubectl.kubernetes.io/last-applied-configuration")
+		RemoveServerManagedFields(obj)
+
+		if options.summarizeStatus {
+			summarizeStatus(obj)
+		}
 
 		gvk := obj.GetObjectKind().GroupVersionKind()
+
 		lowerKind := strings.ToLower(gvk.Kind)
 		if lowerKind == "" {
 			continue
@@ -49,6 +140,7 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes 
 		// (e.g. cluster.x-k8s.io.cluster vs provisioning.cattle.io.cluster)
 		lookupKind := lowerKind
 		steveType := lowerKind
+
 		switch gvk.Group {
 		case converter.CAPIGroup:
 			lookupKind = converter.CAPIKindPrefix + lookupKind
@@ -82,7 +174,7 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes 
 		data = objs
 	}
 
-	if note := strings.Join(notes, "\n"); note != "" {
+	if note := strings.Join(options.notes, "\n"); note != "" {
 		data = map[string]any{
 			"resources": data,
 			"note":      note,
@@ -90,6 +182,52 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes 
 	}
 
 	return CreateMcpResponseAny(data, uiContext...)
+}
+
+// summarizeStatus reduces the status of a resource to what can explain a problem with it.
+// See WithSummarizedStatus.
+func summarizeStatus(obj *unstructured.Unstructured) {
+	status, found, err := unstructured.NestedMap(obj.Object, "status")
+	if err != nil || !found {
+		return
+	}
+
+	for key, value := range status {
+		switch {
+		case key == "lastUpdateTime", strings.HasPrefix(key, "observedGeneration"):
+			delete(status, key)
+		case strings.HasSuffix(strings.ToLower(key), "conditions"):
+			conditions, ok := value.([]any)
+			if !ok {
+				continue
+			}
+
+			var problems []any
+
+			for _, condition := range conditions {
+				if conditionMap, ok := condition.(map[string]any); ok && conditionMap["status"] == "True" {
+					continue
+				}
+
+				problems = append(problems, condition)
+			}
+
+			if len(problems) == 0 {
+				delete(status, key)
+			} else {
+				status[key] = problems
+			}
+		default:
+			// Other status fields, such as the summary, are kept.
+		}
+	}
+
+	if len(status) == 0 {
+		unstructured.RemoveNestedField(obj.Object, "status")
+		return
+	}
+
+	_ = unstructured.SetNestedMap(obj.Object, status, "status")
 }
 
 // CreateMcpResponseAny constructs an MCPResponse with any data that can be marshaled into JSON.
@@ -133,15 +271,32 @@ type Resource struct {
 }
 
 // PlanResource represents a single planned operation on a Kubernetes resource.
-// It pairs an operation type (CREATE, UPDATE, DELETE) with the target resource
+// It pairs an operation type (create, update or delete) with the target resource
 // metadata and the operation payload.
 type PlanResource struct {
 	// Type is the operation to perform on the resource.
-	Type OperationType `json:"type" jsonschema:"enum=CREATE,enum=UPDATE,enum=DELETE"`
-	// Payload holds the resource body for CREATE operations or the patch data for UPDATE operations.
+	Type OperationType `json:"type" jsonschema:"the operation to perform on the resource: create, update or delete"`
+	// Payload holds the resource body for create and delete operations or the patch data for update operations.
 	Payload any `json:"payload"`
 	// Resource identifies the target Kubernetes resource.
 	Resource Resource `json:"resource"`
+	// Detail is shown to the user with the confirmation of the operation, e.g. to warn
+	// about the effects of the operation on other resources.
+	Detail string `json:"detail,omitempty" jsonschema:"text to show to the user with the confirmation of the operation"`
+}
+
+// PlanResourceSchema returns the JSON schema of PlanResource, with the operation type limited to the
+// supported operations. The enum is provided through ForOptions.TypeSchemas because jsonschema-go
+// only uses the jsonschema struct tag as a description.
+func PlanResourceSchema() (*jsonschema.Schema, error) {
+	return jsonschema.For[PlanResource](&jsonschema.ForOptions{
+		TypeSchemas: map[reflect.Type]*jsonschema.Schema{
+			reflect.TypeFor[OperationType](): {
+				Type: "string",
+				Enum: []any{string(OperationCreate), string(OperationUpdate), string(OperationDelete)},
+			},
+		},
+	})
 }
 
 // NewCreateResourceInput constructs a PlanResource for a CREATE operation.
@@ -178,6 +333,24 @@ func NewUpdateResourceInput(obj *unstructured.Unstructured, patch []byte, cluste
 	}
 
 	return plan_resource
+}
+
+// NewDeleteResourceInput constructs a PlanResource for a DELETE operation.
+// It extracts the resource metadata from the given unstructured object and
+// sets the full object as the payload so the resource being deleted can be displayed.
+func NewDeleteResourceInput(obj *unstructured.Unstructured, cluster string) PlanResource {
+	planResource := PlanResource{
+		Type: OperationDelete,
+		Resource: Resource{
+			Name:      obj.GetName(),
+			Kind:      obj.GetKind(),
+			Cluster:   cluster,
+			Namespace: obj.GetNamespace(),
+		},
+		Payload: obj,
+	}
+
+	return planResource
 }
 
 // CreatePlanResponse serializes a slice of PlanResource into a JSON string.

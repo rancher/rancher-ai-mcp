@@ -6,12 +6,14 @@ import (
 	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
+
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"go.uber.org/zap"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
 var zapGetGlobalRole = zap.String("tool", "getGlobalRole")
@@ -45,6 +47,7 @@ func (t *Tools) getGlobalRole(ctx context.Context, toolReq *mcp.CallToolRequest,
 	if err == nil {
 		return createGlobalRolesResponse([]*unstructured.Unstructured{globalRole})
 	}
+
 	if !apierrors.IsNotFound(err) {
 		zap.L().Error("failed to get global role", zapGetGlobalRole, zap.Error(err))
 		return nil, nil, err
@@ -63,11 +66,13 @@ func (t *Tools) getGlobalRole(ctx context.Context, toolReq *mcp.CallToolRequest,
 	}
 
 	var matched []*unstructured.Unstructured
+
 	for _, gr := range globalRoles {
 		if strings.EqualFold(gr.GetName(), params.Name) {
 			matched = append(matched, gr)
 			continue
 		}
+
 		if displayName, found, err := unstructured.NestedString(gr.Object, "displayName"); err == nil && found && strings.EqualFold(displayName, params.Name) {
 			matched = append(matched, gr)
 		}
@@ -84,7 +89,7 @@ func (t *Tools) getGlobalRole(ctx context.Context, toolReq *mcp.CallToolRequest,
 }
 
 func createGlobalRolesResponse(globalRoles []*unstructured.Unstructured, notes ...string) (*mcp.CallToolResult, any, error) {
-	mcpResponse, err := response.CreateMcpResponse(globalRoles, "local", notes...)
+	mcpResponse, err := response.CreateMcpResponse(globalRoles, "local", response.WithSummarizedStatus(), response.WithNotes(notes...))
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapGetGlobalRole, zap.Error(err))
 		return nil, nil, err

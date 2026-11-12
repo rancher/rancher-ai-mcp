@@ -4,10 +4,11 @@ import (
 	"context"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"go.uber.org/zap"
+
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"go.uber.org/zap"
 )
 
 var zapListClusterRoleTemplateBindings = zap.String("tool", "listClusterRoleTemplateBindings")
@@ -31,6 +32,7 @@ func (t *Tools) listClusterRoleTemplateBindings(ctx context.Context, toolReq *mc
 		zap.L().Error("failed to resolve cluster ID", zapListClusterRoleTemplateBindings, zap.Error(err))
 		return nil, nil, err
 	}
+
 	namespace := clusterID
 
 	crtbs, err := t.client.GetResources(ctx, client.ListParams{
@@ -46,12 +48,14 @@ func (t *Tools) listClusterRoleTemplateBindings(ctx context.Context, toolReq *mc
 
 	// Filter the resources to only include those for the specified user, or the groups the user belongs to
 	var notes []string
+
 	if params.User != "" {
 		subjects, err := t.getUserSubjects(ctx, params.User)
 		if err != nil {
 			zap.L().Error("failed to resolve user", zapListClusterRoleTemplateBindings, zap.Error(err))
 			return nil, nil, err
 		}
+
 		crtbs = filterBindingsForUser(crtbs, subjects)
 		notes = userGroupsNote(subjects.groups)
 	}
@@ -59,7 +63,8 @@ func (t *Tools) listClusterRoleTemplateBindings(ctx context.Context, toolReq *mc
 	if params.Group != "" {
 		crtbs = filterBindingsForGroup(crtbs, params.Group)
 	}
-	mcpResponse, err := response.CreateMcpResponse(crtbs, "local", notes...)
+
+	mcpResponse, err := response.CreateMcpResponse(crtbs, "local", response.WithSummarizedStatus(), response.WithNotes(notes...))
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapListClusterRoleTemplateBindings, zap.Error(err))
 		return nil, nil, err

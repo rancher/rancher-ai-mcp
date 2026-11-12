@@ -68,5 +68,6 @@ func TestFilterBindingsForGroup(t *testing.T) {
 	for _, b := range filterBindingsForGroup(bindings, "local://g-abc") {
 		names = append(names, b.GetName())
 	}
+
 	assert.Equal(t, []string{"by-principal", "by-group-name"}, names)
 }

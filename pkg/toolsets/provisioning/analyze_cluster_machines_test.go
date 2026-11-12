@@ -154,15 +154,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "test-cluster"
 							},
 							"name": "test-cluster-machine-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineSet",
-									"name": "test-cluster-machineset-1"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"bootstrap": {
@@ -185,15 +177,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "test-cluster"
 							},
 							"name": "test-cluster-machine-2",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineSet",
-									"name": "test-cluster-machineset-1"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"clusterName": "test-cluster"
@@ -210,15 +194,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "test-cluster"
 							},
 							"name": "test-cluster-machineset-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineDeployment",
-									"name": "test-cluster-md-0"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"replicas": 2
@@ -314,15 +290,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "test-cluster"
 							},
 							"name": "test-cluster-machine-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineSet",
-									"name": "test-cluster-machineset-1"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"bootstrap": {
@@ -345,15 +313,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "test-cluster"
 							},
 							"name": "test-cluster-machineset-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineDeployment",
-									"name": "test-cluster-md-0"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"replicas": 2
@@ -431,15 +391,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "test-cluster"
 							},
 							"name": "test-cluster-machine-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineSet",
-									"name": "test-cluster-machineset-1"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"bootstrap": {
@@ -538,15 +490,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "test-cluster"
 							},
 							"name": "test-cluster-machineset-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineDeployment",
-									"name": "test-cluster-md-0"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"replicas": 2
@@ -585,15 +529,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "test-cluster"
 							},
 							"name": "test-cluster-machine-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineSet",
-									"name": "test-cluster-machineset-1"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"bootstrap": {

@@ -102,15 +102,7 @@ func TestAnalyzeCluster(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "test-cluster"
 							},
 							"name": "test-cluster-machine-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineSet",
-									"name": "test-cluster-machineset-1"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"clusterName": "test-cluster"
@@ -127,15 +119,7 @@ func TestAnalyzeCluster(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "test-cluster"
 							},
 							"name": "test-cluster-machineset-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineDeployment",
-									"name": "test-cluster-md-0"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"replicas": 1
@@ -534,15 +518,7 @@ func TestAnalyzeCluster(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "multi-cluster"
 							},
 							"name": "multi-cluster-machine-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineSet",
-									"name": "multi-cluster-machineset-1"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"clusterName": "multi-cluster"
@@ -559,15 +535,7 @@ func TestAnalyzeCluster(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "multi-cluster"
 							},
 							"name": "multi-cluster-machine-2",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineSet",
-									"name": "multi-cluster-machineset-1"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"clusterName": "multi-cluster"
@@ -584,15 +552,7 @@ func TestAnalyzeCluster(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "multi-cluster"
 							},
 							"name": "multi-cluster-machine-3",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineSet",
-									"name": "multi-cluster-machineset-2"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"clusterName": "multi-cluster"
@@ -609,15 +569,7 @@ func TestAnalyzeCluster(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "multi-cluster"
 							},
 							"name": "multi-cluster-machineset-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineDeployment",
-									"name": "multi-cluster-md-0"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"replicas": 2
@@ -635,15 +587,7 @@ func TestAnalyzeCluster(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "multi-cluster"
 							},
 							"name": "multi-cluster-machineset-2",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineDeployment",
-									"name": "multi-cluster-md-1"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"replicas": 1
@@ -967,15 +911,7 @@ func TestAnalyzeCluster(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "rke-cluster"
 							},
 							"name": "rke-cluster-machine-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineSet",
-									"name": "rke-cluster-machineset-1"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"clusterName": "rke-cluster"
@@ -992,15 +928,7 @@ func TestAnalyzeCluster(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "rke-cluster"
 							},
 							"name": "rke-cluster-machineset-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineDeployment",
-									"name": "rke-cluster-md-0"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"replicas": 1
@@ -1326,15 +1254,7 @@ func TestAnalyzeCluster(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "single-machine-cluster"
 							},
 							"name": "single-machine-cluster-machine-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineSet",
-									"name": "single-machine-cluster-machineset-1"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"clusterName": "single-machine-cluster"
@@ -1351,15 +1271,7 @@ func TestAnalyzeCluster(t *testing.T) {
 								"cluster.x-k8s.io/cluster-name": "single-machine-cluster"
 							},
 							"name": "single-machine-cluster-machineset-1",
-							"namespace": "fleet-default",
-							"ownerReferences": [
-								{
-									"apiVersion": "cluster.x-k8s.io/v1beta1",
-									"controller": true,
-									"kind": "MachineDeployment",
-									"name": "single-machine-cluster-md-0"
-								}
-							]
+							"namespace": "fleet-default"
 						},
 						"spec": {
 							"replicas": 1

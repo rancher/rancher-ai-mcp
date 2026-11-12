@@ -79,7 +79,7 @@ func TestCreateMCPResponse(t *testing.T) {
 			namespace:      "default",
 			cluster:        "local",
 			additionalInfo: []string{},
-			expected:       `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"annotations":{},"name":"test-pod","namespace":"default"}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"test-pod","type":"pod"}]}`,
+			expected:       `{"llm":[{"apiVersion":"v1","kind":"Pod","metadata":{"name":"test-pod","namespace":"default"}}],"uiContext":[{"namespace":"default","kind":"Pod","cluster":"local","name":"test-pod","type":"pod"}]}`,
 			expectError:    false,
 		},
 		"multiple pods": {
@@ -142,7 +142,7 @@ func TestCreateMCPResponse(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			resp, err := CreateMcpResponse(test.objs, test.cluster, test.notes...)
+			resp, err := CreateMcpResponse(test.objs, test.cluster, WithNotes(test.notes...))
 			if test.expectError {
 				assert.Error(t, err)
 			} else {
@@ -346,6 +346,7 @@ func TestCreatePlanResponse(t *testing.T) {
 				assert.Error(t, err)
 				return
 			}
+
 			require.NoError(t, err)
 			assert.JSONEq(t, tc.expected, got)
 		})
@@ -401,4 +402,196 @@ func TestCreateNoChangesPlanResponse(t *testing.T) {
 
 	require.NoError(t, err)
 	assert.JSONEq(t, `{"type":"no_changes","message":"role 'project-member' is already granted, no changes needed"}`, result)
+}
+
+func TestPlanResourceSchema(t *testing.T) {
+	s, err := PlanResourceSchema()
+	require.NoError(t, err)
+
+	typeSchema := s.Properties["type"]
+	assert.Equal(t, "string", typeSchema.Type)
+	assert.Equal(t, []any{string(OperationCreate), string(OperationUpdate), string(OperationDelete)}, typeSchema.Enum)
+	assert.Equal(t, "the operation to perform on the resource: create, update or delete", typeSchema.Description)
+}
+
+func TestPlanResourceSchemaValidatesType(t *testing.T) {
+	s, err := PlanResourceSchema()
+	require.NoError(t, err)
+	resolved, err := s.Resolve(nil)
+	require.NoError(t, err)
+
+	plan := func(operation string) map[string]any {
+		return map[string]any{
+			"type":     operation,
+			"payload":  map[string]any{},
+			"resource": map[string]any{"name": "cm", "kind": "ConfigMap", "cluster": "local", "namespace": "default"},
+		}
+	}
+
+	for _, operation := range []OperationType{OperationCreate, OperationUpdate, OperationDelete} {
+		assert.NoError(t, resolved.Validate(plan(string(operation))), operation)
+	}
+
+	assert.Error(t, resolved.Validate(plan("DELETE")), "the operation type is lowercase")
+	assert.Error(t, resolved.Validate(plan("rename")))
+}
+
+func TestPlanResourceDetail(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "cm"}}}
+
+	withoutText, err := CreatePlanResponse([]PlanResource{NewDeleteResourceInput(obj, "local")})
+	require.NoError(t, err)
+	assert.NotContains(t, withoutText, `"detail"`)
+
+	planResource := NewDeleteResourceInput(obj, "local")
+	planResource.Detail = "Other resources are affected."
+	withText, err := CreatePlanResponse([]PlanResource{planResource})
+	require.NoError(t, err)
+	assert.Contains(t, withText, `"detail":"Other resources are affected."`)
+}
+
+func TestRemoveServerManagedFields(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]any{
+			"name":              "cm",
+			"namespace":         "default",
+			"generateName":      "cm-",
+			"uid":               "5f4bd8fc-80a6-4567-ad76-9706818d6a48",
+			"resourceVersion":   "133639",
+			"generation":        int64(2),
+			"creationTimestamp": "2026-11-04T14:38:09Z",
+			"finalizers":        []any{"example.com/finalizer"},
+			"ownerReferences":   []any{map[string]any{"apiVersion": "v1", "kind": "Secret", "name": "owner", "uid": "9ee2d536"}},
+			"managedFields":     []any{map[string]any{"manager": "kubectl"}},
+			"labels":            map[string]any{"app": "example"},
+			"annotations": map[string]any{
+				"kubectl.kubernetes.io/last-applied-configuration":    "{}",
+				"lifecycle.cattle.io/create.mgmt-auth-grb-controller": "true",
+				"authz.management.cattle.io/crb-name":                 "cattle-globalrolebinding-grb-1",
+				"cleanup.cattle.io/grbUpgradeCluster":                 "true",
+				"field.cattle.io/creatorId":                           "user-sdxtj",
+				"example.com/note":                                    "kept",
+			},
+		},
+		"data": map[string]any{"key": "value"},
+	}}
+
+	RemoveServerManagedFields(obj)
+
+	assert.Equal(t, map[string]any{
+		"apiVersion": "v1",
+		"kind":       "ConfigMap",
+		"metadata": map[string]any{
+			"name":              "cm",
+			"namespace":         "default",
+			"creationTimestamp": "2026-11-04T14:38:09Z",
+			"labels":            map[string]any{"app": "example"},
+			"annotations":       map[string]any{"field.cattle.io/creatorId": "user-sdxtj", "example.com/note": "kept"},
+		},
+		"data": map[string]any{"key": "value"},
+	}, obj.Object)
+}
+
+func TestRemoveServerManagedFieldsKeepsGenerateNameWithoutName(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "ConfigMap"}}
+	obj.SetGenerateName("cm-")
+
+	RemoveServerManagedFields(obj)
+
+	assert.Equal(t, "cm-", obj.GetGenerateName())
+}
+
+func TestRemoveServerManagedFieldsRemovesEmptyAnnotations(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "ConfigMap"}}
+	obj.SetName("cm")
+	obj.SetAnnotations(map[string]string{
+		"kubectl.kubernetes.io/last-applied-configuration":    "{}",
+		"lifecycle.cattle.io/create.mgmt-auth-grb-controller": "true",
+	})
+
+	RemoveServerManagedFields(obj)
+
+	assert.NotContains(t, obj.Object["metadata"], "annotations")
+}
+
+func TestSummarizeStatus(t *testing.T) {
+	failed := map[string]any{"type": "SubjectReconciled", "status": "False", "reason": "SubjectNotFound", "message": "user not found"}
+	tests := map[string]struct {
+		status   map[string]any
+		expected map[string]any
+	}{
+		"reconciled resource keeps only its summary": {
+			status: map[string]any{
+				"summary":        "Completed",
+				"lastUpdateTime": "2026-11-04T14:38:09Z",
+				"conditions":     []any{map[string]any{"type": "Ready", "status": "True"}},
+			},
+			expected: map[string]any{"summary": "Completed"},
+		},
+		"conditions that are not true are kept": {
+			status: map[string]any{
+				"summary":         "Error",
+				"localConditions": []any{map[string]any{"type": "Ready", "status": "True"}, failed},
+			},
+			expected: map[string]any{"summary": "Error", "localConditions": []any{failed}},
+		},
+		"other status fields are kept": {
+			status:   map[string]any{"backingNamespace": "p-abc", "observedGeneration": int64(1)},
+			expected: map[string]any{"backingNamespace": "p-abc"},
+		},
+		"empty status is removed": {
+			status:   map[string]any{"lastUpdateTime": "2026-11-04T14:38:09Z"},
+			expected: nil,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			obj := &unstructured.Unstructured{Object: map[string]any{"status": tt.status}}
+
+			summarizeStatus(obj)
+
+			if tt.expected == nil {
+				assert.NotContains(t, obj.Object, "status")
+				return
+			}
+
+			assert.Equal(t, tt.expected, obj.Object["status"])
+		})
+	}
+}
+
+func TestCreateMcpResponseWithSummarizedStatus(t *testing.T) {
+	newObj := func() *unstructured.Unstructured {
+		return &unstructured.Unstructured{Object: map[string]any{
+			"apiVersion": "management.cattle.io/v3",
+			"kind":       "GlobalRoleBinding",
+			"metadata":   map[string]any{"name": "grb-1"},
+			"status": map[string]any{
+				"summary":         "Completed",
+				"localConditions": []any{map[string]any{"type": "SubjectReconciled", "status": "True"}},
+			},
+		}}
+	}
+
+	summarized := newObj()
+	_, err := CreateMcpResponse([]*unstructured.Unstructured{summarized}, "local", WithSummarizedStatus())
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"summary": "Completed"}, summarized.Object["status"])
+
+	// The status is kept unless WithSummarizedStatus is used.
+	unchanged := newObj()
+	_, err = CreateMcpResponse([]*unstructured.Unstructured{unchanged}, "local")
+	require.NoError(t, err)
+	assert.Equal(t, newObj().Object["status"], unchanged.Object["status"])
+}
+
+func TestCreateMcpResponseWithNotes(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "cm"}}}
+
+	resp, err := CreateMcpResponse([]*unstructured.Unstructured{obj}, "local", WithNotes("first"), WithNotes("second", "third"))
+	require.NoError(t, err)
+	assert.Contains(t, resp, `"note":"first\nsecond\nthird"`)
 }

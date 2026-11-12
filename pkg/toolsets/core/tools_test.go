@@ -33,7 +33,7 @@ func TestAddTools(t *testing.T) {
 	toolsResult, err := cs.ListTools(ctx, &mcp.ListToolsParams{})
 
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 33, "incorrect number of tools registered")
+	assert.Len(t, toolsResult.Tools, 37, "incorrect number of tools registered")
 	// assert that all tools have the correct toolset annotation
 	for _, tool := range toolsResult.Tools {
 		if tool.Name == "listClusters" {
@@ -82,8 +82,12 @@ func TestAddToolsReadOnly(t *testing.T) {
 	assert.False(t, toolNames["moveNamespace"], "moveNamespace should not be registered in read-only mode")
 	assert.False(t, toolNames["createGlobalRole"], "createGlobalRole should not be registered in read-only mode")
 	assert.False(t, toolNames["createGlobalRolePlan"], "createGlobalRolePlan should not be registered in read-only mode")
+	assert.False(t, toolNames["deleteGlobalRole"], "deleteGlobalRole should not be registered in read-only mode")
+	assert.False(t, toolNames["deleteGlobalRolePlan"], "deleteGlobalRolePlan should not be registered in read-only mode")
 	assert.False(t, toolNames["createGlobalRoleBinding"], "createGlobalRoleBinding should not be registered in read-only mode")
 	assert.False(t, toolNames["createGlobalRoleBindingPlan"], "createGlobalRoleBindingPlan should not be registered in read-only mode")
+	assert.False(t, toolNames["deleteGlobalRoleBinding"], "deleteGlobalRoleBinding should not be registered in read-only mode")
+	assert.False(t, toolNames["deleteGlobalRoleBindingPlan"], "deleteGlobalRoleBindingPlan should not be registered in read-only mode")
 }
 
 // startTestMCPServer serves mcpServer on a random local port and returns a client session connected to it.
