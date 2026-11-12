@@ -46,7 +46,7 @@ func TestDeleteGlobalRoleBinding(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tools, fakeDynClient := newTestTools(t, newTestGRB())
+			tools, fakeDynClient := newFakeTools(t, withObjects(newTestGRB()))
 
 			result, _, err := tools.deleteGlobalRoleBinding(
 				middleware.WithToken(t.Context(), fakeToken),
@@ -69,7 +69,7 @@ func TestDeleteGlobalRoleBinding(t *testing.T) {
 }
 
 func TestDeleteGlobalRoleBindingPlan(t *testing.T) {
-	tools, fakeDynClient := newTestTools(t, newTestGRB())
+	tools, fakeDynClient := newFakeTools(t, withObjects(newTestGRB()))
 	ctx := middleware.WithToken(t.Context(), fakeToken)
 
 	result, _, err := tools.deleteGlobalRoleBindingPlan(ctx, test.NewCallToolRequest(fakeURL), deleteGRBParams{Name: "grb-1"})

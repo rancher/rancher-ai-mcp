@@ -15,7 +15,7 @@ var zapListClusterRoleTemplateBindings = zap.String("tool", "listClusterRoleTemp
 
 type listCRTBParams struct {
 	Cluster string `json:"cluster" jsonschema:"the name of the cluster the search is scoped to"`
-	User    string `json:"user,omitempty" jsonschema:"(optional) the username or user ID to get permissions for. Bindings for the groups the user belongs to are included. Cannot be combined with group"`
+	User    string `json:"user,omitempty" jsonschema:"(optional) the username or user ID, or the display name or principal ID, of the user to get permissions for. Bindings for the groups the user belongs to are included. Cannot be combined with group"`
 	Group   string `json:"group,omitempty" jsonschema:"(optional) the group principal name to get permissions for, e.g. github_team://1234. Cannot be combined with user"`
 }
 

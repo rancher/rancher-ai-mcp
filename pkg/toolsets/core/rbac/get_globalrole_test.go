@@ -5,12 +5,14 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
+
 	k8stesting "k8s.io/client-go/testing"
+
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 )
 
 func TestGetGlobalRole(t *testing.T) {
@@ -100,7 +102,7 @@ func TestGetGlobalRole(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tools, fakeDynClient := newTestTools(t, tt.objects...)
+			tools, fakeDynClient := newFakeTools(t, withObjects(tt.objects...))
 			if tt.reactorErr != nil {
 				fakeDynClient.PrependReactor("get", "globalroles", func(k8stesting.Action) (bool, runtime.Object, error) {
 					return true, nil, tt.reactorErr
@@ -112,11 +114,14 @@ func TestGetGlobalRole(t *testing.T) {
 				assert.ErrorContains(t, err, tt.expectedError)
 				return
 			}
+
 			require.NoError(t, err)
+
 			if tt.expectedResult != "" {
 				assert.JSONEq(t, tt.expectedResult, result.Content[0].(*mcp.TextContent).Text)
 				return
 			}
+
 			assert.Equal(t, tt.expected, summarizeResult(t, result))
 		})
 	}
