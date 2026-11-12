@@ -12,6 +12,7 @@ import (
 
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/response"
 )
 
 var zapGetUser = zap.String("tool", "getUser")
@@ -34,7 +35,7 @@ func (t *Tools) getUser(ctx context.Context, toolReq *mcp.CallToolRequest, param
 		matchedUser = append(matchedUser, user)
 	}
 
-	mcpResponse, err := createResourcesResponse(matchedUser)
+	mcpResponse, err := response.CreateMcpResponse(matchedUser, "local", response.WithSummarizedStatus())
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapGetUser, zap.Error(err))
 		return nil, nil, err

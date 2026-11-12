@@ -8,6 +8,7 @@ import (
 
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/response"
 )
 
 var zapListGlobalRoles = zap.String("tool", "listGlobalRoles")
@@ -26,7 +27,7 @@ func (t *Tools) listGlobalRoles(ctx context.Context, toolReq *mcp.CallToolReques
 		return nil, nil, err
 	}
 
-	mcpResponse, err := createResourcesResponse(globalRoles)
+	mcpResponse, err := response.CreateMcpResponse(globalRoles, "local", response.WithSummarizedStatus())
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapListGlobalRoles, zap.Error(err))
 		return nil, nil, err

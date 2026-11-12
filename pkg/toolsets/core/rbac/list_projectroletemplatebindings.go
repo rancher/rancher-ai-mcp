@@ -10,6 +10,7 @@ import (
 
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/core/projects"
 )
 
@@ -108,7 +109,7 @@ func (t *Tools) listProjectRoleTemplateBindings(ctx context.Context, toolReq *mc
 		prtbs = filterPRTBsByCluster(prtbs, clusterID)
 	}
 
-	mcpResponse, err := createResourcesResponse(prtbs, notes...)
+	mcpResponse, err := response.CreateMcpResponse(prtbs, "local", response.WithSummarizedStatus(), response.WithNotes(notes...))
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapListProjectRoleTemplateBindings, zap.Error(err))
 		return nil, nil, err

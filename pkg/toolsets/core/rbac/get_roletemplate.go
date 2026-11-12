@@ -9,6 +9,7 @@ import (
 
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/response"
 )
 
 var zapGetRoleTemplate = zap.String("tool", "getRoleTemplate")
@@ -32,7 +33,7 @@ func (t *Tools) getRoleTemplate(ctx context.Context, toolReq *mcp.CallToolReques
 		return nil, nil, err
 	}
 
-	mcpResponse, err := createResourcesResponse([]*unstructured.Unstructured{roleTemplate})
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{roleTemplate}, "local", response.WithSummarizedStatus())
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapGetRoleTemplate, zap.Error(err))
 		return nil, nil, err

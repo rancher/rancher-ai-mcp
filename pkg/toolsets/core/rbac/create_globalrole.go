@@ -68,7 +68,7 @@ func (t *Tools) createGlobalRole(ctx context.Context, toolReq *mcp.CallToolReque
 		return nil, nil, fmt.Errorf("failed to create global role: %w", err)
 	}
 
-	mcpResponse, err := createResourcesResponse([]*unstructured.Unstructured{obj})
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{obj}, "local", response.WithSummarizedStatus())
 	if err != nil {
 		zap.L().Error("failed to create mcp response", zapCreateGlobalRole, zap.Error(err))
 		return nil, nil, err

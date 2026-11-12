@@ -13,7 +13,6 @@ import (
 
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	"github.com/rancher/rancher-ai-mcp/pkg/response"
 )
 
 var errUserAndGroup = errors.New("only one of user or group can be specified, bindings for the user's groups are included when a user is specified")
@@ -29,63 +28,6 @@ func filterResourcesByField(resources []*unstructured.Unstructured, field, value
 	}
 
 	return filteredResources
-}
-
-// summarizeStatus reduces the status of a resource to what can explain a problem with it.
-// Conditions that are True are removed, as are timestamps and observed generations, so a
-// resource that has been reconciled keeps only its summary.
-func summarizeStatus(obj *unstructured.Unstructured) {
-	status, found, err := unstructured.NestedMap(obj.Object, "status")
-	if err != nil || !found {
-		return
-	}
-
-	for key, value := range status {
-		switch {
-		case key == "lastUpdateTime", strings.HasPrefix(key, "observedGeneration"):
-			delete(status, key)
-		case strings.HasSuffix(strings.ToLower(key), "conditions"):
-			conditions, ok := value.([]any)
-			if !ok {
-				continue
-			}
-
-			var problems []any
-
-			for _, condition := range conditions {
-				if conditionMap, ok := condition.(map[string]any); ok && conditionMap["status"] == "True" {
-					continue
-				}
-
-				problems = append(problems, condition)
-			}
-
-			if len(problems) == 0 {
-				delete(status, key)
-			} else {
-				status[key] = problems
-			}
-		default:
-			// Other status fields, such as the summary, are kept.
-		}
-	}
-
-	if len(status) == 0 {
-		unstructured.RemoveNestedField(obj.Object, "status")
-		return
-	}
-
-	_ = unstructured.SetNestedMap(obj.Object, status, "status")
-}
-
-// createResourcesResponse creates an MCP response for resources in the local cluster, with their
-// status reduced by summarizeStatus. CreateMcpResponse removes the fields maintained by the server.
-func createResourcesResponse(objs []*unstructured.Unstructured, notes ...string) (string, error) {
-	for _, obj := range objs {
-		summarizeStatus(obj)
-	}
-
-	return response.CreateMcpResponse(objs, "local", notes...)
 }
 
 // grbSubjectFields are the fields of a global role binding that record who it assigns the global role to.

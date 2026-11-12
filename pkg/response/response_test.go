@@ -143,7 +143,7 @@ func TestCreateMCPResponse(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Run(name, func(t *testing.T) {
-			resp, err := CreateMcpResponse(test.objs, test.cluster, test.notes...)
+			resp, err := CreateMcpResponse(test.objs, test.cluster, WithNotes(test.notes...))
 			if test.expectError {
 				assert.Error(t, err)
 			} else {
@@ -490,4 +490,84 @@ func TestRemoveServerManagedFieldsRemovesEmptyAnnotations(t *testing.T) {
 	RemoveServerManagedFields(obj)
 
 	assert.NotContains(t, obj.Object["metadata"], "annotations")
+}
+
+func TestSummarizeStatus(t *testing.T) {
+	failed := map[string]any{"type": "SubjectReconciled", "status": "False", "reason": "SubjectNotFound", "message": "user not found"}
+	tests := map[string]struct {
+		status   map[string]any
+		expected map[string]any
+	}{
+		"reconciled resource keeps only its summary": {
+			status: map[string]any{
+				"summary":        "Completed",
+				"lastUpdateTime": "2026-11-04T14:38:09Z",
+				"conditions":     []any{map[string]any{"type": "Ready", "status": "True"}},
+			},
+			expected: map[string]any{"summary": "Completed"},
+		},
+		"conditions that are not true are kept": {
+			status: map[string]any{
+				"summary":         "Error",
+				"localConditions": []any{map[string]any{"type": "Ready", "status": "True"}, failed},
+			},
+			expected: map[string]any{"summary": "Error", "localConditions": []any{failed}},
+		},
+		"other status fields are kept": {
+			status:   map[string]any{"backingNamespace": "p-abc", "observedGeneration": int64(1)},
+			expected: map[string]any{"backingNamespace": "p-abc"},
+		},
+		"empty status is removed": {
+			status:   map[string]any{"lastUpdateTime": "2026-11-04T14:38:09Z"},
+			expected: nil,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			obj := &unstructured.Unstructured{Object: map[string]any{"status": tt.status}}
+
+			summarizeStatus(obj)
+
+			if tt.expected == nil {
+				assert.NotContains(t, obj.Object, "status")
+				return
+			}
+
+			assert.Equal(t, tt.expected, obj.Object["status"])
+		})
+	}
+}
+
+func TestCreateMcpResponseWithSummarizedStatus(t *testing.T) {
+	newObj := func() *unstructured.Unstructured {
+		return &unstructured.Unstructured{Object: map[string]any{
+			"apiVersion": "management.cattle.io/v3",
+			"kind":       "GlobalRoleBinding",
+			"metadata":   map[string]any{"name": "grb-1"},
+			"status": map[string]any{
+				"summary":         "Completed",
+				"localConditions": []any{map[string]any{"type": "SubjectReconciled", "status": "True"}},
+			},
+		}}
+	}
+
+	summarized := newObj()
+	_, err := CreateMcpResponse([]*unstructured.Unstructured{summarized}, "local", WithSummarizedStatus())
+	require.NoError(t, err)
+	assert.Equal(t, map[string]any{"summary": "Completed"}, summarized.Object["status"])
+
+	// The status is kept unless WithSummarizedStatus is used.
+	unchanged := newObj()
+	_, err = CreateMcpResponse([]*unstructured.Unstructured{unchanged}, "local")
+	require.NoError(t, err)
+	assert.Equal(t, newObj().Object["status"], unchanged.Object["status"])
+}
+
+func TestCreateMcpResponseWithNotes(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]any{"apiVersion": "v1", "kind": "ConfigMap", "metadata": map[string]any{"name": "cm"}}}
+
+	resp, err := CreateMcpResponse([]*unstructured.Unstructured{obj}, "local", WithNotes("first"), WithNotes("second", "third"))
+	require.NoError(t, err)
+	assert.Contains(t, resp, `"note":"first\nsecond\nthird"`)
 }

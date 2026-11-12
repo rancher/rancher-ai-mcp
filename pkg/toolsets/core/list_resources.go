@@ -57,7 +57,7 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 
 	var mcpResponse string
 	if note := t.paginator.BuildNote(page, filterSuffix); note != "" {
-		mcpResponse, err = response.CreateMcpResponse(page.Items, params.Cluster, note)
+		mcpResponse, err = response.CreateMcpResponse(page.Items, params.Cluster, response.WithNotes(note))
 	} else {
 		mcpResponse, err = response.CreateMcpResponse(page.Items, params.Cluster)
 	}

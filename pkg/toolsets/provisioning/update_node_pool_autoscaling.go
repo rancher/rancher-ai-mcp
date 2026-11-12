@@ -111,7 +111,7 @@ func (t *Tools) updateNodePoolAutoscaling(ctx context.Context, toolReq *mcp.Call
 
 	removeMachinePoolSchemas(patchObj)
 	// The provisioning cluster object is stored in the local cluster.
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{patchObj}, LocalCluster, notes...)
+	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{patchObj}, LocalCluster, response.WithNotes(notes...))
 	if err != nil {
 		log.Error("failed to create mcp response", zap.Error(err))
 		return nil, nil, err

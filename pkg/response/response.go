@@ -80,13 +80,52 @@ func RemoveServerManagedFields(obj *unstructured.Unstructured) {
 	_ = unstructured.SetNestedMap(obj.Object, annotations, "metadata", "annotations")
 }
 
-// CreateMcpResponse constructs an MCPResponse object. It takes a slice of unstructured Kubernetes objects, cluster,
-// and optional notes. When notes are provided, the LLM field is wrapped as {"resources": ..., "note": "..."}.
-func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes ...string) (string, error) {
+// Option configures the response built by CreateMcpResponse.
+type Option func(*responseOptions)
+
+type responseOptions struct {
+	notes           []string
+	summarizeStatus bool
+}
+
+// WithNotes adds notes to the response. When notes are provided, the LLM field is wrapped as
+// {"resources": ..., "note": "..."}, with the notes joined by newlines.
+func WithNotes(notes ...string) Option {
+	return func(o *responseOptions) {
+		o.notes = append(o.notes, notes...)
+	}
+}
+
+// WithSummarizedStatus reduces the status of each resource to what can explain a problem with it.
+// Conditions that are True are removed, as are timestamps and observed generations, so a resource
+// that has been reconciled keeps only its summary.
+//
+// This is only suitable for resources whose conditions are True when the resource is healthy.
+// For some resources a True condition reports a problem, e.g. a Job's Failed condition or a
+// Node's DiskPressure condition, so this would remove it.
+func WithSummarizedStatus() Option {
+	return func(o *responseOptions) {
+		o.summarizeStatus = true
+	}
+}
+
+// CreateMcpResponse constructs an MCPResponse object. It takes a slice of unstructured Kubernetes objects,
+// the cluster they are in, and options. The fields maintained by the server are removed from each object
+// with RemoveServerManagedFields, and the objects are modified in place.
+func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, opts ...Option) (string, error) {
+	var options responseOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	var uiContext []UIContext
 
 	for _, obj := range objs {
 		RemoveServerManagedFields(obj)
+
+		if options.summarizeStatus {
+			summarizeStatus(obj)
+		}
 
 		gvk := obj.GetObjectKind().GroupVersionKind()
 
@@ -133,7 +172,7 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes 
 		data = objs
 	}
 
-	if note := strings.Join(notes, "\n"); note != "" {
+	if note := strings.Join(options.notes, "\n"); note != "" {
 		data = map[string]any{
 			"resources": data,
 			"note":      note,
@@ -141,6 +180,52 @@ func CreateMcpResponse(objs []*unstructured.Unstructured, cluster string, notes 
 	}
 
 	return CreateMcpResponseAny(data, uiContext...)
+}
+
+// summarizeStatus reduces the status of a resource to what can explain a problem with it.
+// See WithSummarizedStatus.
+func summarizeStatus(obj *unstructured.Unstructured) {
+	status, found, err := unstructured.NestedMap(obj.Object, "status")
+	if err != nil || !found {
+		return
+	}
+
+	for key, value := range status {
+		switch {
+		case key == "lastUpdateTime", strings.HasPrefix(key, "observedGeneration"):
+			delete(status, key)
+		case strings.HasSuffix(strings.ToLower(key), "conditions"):
+			conditions, ok := value.([]any)
+			if !ok {
+				continue
+			}
+
+			var problems []any
+
+			for _, condition := range conditions {
+				if conditionMap, ok := condition.(map[string]any); ok && conditionMap["status"] == "True" {
+					continue
+				}
+
+				problems = append(problems, condition)
+			}
+
+			if len(problems) == 0 {
+				delete(status, key)
+			} else {
+				status[key] = problems
+			}
+		default:
+			// Other status fields, such as the summary, are kept.
+		}
+	}
+
+	if len(status) == 0 {
+		unstructured.RemoveNestedField(obj.Object, "status")
+		return
+	}
+
+	_ = unstructured.SetNestedMap(obj.Object, status, "status")
 }
 
 // CreateMcpResponseAny constructs an MCPResponse with any data that can be marshaled into JSON.
