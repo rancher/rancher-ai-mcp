@@ -108,6 +108,15 @@ Autoscaling is only supported for clusters provisioned by Rancher with machine p
 This should only be used when information about the supported rke2 and k3s is needed. This is often required to support provisioning custom and imported clusters.`},
 		t.listSupportedKubernetesVersions)
 
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "listClusterSnapshots",
+		Meta: map[string]any{
+			toolsSetAnn: ToolsSet,
+		},
+		Description: `Lists the etcd snapshots of an rke2 or k3s cluster provisioned by Rancher, newest first.
+Returns the name, creation time, node, location, storage type (local or s3), size, and status of each snapshot.`},
+		t.listClusterSnapshots)
+
 	if !t.ReadOnly {
 		if t.toolboxImage != "" {
 			// while investigateFailedPlanApplication doesn't create resources
@@ -132,6 +141,26 @@ Not available for the local cluster or non-CAPI clusters (aks, eks, gke, k3k, et
 				Description: `Dry-run of investigateFailedProvisioningPlanApplication. Returns the JSON of the privileged log-gathering job that would be deployed, without deploying or running it.`},
 				t.investigateFailedPlanApplicationPlan)
 		}
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "createClusterSnapshot",
+			Meta: map[string]any{
+				toolsSetAnn: ToolsSet,
+			},
+			Description: `Takes an etcd snapshot of an rke2 or k3s cluster provisioned by Rancher.
+This should be used when the user wants to back up a cluster, for example before upgrading it. The snapshot is taken asynchronously, use listClusterSnapshots to check when it has completed.
+Imported clusters and the local cluster are not supported.`},
+			t.createClusterSnapshot)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "createClusterSnapshotPlan",
+			Meta: map[string]any{
+				toolsSetAnn: ToolsSet,
+			},
+			Description: `Plans to take an etcd snapshot of an rke2 or k3s cluster provisioned by Rancher. It returns the JSON patch to be applied to the provisioning cluster without actually applying it.
+Only used for displaying the resource when using human validation. This should be used when the user wants to back up a cluster, for example before upgrading it.
+Imported clusters and the local cluster are not supported.`},
+			t.createClusterSnapshotPlan)
 
 		mcp.AddTool(mcpServer, &mcp.Tool{
 			Name: "scaleClusterNodePool",
