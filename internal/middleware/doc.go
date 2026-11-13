@@ -65,5 +65,8 @@
 // scopes in the token are space-separated as per OAuth 2.0 specification.
 //
 // If a request is made with R_token then it is passed through without
-// validation to support the previous authentication mechanism.
+// validation to support the previous authentication mechanism. When no
+// authorization server is configured, a bearer token in the Authorization
+// header is passed through the same way, so clients that cannot set custom
+// headers can still authenticate with a Rancher token.
 package middleware

@@ -100,9 +100,15 @@ func (c *OAuthConfig) LoadJWKS(ctx context.Context) error {
 // OAuthMiddleware is a middleware that performs OAuth 2.1 authorization.
 func (c *OAuthConfig) OAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// If OAuth is disabled then pass through the token if it's provided.
+		// If OAuth is disabled then pass through the token if it's provided:
+		// the R_token header first, then the bearer token of the Authorization
+		// header, which is the only header some MCP clients can send.
 		if c.AuthorizationServerURL == "" {
-			next.ServeHTTP(w, r.Clone(WithToken(r.Context(), r.Header.Get(tokenHeader))))
+			token := r.Header.Get(tokenHeader)
+			if token == "" {
+				token, _ = c.extractToken(r)
+			}
+			next.ServeHTTP(w, r.Clone(WithToken(r.Context(), token)))
 			return
 		}
 
