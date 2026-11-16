@@ -2,25 +2,18 @@ package rbac
 
 import (
 	"encoding/json"
-	"net"
-	"net/http"
 	"testing"
-	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
-	"k8s.io/client-go/dynamic"
-	"k8s.io/client-go/rest"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	dynamicfake "k8s.io/client-go/dynamic/fake"
 
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 )
 
 const (
@@ -37,6 +30,8 @@ var rbacGVRs = map[schema.GroupVersionResource]string{
 	{Group: "management.cattle.io", Version: "v3", Resource: "roletemplates"}:               "RoleTemplateList",
 	{Group: "management.cattle.io", Version: "v3", Resource: "users"}:                       "UserList",
 	{Group: "management.cattle.io", Version: "v3", Resource: "userattributes"}:              "UserAttributeList",
+	{Group: "management.cattle.io", Version: "v3", Resource: "tokens"}:                      "TokenList",
+	{Group: "ext.cattle.io", Version: "v1", Resource: "tokens"}:                             "TokenList",
 }
 
 // testUsers returns users u-user1, u-user2 and u-user3, where u-user1 belongs to the group
@@ -67,19 +62,6 @@ func testUsers() []runtime.Object {
 	}
 }
 
-// newTestTools returns Tools backed by a fake dynamic client containing objs, and the fake client
-// so tests can inspect or modify its state.
-func newTestTools(t *testing.T, objs ...runtime.Object) (*Tools, *dynamicfake.FakeDynamicClient) {
-	t.Helper()
-
-	fakeDynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(rbacScheme(), rbacGVRs, objs...)
-	c := &client.Client{
-		DynClientCreator: func(_ *rest.Config) (dynamic.Interface, error) { return fakeDynClient, nil },
-	}
-
-	return NewTools(test.WrapClient(c, fakeToken), false), fakeDynClient
-}
-
 func rbacScheme() *runtime.Scheme {
 	scheme := runtime.NewScheme()
 	_ = corev1.AddToScheme(scheme)
@@ -88,49 +70,36 @@ func rbacScheme() *runtime.Scheme {
 	return scheme
 }
 
-func startMCPServer(t *testing.T, tools *Tools) (*mcp.ClientSession, func()) {
+// startMCPServer connects a client to an MCP server with tools registered, over an in-memory transport.
+// Both sessions are closed when the test ends.
+func startMCPServer(t *testing.T, tools *Tools) *mcp.ClientSession {
 	t.Helper()
 
 	mcpServer := mcp.NewServer(&mcp.Implementation{Name: "test-server", Version: "v1.0.0"}, nil)
 	tools.AddTools(mcpServer)
 
-	handler := mcp.NewStreamableHTTPHandler(func(r *http.Request) *mcp.Server { return mcpServer }, &mcp.StreamableHTTPOptions{})
+	serverTransport, clientTransport := mcp.NewInMemoryTransports()
 
-	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	ss, err := mcpServer.Connect(t.Context(), serverTransport, nil)
 	require.NoError(t, err)
+	t.Cleanup(func() { _ = ss.Close() })
 
-	server := &http.Server{Handler: handler}
-	go server.Serve(listener)
+	cs, err := mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil).Connect(t.Context(), clientTransport, nil)
+	require.NoError(t, err)
+	t.Cleanup(func() { _ = cs.Close() })
 
-	var cs *mcp.ClientSession
-
-	mcpClient := mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
-	transport := &mcp.StreamableClientTransport{Endpoint: "http://" + listener.Addr().String()}
-
-	assert.Eventually(t, func() bool {
-		cs, err = mcpClient.Connect(t.Context(), transport, nil)
-		return err == nil
-	}, 2*time.Second, 100*time.Millisecond)
-
-	require.NotNil(t, cs)
-
-	return cs, func() {
-		cs.Close()
-		server.Shutdown(t.Context())
-		listener.Close()
-	}
+	return cs
 }
 
 func TestAddTools(t *testing.T) {
 	c, err := client.NewClient(true, fakeURL)
 	require.NoError(t, err)
 
-	cs, cleanup := startMCPServer(t, NewTools(c, false))
-	defer cleanup()
+	cs := startMCPServer(t, NewTools(c, false))
 
 	toolsResult, err := cs.ListTools(t.Context(), &mcp.ListToolsParams{})
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 18, "incorrect number of RBAC tools registered")
+	assert.Len(t, toolsResult.Tools, 23, "incorrect number of RBAC tools registered")
 
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
@@ -141,12 +110,11 @@ func TestAddToolsReadOnly(t *testing.T) {
 	c, err := client.NewClient(true, fakeURL)
 	require.NoError(t, err)
 
-	cs, cleanup := startMCPServer(t, NewTools(c, true))
-	defer cleanup()
+	cs := startMCPServer(t, NewTools(c, true))
 
 	toolsResult, err := cs.ListTools(t.Context(), &mcp.ListToolsParams{})
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 8, "incorrect number of RBAC tools registered in read-only mode")
+	assert.Len(t, toolsResult.Tools, 13, "incorrect number of RBAC tools registered in read-only mode")
 
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
@@ -159,8 +127,7 @@ func TestUserParamDescriptions(t *testing.T) {
 	c, err := client.NewClient(true, fakeURL)
 	require.NoError(t, err)
 
-	cs, cleanup := startMCPServer(t, NewTools(c, false))
-	defer cleanup()
+	cs := startMCPServer(t, NewTools(c, false))
 
 	toolsResult, err := cs.ListTools(t.Context(), &mcp.ListToolsParams{})
 	require.NoError(t, err)
@@ -188,5 +155,37 @@ func TestUserParamDescriptions(t *testing.T) {
 		"createGlobalRoleBinding", "createGlobalRoleBindingPlan",
 		"createProjectRoleTemplateBinding", "createProjectRoleTemplateBindingPlan",
 		"listClusterRoleTemplateBindings", "listGlobalRoleBindings", "listProjectRoleTemplateBindings",
+		"listTokenUsage",
 	}, checked)
+}
+
+// TestUserToolAnnotations checks that the user and authentication tools tell clients they only read, so clients
+// can run them without asking for confirmation.
+func TestUserToolAnnotations(t *testing.T) {
+	c, err := client.NewClient(true, fakeURL)
+	require.NoError(t, err)
+
+	cs := startMCPServer(t, NewTools(c, true))
+
+	toolsResult, err := cs.ListTools(t.Context(), &mcp.ListToolsParams{})
+	require.NoError(t, err)
+
+	annotated := map[string]*mcp.ToolAnnotations{}
+	for _, tool := range toolsResult.Tools {
+		annotated[tool.Name] = tool.Annotations
+	}
+
+	for name, title := range map[string]string{
+		"getUser":            "Get user",
+		"getCurrentUser":     "Get current user",
+		"listAuthProviders":  "List authentication providers",
+		"listUsers":          "List users",
+		"auditInactiveUsers": "Audit inactive users",
+		"listTokenUsage":     "List token usage",
+	} {
+		t.Run(name, func(t *testing.T) {
+			require.Contains(t, annotated, name, "tool should be registered in read-only mode")
+			assert.Equal(t, &mcp.ToolAnnotations{Title: title, ReadOnlyHint: true, IdempotentHint: true, OpenWorldHint: new(false)}, annotated[name])
+		})
+	}
 }

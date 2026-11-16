@@ -5,11 +5,12 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 func TestCreateGlobalRoleBinding(t *testing.T) {
@@ -34,7 +35,7 @@ func TestCreateGlobalRoleBinding(t *testing.T) {
 		},
 		"unknown user": {
 			params:        createGRBParams{GlobalRole: "user", User: "nobody"},
-			expectedError: `user "nobody" not found, specify a username or user ID`,
+			expectedError: `user "nobody" not found, specify a username, user ID, display name, principal ID or provider username`,
 		},
 		"assign global role to group": {
 			params: createGRBParams{GlobalRole: "user", Group: "github_team://1234"},
@@ -59,7 +60,7 @@ func TestCreateGlobalRoleBinding(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tools, _ := newTestTools(t, testUsers()...)
+			tools, _ := newFakeTools(t, withObjects(testUsers()...))
 
 			result, _, err := tools.createGlobalRoleBinding(
 				middleware.WithToken(t.Context(), fakeToken),
@@ -70,6 +71,7 @@ func TestCreateGlobalRoleBinding(t *testing.T) {
 				assert.ErrorContains(t, err, tt.expectedError)
 				return
 			}
+
 			require.NoError(t, err)
 
 			var resp struct {
@@ -79,6 +81,7 @@ func TestCreateGlobalRoleBinding(t *testing.T) {
 			require.Len(t, resp.LLM, 1)
 			assert.Equal(t, "GlobalRoleBinding", resp.LLM[0]["kind"])
 			assert.Equal(t, "grb-", resp.LLM[0]["metadata"].(map[string]any)["generateName"])
+
 			for k, v := range tt.expectedObj {
 				assert.Equal(t, v, resp.LLM[0][k], k)
 			}
@@ -87,7 +90,7 @@ func TestCreateGlobalRoleBinding(t *testing.T) {
 }
 
 func TestCreateGlobalRoleBindingPlan(t *testing.T) {
-	tools, _ := newTestTools(t, testUsers()...)
+	tools, _ := newFakeTools(t, withObjects(testUsers()...))
 	ctx := middleware.WithToken(t.Context(), fakeToken)
 
 	result, _, err := tools.createGlobalRoleBindingPlan(ctx, test.NewCallToolRequest(fakeURL), createGRBParams{GlobalRole: "view-rancher-metrics", User: "user1"})
@@ -99,7 +102,8 @@ func TestCreateGlobalRoleBindingPlan(t *testing.T) {
 	assert.Equal(t, response.OperationCreate, planResources[0].Type)
 	assert.Equal(t, "GlobalRoleBinding", planResources[0].Resource.Kind)
 	assert.Equal(t, "local", planResources[0].Resource.Cluster)
-	payload := planResources[0].Payload.(map[string]any)
+	payload, ok := planResources[0].Payload.(map[string]any)
+	require.True(t, ok, "payload should be an object")
 	assert.Equal(t, "view-rancher-metrics", payload["globalRoleName"])
 	assert.Equal(t, "u-user1", payload["userName"])
 

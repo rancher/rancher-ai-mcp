@@ -8,11 +8,6 @@ import (
 	"strings"
 
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-
-	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
 )
 
 var errUserAndGroup = errors.New("only one of user or group can be specified, bindings for the user's groups are included when a user is specified")
@@ -75,7 +70,7 @@ func rbacGroupName(groupPrincipal string) string {
 // getUserSubjects resolves a username or user ID to the subjects that bindings for the user, and the
 // groups the user belongs to, are made for.
 func (t *Tools) getUserSubjects(ctx context.Context, nameOrID string) (*userSubjects, error) {
-	user, err := t.resolveUser(ctx, nameOrID)
+	user, attrs, err := t.resolveUserWithAttributes(ctx, nameOrID)
 	if err != nil {
 		return nil, err
 	}
@@ -83,47 +78,13 @@ func (t *Tools) getUserSubjects(ctx context.Context, nameOrID string) (*userSubj
 	subjects := &userSubjects{userID: user.GetName()}
 	subjects.principalIDs, _, _ = unstructured.NestedStringSlice(user.Object, "principalIds")
 
-	// Rancher records the groups a user belongs to in the UserAttribute with the same name as the user.
-	// It is only created once the user logs in, so a missing UserAttribute means the user has no groups.
-	userAttribute, err := t.client.GetResource(ctx, client.GetParams{
-		Cluster: "local",
-		Kind:    "userattribute",
-		Name:    subjects.userID,
-		Token:   middleware.Token(ctx),
-	})
-	if apierrors.IsNotFound(err) {
-		return subjects, nil
+	// Bindings for the user's groups cannot be found without their groups, so leaving them out silently
+	// would understate the user's access.
+	if attrs.unavailable {
+		return nil, fmt.Errorf("failed to get groups for user %q: the credentials are not allowed to read user attributes", subjects.userID)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to get groups for user %q: %w", subjects.userID, err)
-	}
-
-	// The GroupPrincipals and Items fields of UserAttribute have no JSON tags in Rancher's types, so they
-	// are stored with capitalized keys. Each item is a Principal, with its principal ID in metadata.name.
-	groupPrincipals, _, _ := unstructured.NestedMap(userAttribute.Object, "GroupPrincipals")
-	for _, provider := range groupPrincipals {
-		providerMap, ok := provider.(map[string]any)
-		if !ok {
-			continue
-		}
-
-		items, _, _ := unstructured.NestedSlice(providerMap, "Items")
-		for _, item := range items {
-			itemMap, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-
-			if name, found, err := unstructured.NestedString(itemMap, "metadata", "name"); err == nil && found && name != "" {
-				subjects.groups = append(subjects.groups, name)
-			}
-		}
-	}
-
-	slices.Sort(subjects.groups)
-
-	subjects.groups = slices.Compact(subjects.groups)
+	subjects.groups = attrs.groups(subjects.userID)
 	for _, group := range subjects.groups {
 		subjects.groupNames = append(subjects.groupNames, rbacGroupName(group))
 	}

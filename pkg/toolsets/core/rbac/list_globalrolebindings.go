@@ -14,7 +14,7 @@ import (
 var zapListGlobalRoleBindings = zap.String("tool", "listGlobalRoleBindings")
 
 type listGRBParams struct {
-	User       string `json:"user,omitempty" jsonschema:"(optional) the username or user ID to get permissions for. Bindings for the groups the user belongs to are included. Cannot be combined with group"`
+	User       string `json:"user,omitempty" jsonschema:"(optional) the username or user ID, or the display name or principal ID, of the user to get permissions for. Bindings for the groups the user belongs to are included. Cannot be combined with group"`
 	Group      string `json:"group,omitempty" jsonschema:"(optional) the group principal name to get permissions for, e.g. github_team://1234. Cannot be combined with user"`
 	GlobalRole string `json:"globalRole,omitempty" jsonschema:"(optional) the name of the global role to list bindings for"`
 }

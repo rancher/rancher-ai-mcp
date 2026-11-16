@@ -33,7 +33,7 @@ func TestAddTools(t *testing.T) {
 	toolsResult, err := cs.ListTools(ctx, &mcp.ListToolsParams{})
 
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 37, "incorrect number of tools registered")
+	assert.Len(t, toolsResult.Tools, 42, "incorrect number of tools registered")
 	// assert that all tools have the correct toolset annotation
 	for _, tool := range toolsResult.Tools {
 		if tool.Name == "listClusters" {
@@ -62,7 +62,7 @@ func TestAddToolsReadOnly(t *testing.T) {
 	toolsResult, err := cs.ListTools(ctx, &mcp.ListToolsParams{})
 
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 19, "read-only mode should not register mutating tools")
+	assert.Len(t, toolsResult.Tools, 24, "read-only mode should not register mutating tools")
 
 	toolNames := make(map[string]bool)
 	for _, tool := range toolsResult.Tools {

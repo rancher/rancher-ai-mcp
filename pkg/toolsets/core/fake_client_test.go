@@ -4,11 +4,12 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 )
 
 // fakeToolsClient wraps a *client.Client and validates tokens before delegating to the wrapped client.
@@ -31,6 +32,7 @@ func (f *fakeToolsClient) validateToken(token string) error {
 	if f.expectedToken != "" && token != f.expectedToken {
 		return fmt.Errorf("invalid token: expected %q, got %q", f.expectedToken, token)
 	}
+
 	return nil
 }
 
@@ -39,6 +41,7 @@ func (f *fakeToolsClient) GetResource(ctx context.Context, params client.GetPara
 	if err := f.validateToken(params.Token); err != nil {
 		return nil, err
 	}
+
 	return f.client.GetResource(ctx, params)
 }
 
@@ -47,6 +50,7 @@ func (f *fakeToolsClient) GetResourceInterface(ctx context.Context, token string
 	if err := f.validateToken(token); err != nil {
 		return nil, err
 	}
+
 	return f.client.GetResourceInterface(ctx, token, namespace, cluster, gvr)
 }
 
@@ -55,6 +59,7 @@ func (f *fakeToolsClient) GetResources(ctx context.Context, params client.ListPa
 	if err := f.validateToken(params.Token); err != nil {
 		return nil, err
 	}
+
 	return f.client.GetResources(ctx, params)
 }
 
@@ -63,6 +68,7 @@ func (f *fakeToolsClient) CreateClientSet(ctx context.Context, token string, clu
 	if err := f.validateToken(token); err != nil {
 		return nil, err
 	}
+
 	return f.client.CreateClientSet(ctx, token, cluster)
 }
 
@@ -70,5 +76,12 @@ func (f *fakeToolsClient) GetClusterID(ctx context.Context, token string, cluste
 	if err := f.validateToken(token); err != nil {
 		return "", err
 	}
+
 	return f.client.GetClusterID(ctx, token, clusterNameOrID)
+}
+
+// GetRancherURL delegates to the wrapped client without validating the token, since public Rancher
+// endpoints are called without one.
+func (f *fakeToolsClient) GetRancherURL(ctx context.Context, token string, method string, rancherPath string, body any, v any) error {
+	return f.client.GetRancherURL(ctx, token, method, rancherPath, body, v)
 }

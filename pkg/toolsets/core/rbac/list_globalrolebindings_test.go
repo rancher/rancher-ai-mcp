@@ -24,7 +24,7 @@ func listGlobalRoleBindingsObjects() []runtime.Object {
 func TestListGlobalRoleBindingsResponse(t *testing.T) {
 	objects := listGlobalRoleBindingsObjects()
 	withServerFields(objects[0].(*unstructured.Unstructured))
-	tools, _ := newTestTools(t, objects...)
+	tools, _ := newFakeTools(t, withObjects(objects...))
 
 	result, _, err := tools.listGlobalRoleBindings(middleware.WithToken(t.Context(), fakeToken), test.NewCallToolRequest(fakeURL), listGRBParams{GlobalRole: "admin"})
 	require.NoError(t, err)
@@ -100,7 +100,7 @@ func TestListGlobalRoleBindings(t *testing.T) {
 				objects = listGlobalRoleBindingsObjects()
 			}
 
-			tools, _ := newTestTools(t, objects...)
+			tools, _ := newFakeTools(t, withObjects(objects...))
 
 			result, _, err := tools.listGlobalRoleBindings(middleware.WithToken(t.Context(), fakeToken), test.NewCallToolRequest(fakeURL), tt.params)
 			if tt.expectedError != "" {

@@ -5,10 +5,12 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	provisioningV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/stretchr/testify/assert"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	provisioningV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
+
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 )
 
 func TestAnalyzeCluster(t *testing.T) {
@@ -31,12 +33,14 @@ func TestAnalyzeCluster(t *testing.T) {
 				IncludeMachines:           true,
 			},
 			requestURL: testURL,
-			objects: []runtime.Object{newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
+			objects: []runtime.Object{
+				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
 				newCAPICluster("test-cluster", "fleet-default"),
 				newCAPIMachine("test-cluster-machine-1", "fleet-default", "test-cluster", "Running", "test-cluster-machineset-1"),
 				newCAPIMachineSet("test-cluster-machineset-1", "fleet-default", "test-cluster", 1, 1, "test-cluster-md-0"),
 				newCAPIMachineDeployment("test-cluster-md-0", "fleet-default", "test-cluster", 1, 1),
-				newManagementCluster("c-m-abc123", true)},
+				newManagementCluster("c-m-abc123", true),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -208,8 +212,10 @@ func TestAnalyzeCluster(t *testing.T) {
 				IncludeMachines:           true,
 			},
 			requestURL: testURL,
-			objects: []runtime.Object{newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
-				newManagementCluster("c-m-abc123", true)},
+			objects: []runtime.Object{
+				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
+				newManagementCluster("c-m-abc123", true),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -272,9 +278,11 @@ func TestAnalyzeCluster(t *testing.T) {
 				IncludeMachines:           true,
 			},
 			requestURL: testURL,
-			objects: []runtime.Object{newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
+			objects: []runtime.Object{
+				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
 				newCAPICluster("test-cluster", "fleet-default"),
-				newManagementCluster("c-m-abc123", true)},
+				newManagementCluster("c-m-abc123", true),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -367,8 +375,10 @@ func TestAnalyzeCluster(t *testing.T) {
 				IncludeMachines:           true,
 			},
 			requestURL: testURL,
-			objects: []runtime.Object{newProvisioningCluster("local", "fleet-local", "local"),
-				newManagementCluster("local", true)},
+			objects: []runtime.Object{
+				newProvisioningCluster("local", "fleet-local", "local"),
+				newManagementCluster("local", true),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -443,7 +453,8 @@ func TestAnalyzeCluster(t *testing.T) {
 				IncludeMachines:           true,
 			},
 			requestURL: testURL,
-			objects: []runtime.Object{newProvisioningCluster("multi-cluster", "fleet-default", "c-m-multi123"),
+			objects: []runtime.Object{
+				newProvisioningCluster("multi-cluster", "fleet-default", "c-m-multi123"),
 				newManagementCluster("c-m-multi123", true),
 				newCAPICluster("multi-cluster", "fleet-default"),
 				newCAPIMachine("multi-cluster-machine-1", "fleet-default", "multi-cluster", "Running", "multi-cluster-machineset-1"),
@@ -452,7 +463,8 @@ func TestAnalyzeCluster(t *testing.T) {
 				newCAPIMachineSet("multi-cluster-machineset-1", "fleet-default", "multi-cluster", 2, 2, "multi-cluster-md-0"),
 				newCAPIMachineSet("multi-cluster-machineset-2", "fleet-default", "multi-cluster", 1, 0, "multi-cluster-md-1"),
 				newCAPIMachineDeployment("multi-cluster-md-0", "fleet-default", "multi-cluster", 2, 2),
-				newCAPIMachineDeployment("multi-cluster-md-1", "fleet-default", "multi-cluster", 1, 0)},
+				newCAPIMachineDeployment("multi-cluster-md-1", "fleet-default", "multi-cluster", 1, 0),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -727,8 +739,10 @@ func TestAnalyzeCluster(t *testing.T) {
 				IncludeMachines:           true,
 			},
 			requestURL: testURL,
-			objects: []runtime.Object{newProvisioningCluster("unhealthy-cluster", "fleet-default", "c-m-unhealthy"),
-				newManagementCluster("c-m-unhealthy", false)},
+			objects: []runtime.Object{
+				newProvisioningCluster("unhealthy-cluster", "fleet-default", "c-m-unhealthy"),
+				newManagementCluster("c-m-unhealthy", false),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -791,15 +805,17 @@ func TestAnalyzeCluster(t *testing.T) {
 				IncludeMachines:           true,
 			},
 			requestURL: testURL,
-			objects: []runtime.Object{newProvisioningClusterWithRKEConfig("rke-cluster", "fleet-default", "c-m-rke123", []provisioningV1.RKEMachinePool{
-				newMachinePool("pool1", "rke-cluster-pool1-config", "Amazonec2Config", 3),
-			}),
+			objects: []runtime.Object{
+				newProvisioningClusterWithRKEConfig("rke-cluster", "fleet-default", "c-m-rke123", []provisioningV1.RKEMachinePool{
+					newMachinePool("pool1", "rke-cluster-pool1-config", "Amazonec2Config", 3),
+				}),
 				newCAPICluster("rke-cluster", "fleet-default"),
 				newCAPIMachine("rke-cluster-machine-1", "fleet-default", "rke-cluster", "Running", "rke-cluster-machineset-1"),
 				newCAPIMachineSet("rke-cluster-machineset-1", "fleet-default", "rke-cluster", 1, 1, "rke-cluster-md-0"),
 				newCAPIMachineDeployment("rke-cluster-md-0", "fleet-default", "rke-cluster", 1, 1),
 				newMachineConfig("rke-cluster-pool1-config", "fleet-default", "Amazonec2Config"),
-				newManagementCluster("c-m-rke123", true)},
+				newManagementCluster("c-m-rke123", true),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -1024,9 +1040,11 @@ func TestAnalyzeCluster(t *testing.T) {
 				IncludeMachines:           true,
 			},
 			requestURL: testURL,
-			objects: []runtime.Object{newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
+			objects: []runtime.Object{
+				newProvisioningCluster("test-cluster", "fleet-default", "c-m-abc123"),
 				newManagementCluster("c-m-abc123", true),
-				newCAPICluster("test-cluster", "fleet-default")},
+				newCAPICluster("test-cluster", "fleet-default"),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -1119,8 +1137,10 @@ func TestAnalyzeCluster(t *testing.T) {
 				IncludeMachines:           true,
 			},
 			requestURL: testURL,
-			objects: []runtime.Object{newProvisioningCluster("minimal-cluster", "fleet-default", "c-m-minimal"),
-				newManagementCluster("c-m-minimal", true)},
+			objects: []runtime.Object{
+				newProvisioningCluster("minimal-cluster", "fleet-default", "c-m-minimal"),
+				newManagementCluster("c-m-minimal", true),
+			},
 			expectedResult: `{
 				"llm": [
 					{
@@ -1183,12 +1203,14 @@ func TestAnalyzeCluster(t *testing.T) {
 				IncludeMachines:           true,
 			},
 			requestURL: testURL,
-			objects: []runtime.Object{newProvisioningCluster("single-machine-cluster", "fleet-default", "c-m-single"),
+			objects: []runtime.Object{
+				newProvisioningCluster("single-machine-cluster", "fleet-default", "c-m-single"),
 				newManagementCluster("c-m-single", true),
 				newCAPICluster("single-machine-cluster", "fleet-default"),
 				newCAPIMachine("single-machine-cluster-machine-1", "fleet-default", "single-machine-cluster", "Running", "single-machine-cluster-machineset-1"),
 				newCAPIMachineSet("single-machine-cluster-machineset-1", "fleet-default", "single-machine-cluster", 1, 1, "single-machine-cluster-md-0"),
-				newCAPIMachineDeployment("single-machine-cluster-md-0", "fleet-default", "single-machine-cluster", 1, 1)},
+				newCAPIMachineDeployment("single-machine-cluster-md-0", "fleet-default", "single-machine-cluster", 1, 1),
+			},
 			expectedResult: `{
 				"llm": [
 					{

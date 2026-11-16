@@ -20,7 +20,7 @@ var zapCreateGlobalRoleBinding = zap.String("tool", "createGlobalRoleBinding")
 
 type createGRBParams struct {
 	GlobalRole string `json:"globalRole" jsonschema:"the name of the global role to assign"`
-	User       string `json:"user,omitempty" jsonschema:"the username or user ID to assign the global role to. Exactly one of user or group must be set"`
+	User       string `json:"user,omitempty" jsonschema:"the username or user ID, or the display name or principal ID, of the user to assign the global role to. Exactly one of user or group must be set"`
 	Group      string `json:"group,omitempty" jsonschema:"the group principal name to assign the global role to. Exactly one of user or group must be set"`
 }
 

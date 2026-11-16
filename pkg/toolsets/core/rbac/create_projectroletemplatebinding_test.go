@@ -97,7 +97,7 @@ func TestCreateProjectRoleTemplateBinding(t *testing.T) {
 		},
 		"unknown user": {
 			params:        createPRTBParams{Cluster: "local", Project: "web", User: "bob"},
-			expectedError: `user "bob" not found, specify a username or user ID`,
+			expectedError: `user "bob" not found, specify a username, user ID, display name, principal ID or provider username`,
 		},
 		"unknown project": {
 			params:        createPRTBParams{Cluster: "local", Project: "api", User: "alice"},

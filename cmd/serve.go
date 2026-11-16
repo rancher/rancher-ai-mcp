@@ -90,8 +90,11 @@ func runServe(cmd *cobra.Command, args []string) error {
 	zap.L().Info("read-only mode", zap.Bool("enabled", readOnly))
 
 	if stdio {
+		mcpServer.AddReceivingMiddleware(middleware.ToolErrors(middleware.StdioCredentialsHint))
 		return runStdio(cmd.Context(), mcpServer, token)
 	}
+
+	mcpServer.AddReceivingMiddleware(middleware.ToolErrors(middleware.HTTPCredentialsHint))
 
 	handler := mcp.NewStreamableHTTPHandler(func(request *http.Request) *mcp.Server {
 		return mcpServer

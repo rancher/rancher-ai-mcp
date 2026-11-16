@@ -204,7 +204,7 @@ func (t *Tools) resolvePRTBTarget(ctx context.Context, params createPRTBParams) 
 	}
 
 	return &prtbTarget{
-		namespace:         namespace,
+		namespace: namespace,
 		// The PRTB projectName is "<cluster>:<project>", built from the resolved Project's namespace (its cluster)
 		// and metadata.name, which may differ from the display name or the value given in the parameters.
 		projectName:       projectResource.GetNamespace() + ":" + projectResource.GetName(),

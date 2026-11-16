@@ -84,7 +84,7 @@ func TestDeleteGlobalRole(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tools, fakeDynClient := newTestTools(t, deleteGlobalRoleObjects()...)
+			tools, fakeDynClient := newFakeTools(t, withObjects(deleteGlobalRoleObjects()...))
 
 			result, _, err := tools.deleteGlobalRole(
 				middleware.WithToken(t.Context(), fakeToken),
@@ -116,7 +116,7 @@ func TestDeleteGlobalRole(t *testing.T) {
 }
 
 func TestDeleteGlobalRoleWithoutBindings(t *testing.T) {
-	tools, _ := newTestTools(t, globalRole("gr-unused", nil))
+	tools, _ := newFakeTools(t, withObjects(globalRole("gr-unused", nil)))
 
 	result, _, err := tools.deleteGlobalRole(middleware.WithToken(t.Context(), fakeToken), test.NewCallToolRequest(fakeURL), deleteGlobalRoleParams{Name: "gr-unused"})
 	require.NoError(t, err)
@@ -148,7 +148,7 @@ func TestDeleteGlobalRolePlan(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tools, fakeDynClient := newTestTools(t, append(deleteGlobalRoleObjects(), globalRole("gr-unused", nil))...)
+			tools, fakeDynClient := newFakeTools(t, withObjects(append(deleteGlobalRoleObjects(), globalRole("gr-unused", nil))...))
 
 			result, _, err := tools.deleteGlobalRolePlan(middleware.WithToken(t.Context(), fakeToken), test.NewCallToolRequest(fakeURL), deleteGlobalRoleParams{Name: tt.name})
 			require.NoError(t, err)
@@ -177,7 +177,7 @@ func TestDeleteGlobalRolePlan(t *testing.T) {
 }
 
 func TestDeleteGlobalRolePlanBuiltIn(t *testing.T) {
-	tools, _ := newTestTools(t, deleteGlobalRoleObjects()...)
+	tools, _ := newFakeTools(t, withObjects(deleteGlobalRoleObjects()...))
 
 	_, _, err := tools.deleteGlobalRolePlan(middleware.WithToken(t.Context(), fakeToken), test.NewCallToolRequest(fakeURL), deleteGlobalRoleParams{Name: "admin"})
 	assert.ErrorContains(t, err, "is built-in and cannot be deleted")

@@ -4,11 +4,12 @@ import (
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/rancher/rancher-ai-mcp/internal/middleware"
-	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/runtime"
+
+	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/client/test"
 )
 
 func TestListGlobalRoles(t *testing.T) {
@@ -40,7 +41,7 @@ func TestListGlobalRoles(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tools, _ := newTestTools(t, tt.objects...)
+			tools, _ := newFakeTools(t, withObjects(tt.objects...))
 
 			result, _, err := tools.listGlobalRoles(
 				middleware.WithToken(t.Context(), fakeToken),
