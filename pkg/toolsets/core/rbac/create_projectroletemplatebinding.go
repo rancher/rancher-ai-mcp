@@ -31,7 +31,7 @@ type createPRTBParams struct {
 	Cluster      string `json:"cluster" jsonschema:"the name or ID of the cluster the project belongs to"`
 	Project      string `json:"project" jsonschema:"the ID (e.g. p-abc) or display name of the project"`
 	User         string `json:"user,omitempty" jsonschema:"the username or user ID to grant access to. Exactly one of user or group must be specified"`
-	Group        string `json:"group,omitempty" jsonschema:"the group principal ID to grant access to (e.g. github_team://123). Exactly one of user or group must be specified"`
+	Group        string `json:"group,omitempty" jsonschema:"the group to grant access to: its principal ID (e.g. github_team://123 or openldap_group://cn=devs,ou=groups,dc=example,dc=org) or its name, which is looked up in the enabled auth providers. Exactly one of user or group must be specified"`
 	RoleTemplate string `json:"roleTemplate,omitempty" jsonschema:"the name of the project role template to grant (e.g. project-owner, project-member, read-only). Defaults to project-member"`
 }
 
@@ -185,12 +185,18 @@ func (t *Tools) resolvePRTBTarget(ctx context.Context, params createPRTBParams) 
 		return nil, fmt.Errorf("failed to get project backing namespace: %w", err)
 	}
 
-	subjectField, subject := "groupPrincipalName", params.Group
-	subjectIdentities := map[string][]string{
-		"groupPrincipalName": {params.Group},
-		"groupName":          {rbacGroupName(params.Group)},
-	}
-	if params.User != "" {
+	subjectField, subject := "groupPrincipalName", ""
+	var subjectIdentities map[string][]string
+	if params.User == "" {
+		subject, err = t.resolveGroupPrincipal(ctx, params.Group)
+		if err != nil {
+			return nil, err
+		}
+		subjectIdentities = map[string][]string{
+			"groupPrincipalName": {subject},
+			"groupName":          {rbacGroupName(subject)},
+		}
+	} else {
 		user, err := t.resolveUser(ctx, params.User)
 		if err != nil {
 			return nil, err
