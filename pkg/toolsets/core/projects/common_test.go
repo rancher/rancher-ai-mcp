@@ -53,9 +53,11 @@ func TestGetProjectID(t *testing.T) {
 	matchedProject := project("p-matched", "Production", "")
 	notFound := apierrors.NewNotFound(schema.GroupResource{Group: "management.cattle.io", Resource: "projects"}, "requested")
 
+	forbidden := apierrors.NewForbidden(schema.GroupResource{Group: "management.cattle.io", Resource: "projects"}, "requested", errors.New("not allowed"))
+
 	tests := map[string]struct {
 		projectName string
-		getResult   *unstructured.Unstructured
+		getResult  *unstructured.Unstructured
 		getErr      error
 		listResult  []*unstructured.Unstructured
 		listErr     error
@@ -72,6 +74,13 @@ func TestGetProjectID(t *testing.T) {
 			projectName: "production",
 			getErr:      notFound,
 			listResult:  []*unstructured.Unstructured{project("p-other", "Other", ""), matchedProject},
+			wantID:      "p-matched",
+			wantList:    true,
+		},
+		"finds project by display name when the direct lookup is forbidden": {
+			projectName: "production",
+			getErr:      forbidden,
+			listResult:  []*unstructured.Unstructured{matchedProject},
 			wantID:      "p-matched",
 			wantList:    true,
 		},
