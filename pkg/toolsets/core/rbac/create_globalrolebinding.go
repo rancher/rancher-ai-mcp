@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"go.uber.org/zap"
@@ -105,25 +106,33 @@ func (t *Tools) resolveGlobalRoleBindingObj(ctx context.Context, params createGR
 		return nil, nil, err
 	}
 
+	// subjectIdentities maps each GRB field that can identify the subject to the values that match it.
+	var subjectIdentities map[string][]string
+
 	if params.User != "" {
-		userID, err := t.resolveUserID(ctx, params.User)
+		user, err := t.resolveUser(ctx, params.User)
 		if err != nil {
 			return nil, nil, err
 		}
 
-		params.User = userID
+		params.User = user.GetName()
+		subjectIdentities = map[string][]string{
+			"userName":          {user.GetName()},
+			"userPrincipalName": principalIDs(user),
+		}
 	} else {
 		groupPrincipal, err := t.resolveGroupPrincipal(ctx, params.Group)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 
 		params.Group = groupPrincipal
+		subjectIdentities = map[string][]string{"groupPrincipalName": {groupPrincipal}}
 	}
 
 	grb = createGlobalRoleBindingObj(params)
 
-	existing, err = t.findExistingGlobalRoleBinding(ctx, grb)
+	existing, err = t.findExistingGlobalRoleBinding(ctx, grb, subjectIdentities)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -131,9 +140,10 @@ func (t *Tools) resolveGlobalRoleBindingObj(ctx context.Context, params createGR
 	return grb, existing, nil
 }
 
-// findExistingGlobalRoleBinding returns an active global role binding that grants the same role
-// to the same user or group as grb, or nil if there is none.
-func (t *Tools) findExistingGlobalRoleBinding(ctx context.Context, grb *unstructured.Unstructured) (*unstructured.Unstructured, error) {
+// findExistingGlobalRoleBinding returns an active global role binding that grants the same role as grb
+// to the same subject, or nil if there is none. A binding identifies its subject by any of the fields in
+// subjectIdentities, e.g. a user binding may only set userPrincipalName rather than userName.
+func (t *Tools) findExistingGlobalRoleBinding(ctx context.Context, grb *unstructured.Unstructured, subjectIdentities map[string][]string) (*unstructured.Unstructured, error) {
 	grbs, err := t.client.GetResources(ctx, client.ListParams{
 		Cluster: "local",
 		Kind:    "globalrolebinding",
@@ -143,19 +153,19 @@ func (t *Tools) findExistingGlobalRoleBinding(ctx context.Context, grb *unstruct
 		return nil, fmt.Errorf("failed to get global role bindings: %w", err)
 	}
 
-	subjectField := "userName"
-	if _, ok := grb.Object[subjectField]; !ok {
-		subjectField = "groupPrincipalName"
-	}
-
 	roleName, _, _ := unstructured.NestedString(grb.Object, "globalRoleName")
-	subject, _, _ := unstructured.NestedString(grb.Object, subjectField)
 
-	grbs = filterResourcesByField(grbs, "globalRoleName", roleName)
-	for _, existing := range filterResourcesByField(grbs, subjectField, subject) {
+	for _, existing := range filterResourcesByField(grbs, "globalRoleName", roleName) {
 		// GRBs are kept until Rancher's finalizers have run, ignore those that are already being deleted.
-		if existing.GetDeletionTimestamp() == nil {
-			return existing, nil
+		if existing.GetDeletionTimestamp() != nil {
+			continue
+		}
+
+		for field, values := range subjectIdentities {
+			value, _, _ := unstructured.NestedString(existing.Object, field)
+			if value != "" && slices.Contains(values, value) {
+				return existing, nil
+			}
 		}
 	}
 

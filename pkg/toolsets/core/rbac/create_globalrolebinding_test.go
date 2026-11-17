@@ -122,6 +122,8 @@ func TestCreateGlobalRoleBindingAlreadyExists(t *testing.T) {
 	existing := append(testUsers(),
 		globalRoleBinding("grb-user", "view-rancher-metrics", "userName", "u-user1"),
 		globalRoleBinding("grb-group", "user", "groupPrincipalName", "github_team://5678"),
+		globalRoleBinding("grb-principal", "edit", "userPrincipalName", "github_user://99"),
+		globalRoleBinding("grb-other-principal", "audit", "userPrincipalName", "github_user://12345"),
 		deleting,
 	)
 
@@ -129,11 +131,13 @@ func TestCreateGlobalRoleBindingAlreadyExists(t *testing.T) {
 		params           createGRBParams
 		expectedExisting string
 	}{
-		"user already has the role":    {params: createGRBParams{GlobalRole: "view-rancher-metrics", User: "user1"}, expectedExisting: "grb-user"},
-		"group already has the role":   {params: createGRBParams{GlobalRole: "user", Group: "github_team://5678"}, expectedExisting: "grb-group"},
-		"different role":               {params: createGRBParams{GlobalRole: "admin", User: "user1"}},
-		"different user":               {params: createGRBParams{GlobalRole: "view-rancher-metrics", User: "user2"}},
-		"existing binding is deleting": {params: createGRBParams{GlobalRole: "user", Group: "github_team://1234"}},
+		"user already has the role":                {params: createGRBParams{GlobalRole: "view-rancher-metrics", User: "user1"}, expectedExisting: "grb-user"},
+		"group already has the role":               {params: createGRBParams{GlobalRole: "user", Group: "github_team://5678"}, expectedExisting: "grb-group"},
+		"user has the role through a principal ID": {params: createGRBParams{GlobalRole: "edit", User: "user1"}, expectedExisting: "grb-principal"},
+		"principal ID of another user":             {params: createGRBParams{GlobalRole: "audit", User: "user1"}},
+		"different role":                           {params: createGRBParams{GlobalRole: "admin", User: "user1"}},
+		"different user":                           {params: createGRBParams{GlobalRole: "view-rancher-metrics", User: "user2"}},
+		"existing binding is deleting":             {params: createGRBParams{GlobalRole: "user", Group: "github_team://1234"}},
 	}
 
 	for name, tt := range tests {
