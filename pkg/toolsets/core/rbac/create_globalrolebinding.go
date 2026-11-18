@@ -21,7 +21,7 @@ var zapCreateGlobalRoleBinding = zap.String("tool", "createGlobalRoleBinding")
 type createGRBParams struct {
 	GlobalRole string `json:"globalRole" jsonschema:"the name of the global role to assign"`
 	User       string `json:"user,omitempty" jsonschema:"the username or user ID, or the display name or principal ID, of the user to assign the global role to. Exactly one of user or group must be set"`
-	Group      string `json:"group,omitempty" jsonschema:"the group principal name to assign the global role to. Exactly one of user or group must be set"`
+	Group      string `json:"group,omitempty" jsonschema:"the group to assign the global role to: its principal ID (e.g. github_team://123 or openldap_group://cn=devs,ou=groups,dc=example,dc=org) or its name, which is looked up in the enabled auth providers. Exactly one of user or group must be set"`
 }
 
 // createGlobalRoleBinding assigns a global role to a user or group by creating a global role binding.
@@ -92,6 +92,13 @@ func (t *Tools) resolveGlobalRoleBindingObj(ctx context.Context, params createGR
 		}
 
 		params.User = userID
+	} else {
+		groupPrincipal, err := t.resolveGroupPrincipal(ctx, params.Group)
+		if err != nil {
+			return nil, err
+		}
+
+		params.Group = groupPrincipal
 	}
 
 	return createGlobalRoleBindingObj(params), nil
