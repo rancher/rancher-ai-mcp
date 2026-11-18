@@ -296,7 +296,7 @@ func TestResolveUser(t *testing.T) {
 func TestCreateGlobalRoleBindingResolvesUserIDBeforeUsername(t *testing.T) {
 	tools, _ := newFakeTools(t, withObjects(user("u-aaa", "u-zzz", nil), user("u-zzz", "alice", nil)))
 
-	grb, err := tools.resolveGlobalRoleBindingObj(middleware.WithToken(t.Context(), fakeToken), createGRBParams{GlobalRole: "admin", User: "u-zzz"})
+	grb, _, err := tools.resolveGlobalRoleBindingObj(middleware.WithToken(t.Context(), fakeToken), createGRBParams{GlobalRole: "admin", User: "u-zzz"})
 	require.NoError(t, err)
 	assert.Equal(t, "u-zzz", grb.Object["userName"])
 }
