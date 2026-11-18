@@ -24,7 +24,9 @@ func GetProjectID(ctx context.Context, tClient toolsClient, token, clusterID, pr
 		return projectResource.GetName(), projectResource, nil
 	}
 
-	if !apierrors.IsNotFound(err) {
+	// Rancher checks access before existence, so a user who can't get a project by that name gets a 403
+	// rather than a 404. Fall back to searching the projects they can list by display name.
+	if !apierrors.IsNotFound(err) && !apierrors.IsForbidden(err) {
 		return "", nil, err
 	}
 
