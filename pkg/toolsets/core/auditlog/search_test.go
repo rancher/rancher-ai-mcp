@@ -403,3 +403,51 @@ func TestSearchResultKeepsNewestEntries(t *testing.T) {
 	assert.Equal(t, "5", result.entries[0].AuditID)
 	assert.Equal(t, "4", result.entries[1].AuditID)
 }
+
+func TestBuildResponseNeverSuggestsUnusableOffset(t *testing.T) {
+	entries := make(entryHeap, maxWindow)
+	start := time.Date(2026, 11, 4, 12, 0, 0, 0, time.UTC)
+	for i := range entries {
+		// newest first
+		entries[i] = entry{AuditID: fmt.Sprintf("e%d", i), RequestTimestamp: start.Add(-time.Duration(i) * time.Second)}
+	}
+	result := &searchResult{window: maxWindow, entries: entries, total: maxWindow + 1000}
+
+	tests := map[string]struct {
+		offset, limit int
+		contains      []string
+		notContains   []string
+	}{
+		"suggests the next page while it fits in the window": {
+			offset: 0, limit: 100,
+			contains: []string{"set offset=100"},
+		},
+		"suggests the last page that fits in the window": {
+			offset: 4400, limit: 100,
+			contains: []string{"set offset=4500"},
+		},
+		"does not suggest an offset at the window boundary": {
+			offset: 4500, limit: 500,
+			contains:    []string{"no next page", "at most 5000", "until=" + start.Add(-(maxWindow-1)*time.Second).Format(time.RFC3339)},
+			notContains: []string{"set offset="},
+		},
+		"does not suggest an offset whose page would exceed the window": {
+			offset: 4500, limit: 300,
+			contains:    []string{"no next page"},
+			notContains: []string{"set offset="},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			data, ok := buildResponse(result, tt.offset, tt.limit, true).(map[string]any)
+			require.True(t, ok)
+			note, _ := data["note"].(string)
+			for _, c := range tt.contains {
+				assert.Contains(t, note, c)
+			}
+			for _, c := range tt.notContains {
+				assert.NotContains(t, note, c)
+			}
+		})
+	}
+}

@@ -54,7 +54,7 @@ type searchAuditLogsParams struct {
 	Since             string `json:"since,omitempty" jsonschema:"optional RFC3339 timestamp, only requests made at or after it are returned (e.g. 2026-01-02T15:04:05Z)"`
 	Until             string `json:"until,omitempty" jsonschema:"optional RFC3339 timestamp, only requests made at or before it are returned. Set it when paginating to limit shifting of the pages by new requests (timestamps have one-second precision, so requests logged in the same second may still shift them)"`
 	Search            string `json:"search,omitempty" jsonschema:"optional case-insensitive text to search for anywhere in the entry, including the request and response bodies (e.g. a resource name or ID)"`
-	IncludeBodies     bool   `json:"includeBodies,omitempty" jsonschema:"include larger request bodies and the response bodies. Defaults to false, which returns only the first 512 bytes of the request body. Use it with filters that select few entries, because bodies can be large"`
+	IncludeBodies     bool   `json:"includeBodies,omitempty" jsonschema:"include larger request bodies and the response bodies. Defaults to false, which returns only the first 512 bytes of the request body. With true, request and response bodies are returned up to 8192 bytes each and longer ones are truncated. Use it with filters that select few entries, because bodies can be large"`
 	Limit             int    `json:"limit,omitempty" jsonschema:"maximum number of entries to return, defaults to 50, at most 500"`
 	Offset            int    `json:"offset,omitempty" jsonschema:"how many matching entries to skip, newest first, before returning results. Defaults to 0 and offset+limit can be at most 5000. To get the next page increase offset by limit, the response tells you the exact offset to use for the next page"`
 }
@@ -271,12 +271,19 @@ func buildResponse(result *searchResult, offset, limit int, suggestUntil bool) a
 	if offset > 0 || nextOffset < result.total {
 		note := fmt.Sprintf("Returned %d audit log entries (offset %d, limit %d) out of %d matching entries, newest first. Use filters to narrow results.",
 			len(page), offset, limit, result.total)
-		if nextOffset < result.total {
+		switch {
+		case nextOffset < result.total && nextOffset+limit <= maxWindow:
 			note += fmt.Sprintf(" To get the next page, set offset=%d", nextOffset)
 			if suggestUntil && kept > 0 {
 				note += fmt.Sprintf(" and until=%s to limit shifting of the pages by new requests (timestamps have one-second precision, so requests logged in the same second may still shift them)", result.entries[0].RequestTimestamp.UTC().Format(time.RFC3339))
 			}
 			note += "."
+		case nextOffset < result.total:
+			// The next page would exceed the window, which the tool rejects, so do not suggest it.
+			note += fmt.Sprintf(" There is no next page, a search can page through at most %d entries (offset+limit).", maxWindow)
+			if kept > 0 {
+				note += fmt.Sprintf(" To see older entries, search again with until=%s, or narrow the search with filters such as since, user, requestURI, changesOnly or search.", result.entries[kept-1].RequestTimestamp.UTC().Format(time.RFC3339))
+			}
 		}
 		notes = append(notes, note)
 	}
