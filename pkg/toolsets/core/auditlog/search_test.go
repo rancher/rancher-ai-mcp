@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"math"
 	"slices"
 	"strings"
 	"testing"
@@ -165,7 +166,7 @@ func TestSearchAuditLogs(t *testing.T) {
 				"entries": [
 					{"auditID":"a2","requestTimestamp":"2026-11-04T10:01:00Z","responseTimestamp":"2026-11-04T10:01:00Z","user":"user-admin","username":"admin","principalID":"local://user-admin","method":"POST","requestURI":"/v1/management.cattle.io.users","responseCode":201,"remoteAddr":"10.0.0.1:1234","requestBody":{"username":"testing","displayName":"test user"},"pod":"rancher-1"}
 				],
-				"note": "Returned 1 audit log entries (offset 1, limit 1) out of 3 matching entries, newest first. Use filters to narrow results. To get the next page, set offset=2 and until=2026-11-04T10:01:01Z so that new requests do not shift the pages."
+				"note": "Returned 1 audit log entries (offset 1, limit 1) out of 3 matching entries, newest first. Use filters to narrow results. To get the next page, set offset=2 and until=2026-11-04T10:01:01Z to limit shifting of the pages by new requests (timestamps have one-second precision, so requests logged in the same second may still shift them)."
 			}}`,
 		},
 		"paginates results without suggesting until when it is set": {
@@ -200,6 +201,23 @@ func TestSearchAuditLogs(t *testing.T) {
 		"error when offset+limit exceeds the maximum window": {
 			params:        searchAuditLogsParams{Offset: 4900, Limit: 200},
 			expectedError: "offset+limit must be at most 5000",
+		},
+		"error when offset+limit would overflow": {
+			params:        searchAuditLogsParams{Offset: math.MaxInt},
+			expectedError: "offset+limit must be at most 5000",
+		},
+		"error when offset is the maximum and limit is capped": {
+			params:        searchAuditLogsParams{Offset: math.MaxInt, Limit: math.MaxInt},
+			expectedError: "offset+limit must be at most 5000",
+		},
+		"allows offset+limit equal to the maximum window": {
+			params: searchAuditLogsParams{Method: "GET,POST", Offset: 4500, Limit: 500},
+			pods:   []runtime.Object{rancher1, rancher2},
+			logs:   logs,
+			expectedResult: `{"llm": {
+				"entries": [],
+				"note": "Returned 0 audit log entries (offset 4500, limit 500) out of 3 matching entries, newest first. Use filters to narrow results."
+			}}`,
 		},
 		"returns identity and impersonator and filters by impersonator username": {
 			params: searchAuditLogsParams{User: "JANE@example.com"},

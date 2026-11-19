@@ -55,7 +55,7 @@ To leave out other noisy requests, set excludeRequestURI to comma-separated subs
 Resources are often referred to by ID in request URIs and bodies (e.g. u-abc12 for users), so look up the resource ID first (e.g. with getUser) and search for both the ID and the name.
 The audit log is read from the rancher-audit-log sidecar container of the Rancher pods, so Rancher must be installed with auditLog.enabled=true and auditLog.destination=sidecar. Only entries still in the current container log are available.
 
-Results are paginated with limit (page size, default 50) and offset (how many matching entries to skip, default 0). When more entries remain, the response includes the exact offset value to pass in for the next page, and an until value that keeps the pages stable while new requests are logged. Each call reads the log again.`},
+Results are paginated with limit (page size, default 50) and offset (how many matching entries to skip, default 0). When more entries remain, the response includes the exact offset value to pass in for the next page, and an until value that limits shifting of the pages while new requests are logged (timestamps have one-second precision, so requests logged in the same second may still shift them). Each call reads the log again.`},
 		t.searchAuditLogs,
 	)
 }

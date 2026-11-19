@@ -52,7 +52,7 @@ type searchAuditLogsParams struct {
 	MinResponseCode   int    `json:"minResponseCode,omitempty" jsonschema:"optional minimum HTTP response code (e.g. 400 to find failed requests)"`
 	MaxResponseCode   int    `json:"maxResponseCode,omitempty" jsonschema:"optional maximum HTTP response code (e.g. 299 to find successful requests)"`
 	Since             string `json:"since,omitempty" jsonschema:"optional RFC3339 timestamp, only requests made at or after it are returned (e.g. 2026-01-02T15:04:05Z)"`
-	Until             string `json:"until,omitempty" jsonschema:"optional RFC3339 timestamp, only requests made at or before it are returned. Set it when paginating so that new requests do not shift the pages"`
+	Until             string `json:"until,omitempty" jsonschema:"optional RFC3339 timestamp, only requests made at or before it are returned. Set it when paginating to limit shifting of the pages by new requests (timestamps have one-second precision, so requests logged in the same second may still shift them)"`
 	Search            string `json:"search,omitempty" jsonschema:"optional case-insensitive text to search for anywhere in the entry, including the request and response bodies (e.g. a resource name or ID)"`
 	IncludeBodies     bool   `json:"includeBodies,omitempty" jsonschema:"include larger request bodies and the response bodies. Defaults to false, which returns only the first 512 bytes of the request body. Use it with filters that select few entries, because bodies can be large"`
 	Limit             int    `json:"limit,omitempty" jsonschema:"maximum number of entries to return, defaults to 50, at most 500"`
@@ -115,7 +115,7 @@ func (t *Tools) searchAuditLogs(ctx context.Context, _ *mcp.CallToolRequest, par
 		limit = defaultLimit
 	}
 	limit = min(limit, maxLimit)
-	if offset+limit > maxWindow {
+	if offset > maxWindow-limit {
 		return nil, nil, fmt.Errorf("offset+limit must be at most %d, use filters such as since, until, user, method or search to narrow the results instead", maxWindow)
 	}
 
@@ -274,7 +274,7 @@ func buildResponse(result *searchResult, offset, limit int, suggestUntil bool) a
 		if nextOffset < result.total {
 			note += fmt.Sprintf(" To get the next page, set offset=%d", nextOffset)
 			if suggestUntil && kept > 0 {
-				note += fmt.Sprintf(" and until=%s so that new requests do not shift the pages", result.entries[0].RequestTimestamp.UTC().Format(time.RFC3339))
+				note += fmt.Sprintf(" and until=%s to limit shifting of the pages by new requests (timestamps have one-second precision, so requests logged in the same second may still shift them)", result.entries[0].RequestTimestamp.UTC().Format(time.RFC3339))
 			}
 			note += "."
 		}
