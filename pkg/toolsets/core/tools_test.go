@@ -8,10 +8,11 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
-	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/provisioning"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
+	"github.com/rancher/rancher-ai-mcp/pkg/toolsets/provisioning"
 )
 
 func TestAddTools(t *testing.T) {
@@ -33,7 +34,7 @@ func TestAddTools(t *testing.T) {
 	toolsResult, err := cs.ListTools(ctx, &mcp.ListToolsParams{})
 
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 43, "incorrect number of tools registered")
+	assert.Len(t, toolsResult.Tools, 46, "incorrect number of tools registered")
 	// assert that all tools have the correct toolset annotation
 	for _, tool := range toolsResult.Tools {
 		if tool.Name == "listClusters" {
@@ -62,7 +63,7 @@ func TestAddToolsReadOnly(t *testing.T) {
 	toolsResult, err := cs.ListTools(ctx, &mcp.ListToolsParams{})
 
 	assert.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 25, "read-only mode should not register mutating tools")
+	assert.Len(t, toolsResult.Tools, 26, "read-only mode should not register mutating tools")
 
 	toolNames := make(map[string]bool)
 	for _, tool := range toolsResult.Tools {
@@ -73,6 +74,7 @@ func TestAddToolsReadOnly(t *testing.T) {
 			assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 		}
 	}
+
 	assert.False(t, toolNames["patchKubernetesResource"], "patchKubernetesResource should not be registered in read-only mode")
 	assert.False(t, toolNames["patchKubernetesResourcePlan"], "patchKubernetesResourcePlan should not be registered in read-only mode")
 	assert.False(t, toolNames["createKubernetesResource"], "createKubernetesResource should not be registered in read-only mode")
@@ -100,16 +102,20 @@ func startTestMCPServer(t *testing.T, mcpServer *mcp.Server) *mcp.ClientSession 
 	require.NoError(t, err)
 
 	server := &http.Server{Handler: handler}
+
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- server.Serve(listener) }()
+
 	t.Cleanup(func() {
 		assert.NoError(t, server.Shutdown(context.WithoutCancel(t.Context())))
 		assert.ErrorIs(t, <-serveErr, http.ErrServerClosed)
 	})
 
 	var session *mcp.ClientSession
+
 	mcpClient := mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
 	transport := &mcp.StreamableClientTransport{Endpoint: "http://" + listener.Addr().String()}
+
 	assert.Eventually(t, func() bool {
 		session, err = mcpClient.Connect(t.Context(), transport, nil)
 		return err == nil
