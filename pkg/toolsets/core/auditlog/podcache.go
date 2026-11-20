@@ -11,8 +11,11 @@ import (
 const (
 	// podCacheTTL is how long the names of the Rancher pods with an audit log sidecar are remembered. Pods only
 	// change on a rollout, restart or scale, and a search streams their whole logs, which is far more expensive
-	// than listing them. A new pod is not searched until the entry expires or a pod read fails.
-	podCacheTTL = 30 * time.Second
+	// than listing them. The entry is dropped as soon as reading a pod fails, which is what happens when a
+	// remembered pod is replaced, so the TTL only bounds how long a pod added next to the remembered ones, e.g.
+	// by scaling up, goes unnoticed. Each Rancher pod logs the requests it served, so such a pod is missing
+	// from the results until the entry expires.
+	podCacheTTL = 5 * time.Minute
 	// podCacheMaxEntries bounds the number of cached callers.
 	podCacheMaxEntries = 64
 )
