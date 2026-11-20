@@ -1,6 +1,7 @@
 package auditlog
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -173,6 +174,17 @@ func TestSearchAuditLogs(t *testing.T) {
 			expectedResult: `{"llm": {"entries": [
 				{"auditID":"a1","requestTimestamp":"2026-11-04T10:00:00Z","responseTimestamp":"2026-11-04T10:00:00Z","user":"user-admin","username":"admin","principalID":"local://user-admin","method":"GET","requestURI":"/v1/management.cattle.io.users","responseCode":200,"remoteAddr":"10.0.0.1:1234","pod":"rancher-1"}
 			]}}`,
+		},
+		"skips lines longer than the limit with a warning and reads the next line": {
+			params: searchAuditLogsParams{},
+			pods:   []runtime.Object{rancher1},
+			logs: map[string]string{
+				"rancher-1": auditLine("huge", "2026-11-04T11:00:00Z", "user-admin", "admin", "POST", "/v3/secrets", 201,
+					`{"data":"`+strings.Repeat("x", maxLineBytes)+`"}`) + "\n" + lineGetUsers + "\n",
+			},
+			expectedResult: fmt.Sprintf(`{"llm": {"entries": [
+				{"auditID":"a1","requestTimestamp":"2026-11-04T10:00:00Z","responseTimestamp":"2026-11-04T10:00:00Z","user":"user-admin","username":"admin","principalID":"local://user-admin","method":"GET","requestURI":"/v1/management.cattle.io.users","responseCode":200,"remoteAddr":"10.0.0.1:1234","pod":"rancher-1"}
+			], "note": "1 audit log lines of pod rancher-1 were longer than %d bytes and skipped, so matching entries may be missing, they can only be read from the rancher-audit-log container of the pod"}}`, maxLineBytes),
 		},
 		"paginates results": {
 			params: searchAuditLogsParams{Method: "GET,POST", Limit: 1, Offset: 1},
@@ -707,4 +719,58 @@ func TestPodCacheIsBounded(t *testing.T) {
 	c.set("latest", []string{"rancher-1"})
 	_, ok := c.get("latest")
 	assert.True(t, ok)
+}
+
+func TestReadLine(t *testing.T) {
+	type read struct {
+		line    string
+		skipped int
+		err     error
+	}
+	tests := map[string]struct {
+		input string
+		limit int
+		reads []read
+	}{
+		"a line within the limit": {
+			input: "short\n", limit: 10,
+			reads: []read{{line: "short\n"}, {err: io.EOF}},
+		},
+		"a line of exactly the limit": {
+			input: "123456789\nnext\n", limit: 10,
+			reads: []read{{line: "123456789\n"}, {line: "next\n"}, {err: io.EOF}},
+		},
+		"a line one byte over the limit is skipped and the next line is read": {
+			input: "1234567890\nnext\n", limit: 10,
+			reads: []read{{skipped: 11}, {line: "next\n"}, {err: io.EOF}},
+		},
+		"a line much longer than the buffer is skipped completely": {
+			input: strings.Repeat("x", 100) + "\nok\n", limit: 10,
+			reads: []read{{skipped: 101}, {line: "ok\n"}, {err: io.EOF}},
+		},
+		"an oversized last line without a newline": {
+			input: "ok\n" + strings.Repeat("x", 50), limit: 10,
+			reads: []read{{line: "ok\n"}, {skipped: 50, err: io.EOF}},
+		},
+		"a last line without a newline within the limit": {
+			input: "tail", limit: 10,
+			reads: []read{{line: "tail", err: io.EOF}},
+		},
+		"no input": {
+			input: "", limit: 10,
+			reads: []read{{err: io.EOF}},
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			// the smallest buffer, so that long lines need several reads
+			reader := bufio.NewReaderSize(strings.NewReader(tt.input), 16)
+			for i, want := range tt.reads {
+				line, skipped, err := readLine(reader, tt.limit)
+				assert.Equal(t, want.line, string(line), "read %d", i)
+				assert.Equal(t, want.skipped, skipped, "read %d", i)
+				assert.Equal(t, want.err, err, "read %d", i)
+			}
+		})
+	}
 }

@@ -41,6 +41,10 @@ const (
 	// filters on the time the kubelet received the line, which is always after the request timestamp written
 	// by Rancher, so the margin only allows for clock differences between Rancher and the kubelet.
 	sinceMargin = time.Minute
+	// maxLineBytes is the maximum size of an audit log line that is read. A line is held in memory completely,
+	// more than once while it is decoded, before the limits on the size of bodies apply, and Rancher writes
+	// the full bodies of requests and responses at audit level 3. Longer lines are skipped.
+	maxLineBytes = 4 << 20
 )
 
 // searchAuditLogsParams specifies the parameters for searching the Rancher audit log.
@@ -215,6 +219,29 @@ func (t *Tools) search(ctx context.Context, clientset kubernetes.Interface, cach
 type podStats struct {
 	parsed   int
 	unparsed int
+	// oversized is the number of lines longer than maxLineBytes, which are skipped.
+	oversized int
+}
+
+// readLine reads the next line of r, including its newline, if it has at most limit bytes. A longer line is
+// read to its end without keeping it in memory and reported by its length in skipped, with a nil line.
+// At the end of the input it returns what was read together with io.EOF.
+func readLine(r *bufio.Reader, limit int) (line []byte, skipped int, err error) {
+	for {
+		chunk, err := r.ReadSlice('\n')
+		switch {
+		case skipped > 0:
+			skipped += len(chunk)
+		case len(line)+len(chunk) > limit:
+			skipped = len(line) + len(chunk)
+			line = nil
+		default:
+			line = append(line, chunk...)
+		}
+		if !errors.Is(err, bufio.ErrBufferFull) {
+			return line, skipped, err
+		}
+	}
 }
 
 // searchPod reads the audit log of a single pod and adds the matching entries to result.
@@ -233,8 +260,11 @@ func (t *Tools) searchPod(ctx context.Context, clientset kubernetes.Interface, p
 	var stats podStats
 	reader := bufio.NewReader(stream)
 	for lineNum := 0; ; lineNum++ {
-		line, readErr := reader.ReadBytes('\n')
-		if len(line) > 0 {
+		line, skipped, readErr := readLine(reader, maxLineBytes)
+		switch {
+		case skipped > 0:
+			stats.oversized++
+		case len(line) > 0:
 			processLine(line, pod, lineNum, f, includeBodies, result, &stats)
 		}
 		if errors.Is(readErr, io.EOF) {
@@ -245,6 +275,12 @@ func (t *Tools) searchPod(ctx context.Context, clientset kubernetes.Interface, p
 		}
 	}
 
+	if stats.oversized > 0 {
+		zap.L().Warn("skipped audit log lines that are too long", zap.String("pod", pod), zap.Int("lines", stats.oversized), zap.Int("maxBytes", maxLineBytes))
+		result.warnings = append(result.warnings, fmt.Sprintf(
+			"%d audit log lines of pod %s were longer than %d bytes and skipped, so matching entries may be missing, they can only be read from the %s container of the pod",
+			stats.oversized, pod, maxLineBytes, auditLogContainer))
+	}
 	if stats.unparsed > 0 {
 		zap.L().Warn("unable to parse audit log lines", zap.String("pod", pod), zap.Int("unparsed", stats.unparsed), zap.Int("parsed", stats.parsed))
 		result.warnings = append(result.warnings, fmt.Sprintf(
