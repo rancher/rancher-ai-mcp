@@ -24,9 +24,10 @@ import (
 
 const (
 	localCluster = "local"
-	// rancherNamespace and rancherPodSelector identify the Rancher server pods.
-	rancherNamespace   = "cattle-system"
-	rancherPodSelector = "app=rancher"
+	// rancherNamespace is the namespace of the Rancher server pods. They are recognised by their audit log
+	// sidecar container rather than by a label, because the labels of the Rancher chart depend on the name of
+	// the Helm release.
+	rancherNamespace = "cattle-system"
 	// auditLogContainer is the sidecar container of the Rancher pods that writes the audit log to its output
 	// when Rancher is installed with auditLog.destination=sidecar.
 	auditLogContainer = "rancher-audit-log"
@@ -125,7 +126,7 @@ func (t *Tools) searchAuditLogs(ctx context.Context, _ *mcp.CallToolRequest, par
 		return nil, nil, err
 	}
 
-	result, err := t.search(ctx, clientset, f, params.IncludeBodies, offset+limit)
+	result, err := t.search(ctx, clientset, podCacheKey(middleware.Token(ctx), localCluster), f, params.IncludeBodies, offset+limit)
 	if err != nil {
 		zap.L().Error("failed to search audit log", zap.String("tool", "searchAuditLogs"), zap.Error(err))
 		return nil, nil, err
@@ -142,44 +143,71 @@ func (t *Tools) searchAuditLogs(ctx context.Context, _ *mcp.CallToolRequest, par
 	}, nil, nil
 }
 
-// search reads the audit log of every Rancher pod and returns the newest window matching entries, newest first.
-func (t *Tools) search(ctx context.Context, clientset kubernetes.Interface, f filter, includeBodies bool, window int) (*searchResult, error) {
-	pods, err := clientset.CoreV1().Pods(rancherNamespace).List(ctx, metav1.ListOptions{LabelSelector: rancherPodSelector})
+// discoverPods returns the names of the pods in the Rancher namespace that have an audit log sidecar.
+func discoverPods(ctx context.Context, clientset kubernetes.Interface) ([]string, error) {
+	pods, err := clientset.CoreV1().Pods(rancherNamespace).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		return nil, fmt.Errorf("failed to list Rancher pods in namespace %s: %w", rancherNamespace, err)
+		return nil, fmt.Errorf("failed to list pods in namespace %s: %w", rancherNamespace, err)
 	}
+	var names []string
+	for _, pod := range pods.Items {
+		if hasContainer(pod, auditLogContainer) {
+			names = append(names, pod.Name)
+		}
+	}
+	return names, nil
+}
 
+// search reads the audit log of every Rancher pod and returns the newest window matching entries, newest first.
+// The pods are remembered per cacheKey for a short time. If reading a remembered pod fails, e.g. because the
+// pod was replaced, the pods are listed again and the search is repeated once.
+func (t *Tools) search(ctx context.Context, clientset kubernetes.Interface, cacheKey string, f filter, includeBodies bool, window int) (*searchResult, error) {
 	logOptions := &corev1.PodLogOptions{Container: auditLogContainer}
 	if !f.since.IsZero() {
 		logOptions.SinceTime = &metav1.Time{Time: f.since.Add(-sinceMargin)}
 	}
 
-	result := &searchResult{window: window}
-	podsRead := 0
-	for _, pod := range pods.Items {
-		if !hasContainer(pod, auditLogContainer) {
-			continue
+	for {
+		pods, cached := t.pods.get(cacheKey)
+		if !cached {
+			var err error
+			if pods, err = discoverPods(ctx, clientset); err != nil {
+				return nil, err
+			}
+			t.pods.set(cacheKey, pods)
 		}
-		if err := t.searchPod(ctx, clientset, pod.Name, logOptions, f, includeBodies, result); err != nil {
-			zap.L().Warn("unable to read audit log", zap.String("pod", pod.Name), zap.Error(err))
-			result.warnings = append(result.warnings, fmt.Sprintf("unable to read the audit log of pod %s: %v", pod.Name, err))
-			continue
+		if len(pods) == 0 {
+			return nil, fmt.Errorf("no Rancher pods with an %s container found in namespace %s. "+
+				"The audit log can only be read when Rancher is installed with the Helm values auditLog.enabled=true and auditLog.destination=sidecar",
+				auditLogContainer, rancherNamespace)
 		}
-		podsRead++
-	}
 
-	if podsRead == 0 {
-		if len(result.warnings) > 0 {
+		result := &searchResult{window: window}
+		failed := 0
+		for _, pod := range pods {
+			if err := t.searchPod(ctx, clientset, pod, logOptions, f, includeBodies, result); err != nil {
+				zap.L().Warn("unable to read audit log", zap.String("pod", pod), zap.Error(err))
+				result.warnings = append(result.warnings, fmt.Sprintf("unable to read the audit log of pod %s: %v", pod, err))
+				failed++
+			}
+		}
+
+		if failed > 0 {
+			// The remembered pods may be out of date, so do not use them for the next search either.
+			t.pods.delete(cacheKey)
+			if cached {
+				zap.L().Debug("unable to read a remembered pod, listing the Rancher pods again")
+				continue
+			}
+		}
+		if failed == len(pods) {
 			return nil, errors.New(strings.Join(result.warnings, "; "))
 		}
-		return nil, fmt.Errorf("no Rancher pods with an %s container found in namespace %s. "+
-			"The audit log can only be read when Rancher is installed with the Helm values auditLog.enabled=true and auditLog.destination=sidecar",
-			auditLogContainer, rancherNamespace)
+
+		slices.SortFunc(result.entries, func(a, b entry) int { return compareEntries(&a, &b) })
+
+		return result, nil
 	}
-
-	slices.SortFunc(result.entries, func(a, b entry) int { return compareEntries(&a, &b) })
-
-	return result, nil
 }
 
 // podStats counts the lines of a pod's log that were decoded and those that looked like audit log entries but

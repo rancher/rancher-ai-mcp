@@ -10,6 +10,7 @@ import (
 	"slices"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -19,11 +20,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/client-go/rest"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 const fakeToken = "fakeToken"
@@ -63,7 +66,8 @@ func rancherPod(name string, containers ...string) *corev1.Pod {
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      name,
 			Namespace: rancherNamespace,
-			Labels:    map[string]string{"app": "rancher"},
+			// Labels depend on the name of the Helm release, e.g. app=prod-rancher, so they are not used.
+			Labels: map[string]string{"app": name + "-release"},
 		},
 	}
 	for _, c := range containers {
@@ -156,6 +160,18 @@ func TestSearchAuditLogs(t *testing.T) {
 			},
 			expectedResult: `{"llm": {"entries": [
 				{"auditID":"a4","requestTimestamp":"2026-11-04T10:02:00Z","responseTimestamp":"2026-11-04T10:02:00Z","user":"u-95ckr","username":"testing","principalID":"local://u-95ckr","method":"DELETE","requestURI":"/v3/clusters/c-abc","responseCode":403,"remoteAddr":"10.0.0.1:1234","pod":"rancher-1"}
+			]}}`,
+		},
+		"finds pods by their sidecar whatever the labels and ignores other pods": {
+			params: searchAuditLogsParams{},
+			pods: []runtime.Object{
+				rancher1,
+				rancherPod("helm-operation-abc", "helm", "proxy"),
+				rancherPod("rancher-webhook-1", "rancher-webhook"),
+			},
+			logs: map[string]string{"rancher-1": lineGetUsers + "\n"},
+			expectedResult: `{"llm": {"entries": [
+				{"auditID":"a1","requestTimestamp":"2026-11-04T10:00:00Z","responseTimestamp":"2026-11-04T10:00:00Z","user":"user-admin","username":"admin","principalID":"local://user-admin","method":"GET","requestURI":"/v1/management.cattle.io.users","responseCode":200,"remoteAddr":"10.0.0.1:1234","pod":"rancher-1"}
 			]}}`,
 		},
 		"paginates results": {
@@ -484,4 +500,211 @@ func TestCompactSkipsEmptyUserExtras(t *testing.T) {
 			assert.Equal(t, tt.expectedPrincipalID, got.PrincipalID)
 		})
 	}
+}
+
+// newCachingTools returns tools reading the logs of the pods in logs and a counter of the pod list calls.
+func newCachingTools(t *testing.T, logs map[string]string, pods ...runtime.Object) (*Tools, *int) {
+	t.Helper()
+	return cachingToolsFor(t, logs, fake.NewClientset(pods...))
+}
+
+// cachingToolsFor is newCachingTools for a clientset the test also uses to change the pods or reactors.
+func cachingToolsFor(t *testing.T, logs map[string]string, fakeClientset *fake.Clientset) (*Tools, *int) {
+	t.Helper()
+	lists := 0
+	fakeClientset.PrependReactor("list", "pods", func(k8stesting.Action) (bool, runtime.Object, error) {
+		lists++
+		return false, nil, nil
+	})
+	c := &client.Client{
+		ClientSetCreator: func(_ *rest.Config) (kubernetes.Interface, error) { return fakeClientset, nil },
+	}
+	tools := NewTools(test.WrapClient(c, fakeToken))
+	tools.openLogs = func(_ context.Context, _ kubernetes.Interface, _, pod string, _ *corev1.PodLogOptions) (io.ReadCloser, error) {
+		content, ok := logs[pod]
+		if !ok {
+			return nil, apierrors.NewNotFound(corev1.Resource("pods"), pod)
+		}
+		return io.NopCloser(strings.NewReader(content)), nil
+	}
+	return tools, &lists
+}
+
+func search(t *testing.T, tools *Tools, token string) (*mcp.CallToolResult, error) {
+	t.Helper()
+	result, _, err := tools.searchAuditLogs(middleware.WithToken(t.Context(), token), &mcp.CallToolRequest{}, searchAuditLogsParams{})
+	return result, err
+}
+
+func TestSearchRemembersPodsForTTL(t *testing.T) {
+	// the bubble has a fake clock that advances when every goroutine is blocked, so the sleep is instant
+	synctest.Test(t, func(t *testing.T) {
+		logs := map[string]string{"rancher-1": lineGetUsers + "\n"}
+		tools, lists := newCachingTools(t, logs, rancherPod("rancher-1", "rancher", auditLogContainer))
+
+		for range 3 {
+			_, err := search(t, tools, fakeToken)
+			require.NoError(t, err)
+		}
+		assert.Equal(t, 1, *lists, "pods are listed once while the entry is valid")
+
+		time.Sleep(podCacheTTL + time.Second)
+		_, err := search(t, tools, fakeToken)
+		require.NoError(t, err)
+		assert.Equal(t, 2, *lists, "pods are listed again after the entry expired")
+	})
+}
+
+// anyTokenClient creates the clientset for any token.
+type anyTokenClient struct{ clientset kubernetes.Interface }
+
+func (c anyTokenClient) CreateClientSet(context.Context, string, string) (kubernetes.Interface, error) {
+	return c.clientset, nil
+}
+
+func TestSearchDoesNotShareRememberedPodsBetweenTokens(t *testing.T) {
+	fakeClientset := fake.NewClientset(rancherPod("rancher-1", "rancher", auditLogContainer))
+	lists := 0
+	fakeClientset.PrependReactor("list", "pods", func(k8stesting.Action) (bool, runtime.Object, error) {
+		lists++
+		return false, nil, nil
+	})
+	tools := NewTools(anyTokenClient{fakeClientset})
+	tools.openLogs = func(context.Context, kubernetes.Interface, string, string, *corev1.PodLogOptions) (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader(lineGetUsers + "\n")), nil
+	}
+
+	for _, token := range []string{"token-a", "token-b", "token-a", "token-b"} {
+		_, err := search(t, tools, token)
+		require.NoError(t, err)
+	}
+	assert.Equal(t, 2, lists, "every token lists the pods itself, once")
+
+	assert.NotEqual(t, podCacheKey("token-a", localCluster), podCacheKey("token-b", localCluster))
+	assert.NotContains(t, podCacheKey("token-a", localCluster), "token-a")
+}
+
+func TestSearchListsPodsAgainWhenRememberedPodCannotBeRead(t *testing.T) {
+	// rancher-old is remembered but was replaced by rancher-new
+	logs := map[string]string{"rancher-new": lineGetUsers + "\n"}
+	tools, lists := newCachingTools(t, logs, rancherPod("rancher-new", "rancher", auditLogContainer))
+	tools.pods.set(podCacheKey(fakeToken, localCluster), []string{"rancher-old"})
+
+	result, err := search(t, tools, fakeToken)
+
+	require.NoError(t, err)
+	assert.Equal(t, 1, *lists)
+	text := result.Content[0].(*mcp.TextContent).Text
+	assert.Contains(t, text, `"pod":"rancher-new"`)
+	assert.NotContains(t, text, "unable to read")
+}
+
+func TestSearchForgetsPodsWhenAFreshlyListedPodCannotBeRead(t *testing.T) {
+	// rancher-2 exists but its log cannot be read, so the search returns the entries of rancher-1 with a warning
+	logs := map[string]string{"rancher-1": lineGetUsers + "\n"}
+	tools, lists := newCachingTools(t, logs,
+		rancherPod("rancher-1", "rancher", auditLogContainer),
+		rancherPod("rancher-2", "rancher", auditLogContainer))
+
+	result, err := search(t, tools, fakeToken)
+	require.NoError(t, err)
+	assert.Contains(t, result.Content[0].(*mcp.TextContent).Text, "unable to read the audit log of pod rancher-2")
+	assert.Equal(t, 1, *lists)
+	_, remembered := tools.pods.get(podCacheKey(fakeToken, localCluster))
+	assert.False(t, remembered, "a pod that could not be read must not be remembered")
+
+	// the next search lists the pods again instead of waiting for the entry to expire
+	_, err = search(t, tools, fakeToken)
+	require.NoError(t, err)
+	assert.Equal(t, 2, *lists)
+}
+
+func TestSearchDoesNotRememberNoPods(t *testing.T) {
+	fakeClientset := fake.NewClientset(rancherPod("rancher-1", "rancher"))
+	c := &client.Client{
+		ClientSetCreator: func(_ *rest.Config) (kubernetes.Interface, error) { return fakeClientset, nil },
+	}
+	tools := NewTools(test.WrapClient(c, fakeToken))
+	tools.openLogs = func(context.Context, kubernetes.Interface, string, string, *corev1.PodLogOptions) (io.ReadCloser, error) {
+		return io.NopCloser(strings.NewReader(lineGetUsers + "\n")), nil
+	}
+
+	_, err := search(t, tools, fakeToken)
+	require.ErrorContains(t, err, "no Rancher pods with an rancher-audit-log container")
+
+	// the audit log sidecar is enabled, the next search must find it without waiting for the TTL
+	_, err = fakeClientset.CoreV1().Pods(rancherNamespace).Create(t.Context(), rancherPod("rancher-2", "rancher", auditLogContainer), metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = search(t, tools, fakeToken)
+	require.NoError(t, err)
+}
+
+func TestSearchDoesNotRememberPodsWhenListingFails(t *testing.T) {
+	fakeClientset := fake.NewClientset(rancherPod("rancher-1", "rancher", auditLogContainer))
+	failList := true
+	fakeClientset.PrependReactor("list", "pods", func(k8stesting.Action) (bool, runtime.Object, error) {
+		if failList {
+			return true, nil, errors.New("api unavailable")
+		}
+		return false, nil, nil
+	})
+	tools, lists := cachingToolsFor(t, map[string]string{"rancher-1": lineGetUsers + "\n"}, fakeClientset)
+
+	_, err := search(t, tools, fakeToken)
+	require.ErrorContains(t, err, "failed to list pods in namespace cattle-system")
+	assert.Equal(t, 1, *lists)
+
+	// the next search lists the pods again and works, a failure is not remembered
+	failList = false
+	result, err := search(t, tools, fakeToken)
+	require.NoError(t, err)
+	assert.Contains(t, result.Content[0].(*mcp.TextContent).Text, `"pod":"rancher-1"`)
+	assert.Equal(t, 2, *lists)
+}
+
+// A pod that starts while the pods are remembered is not searched until the entry expires. This documents the
+// trade-off of remembering the pods for podCacheTTL.
+func TestSearchFindsNewPodOnlyAfterTTL(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		fakeClientset := fake.NewClientset(rancherPod("rancher-1", "rancher", auditLogContainer))
+		logs := map[string]string{
+			"rancher-1": lineGetUsers + "\n",
+			"rancher-2": lineCreateUser + "\n",
+		}
+		tools, lists := cachingToolsFor(t, logs, fakeClientset)
+
+		result, err := search(t, tools, fakeToken)
+		require.NoError(t, err)
+		assert.NotContains(t, result.Content[0].(*mcp.TextContent).Text, `"pod":"rancher-2"`)
+
+		// rancher-2 starts, e.g. in a rollout
+		_, err = fakeClientset.CoreV1().Pods(rancherNamespace).Create(t.Context(), rancherPod("rancher-2", "rancher", auditLogContainer), metav1.CreateOptions{})
+		require.NoError(t, err)
+
+		result, err = search(t, tools, fakeToken)
+		require.NoError(t, err)
+		assert.NotContains(t, result.Content[0].(*mcp.TextContent).Text, `"pod":"rancher-2"`, "remembered pods are used until the entry expires")
+		assert.Equal(t, 1, *lists)
+
+		time.Sleep(podCacheTTL + time.Second)
+		result, err = search(t, tools, fakeToken)
+		require.NoError(t, err)
+		text := result.Content[0].(*mcp.TextContent).Text
+		assert.Contains(t, text, `"pod":"rancher-1"`)
+		assert.Contains(t, text, `"pod":"rancher-2"`)
+		assert.Equal(t, 2, *lists)
+	})
+}
+
+func TestPodCacheIsBounded(t *testing.T) {
+	c := newPodCache(time.Hour)
+	for i := range podCacheMaxEntries * 3 {
+		c.set(fmt.Sprintf("key-%d", i), []string{"rancher-1"})
+	}
+	assert.LessOrEqual(t, len(c.entries), podCacheMaxEntries)
+
+	// the entry just written is kept
+	c.set("latest", []string{"rancher-1"})
+	_, ok := c.get("latest")
+	assert.True(t, ok)
 }

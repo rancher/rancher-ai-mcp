@@ -31,6 +31,7 @@ func streamPodLogs(ctx context.Context, clientset kubernetes.Interface, namespac
 type Tools struct {
 	client   toolsClient
 	openLogs logOpener
+	pods     *podCache
 }
 
 // NewTools creates and returns a new Tools instance.
@@ -38,6 +39,7 @@ func NewTools(client toolsClient) *Tools {
 	return &Tools{
 		client:   client,
 		openLogs: streamPodLogs,
+		pods:     newPodCache(podCacheTTL),
 	}
 }
 
