@@ -480,7 +480,7 @@ func TestBuildResponseNeverSuggestsUnusableOffset(t *testing.T) {
 	}
 }
 
-func TestCompactSkipsEmptyUserExtras(t *testing.T) {
+func TestCompactSelectsUserExtrasDeterministically(t *testing.T) {
 	tests := map[string]struct {
 		extra               string
 		expectedUsername    string
@@ -495,6 +495,21 @@ func TestCompactSkipsEmptyUserExtras(t *testing.T) {
 			extra:               `{"username":["","admin"],"principalid":["","local://user-admin"]}`,
 			expectedUsername:    "admin",
 			expectedPrincipalID: "local://user-admin",
+		},
+		"selects the smallest value whatever the order, like Rancher": {
+			extra:               `{"username":["jane@example.com","jane","bob"],"principalid":["local://u-2","keycloakoidc_user://1","local://u-1"]}`,
+			expectedUsername:    "bob",
+			expectedPrincipalID: "keycloakoidc_user://1",
+		},
+		"the same values in another order give the same result": {
+			extra:               `{"username":["bob","jane","jane@example.com"],"principalid":["local://u-1","local://u-2","keycloakoidc_user://1"]}`,
+			expectedUsername:    "bob",
+			expectedPrincipalID: "keycloakoidc_user://1",
+		},
+		"empty values are never selected": {
+			extra:               `{"username":["","z",""],"principalid":["","local://u-1"]}`,
+			expectedUsername:    "z",
+			expectedPrincipalID: "local://u-1",
 		},
 		"only empty or missing values": {
 			extra: `{"username":[""]}`,

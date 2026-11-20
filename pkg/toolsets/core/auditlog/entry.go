@@ -56,7 +56,7 @@ func (e *rawEntry) username() string {
 	if e.User.Identity != nil && e.User.Identity.Username != "" {
 		return e.User.Identity.Username
 	}
-	return first(e.User.Extra["username"])
+	return userNameFromExtra(e.User.Extra)
 }
 
 // principalID returns the principal ID of the user, preferring the identity over the user extras.
@@ -64,7 +64,7 @@ func (e *rawEntry) principalID() string {
 	if e.User.Identity != nil && e.User.Identity.PrincipalID != "" {
 		return e.User.Identity.PrincipalID
 	}
-	return first(e.User.Extra["principalid"])
+	return principalIDFromExtra(e.User.Extra)
 }
 
 // impersonator is the real caller of an impersonated request returned to the LLM.
@@ -331,13 +331,29 @@ func truncateBody(body json.RawMessage, limit int) any {
 	return fmt.Sprintf("%s... (truncated, %d of %d bytes shown)", strings.ToValidUTF8(string(body[:limit]), ""), limit, len(body))
 }
 
-// first returns the first non-empty value, or an empty string if there is none. Rancher may write empty
-// values in the extras of a user, which must not hide the real value.
-func first(s []string) string {
-	for _, v := range s {
-		if v != "" {
-			return v
+// userNameFromExtra returns the human-readable name from the "username" user extra, or "" if there is none.
+// It follows UsernameFromExtra of the audit package of Rancher: the extra can hold several values, one per
+// linked auth provider, in no meaningful order, and the smallest non-empty value is returned so that the
+// result is stable across requests and the same as the one Rancher selects.
+func userNameFromExtra(extra map[string][]string) string {
+	return smallestNonEmpty(extra["username"])
+}
+
+// principalIDFromExtra returns the principal ID from the "principalid" user extra, or "" if there is none.
+// Rancher does not select one of several values, so this applies the same rule as userNameFromExtra to give
+// a stable result.
+func principalIDFromExtra(extra map[string][]string) string {
+	return smallestNonEmpty(extra["principalid"])
+}
+
+// smallestNonEmpty returns the smallest non-empty value, or an empty string if there is none. Rancher may
+// write empty values in the extras of a user, which must not hide the real value.
+func smallestNonEmpty(values []string) string {
+	var smallest string
+	for _, v := range values {
+		if v != "" && (smallest == "" || v < smallest) {
+			smallest = v
 		}
 	}
-	return ""
+	return smallest
 }
