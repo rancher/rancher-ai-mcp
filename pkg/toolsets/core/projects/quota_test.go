@@ -236,3 +236,13 @@ func TestAuditProjectQuota(t *testing.T) {
 	assert.Contains(t, audit.Findings[1], "pods: 100% of the project limit is already allocated")
 	assert.Contains(t, audit.Findings[2], "unlimited")
 }
+
+// quotaTestToolsFromUnstructured is quotaTestTools for a list of unstructured objects.
+func quotaTestToolsFromUnstructured(objs ...*unstructured.Unstructured) (*Tools, *dynamicfake.FakeDynamicClient) {
+	runtimeObjs := make([]runtime.Object, 0, len(objs))
+	for _, obj := range objs {
+		runtimeObjs = append(runtimeObjs, obj)
+	}
+
+	return quotaTestTools(runtimeObjs...)
+}

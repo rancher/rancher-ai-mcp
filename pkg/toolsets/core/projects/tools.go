@@ -142,6 +142,27 @@ Use auditProjectQuota first to see the current quota and usage.`,
 			t.updateProjectQuotaPlan)
 
 		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "updateNamespaceQuota",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Sets or updates the resource quota of a single namespace in a project, instead of the default given to every namespace.
+Only the given resources are changed, the others keep their value. Each resource must already have a namespace default in the project (see updateProjectQuota), and the quotas of all namespaces in the project together can't exceed the project quota, otherwise Rancher ignores the change.
+Resources are requestsCpu, limitsCpu, requestsMemory, limitsMemory, requestsStorage, pods, services, replicationControllers, secrets, configMaps, persistentVolumeClaims, servicesNodePorts, servicesLoadBalancers, or an extended resource such as nvidia.com/gpu.
+Use auditProjectQuota first to see the quota and usage of each namespace.`,
+		},
+			t.updateNamespaceQuota)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
+			Name: "updateNamespaceQuotaPlan",
+			Meta: map[string]any{
+				toolsSetAnn: toolsSet,
+			},
+			Description: `Plans to set or update the resource quota of a single namespace in a project. It returns the JSON merge patch that would be applied without actually applying it. Only used for displaying the change when using human validation.`,
+		},
+			t.updateNamespaceQuotaPlan)
+
+		mcp.AddTool(mcpServer, &mcp.Tool{
 			Name: "moveNamespace",
 			Meta: map[string]any{
 				toolsSetAnn: toolsSet,

@@ -58,7 +58,7 @@ func TestAddTools(t *testing.T) {
 
 	toolsResult, err := session.ListTools(t.Context(), &mcp.ListToolsParams{})
 	require.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 11, "incorrect number of project tools registered")
+	assert.Len(t, toolsResult.Tools, 13, "incorrect number of project tools registered")
 
 	toolNames := make(map[string]bool)
 	for _, tool := range toolsResult.Tools {
