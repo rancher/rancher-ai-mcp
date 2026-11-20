@@ -451,3 +451,37 @@ func TestBuildResponseNeverSuggestsUnusableOffset(t *testing.T) {
 		})
 	}
 }
+
+func TestCompactSkipsEmptyUserExtras(t *testing.T) {
+	tests := map[string]struct {
+		extra               string
+		expectedUsername    string
+		expectedPrincipalID string
+	}{
+		"single values": {
+			extra:               `{"username":["admin"],"principalid":["local://user-admin"]}`,
+			expectedUsername:    "admin",
+			expectedPrincipalID: "local://user-admin",
+		},
+		"skips empty values before the first real value": {
+			extra:               `{"username":["","admin"],"principalid":["","local://user-admin"]}`,
+			expectedUsername:    "admin",
+			expectedPrincipalID: "local://user-admin",
+		},
+		"only empty or missing values": {
+			extra: `{"username":[""]}`,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			line := fmt.Sprintf(`{"auditID":"x","requestURI":"/v3/users","user":{"name":"user-admin","extra":%s},"method":"POST","responseCode":201,"requestTimestamp":"2026-11-04T10:00:00Z"}`, tt.extra)
+			var raw rawEntry
+			require.NoError(t, json.Unmarshal([]byte(line), &raw))
+
+			got := compact(&raw, "rancher-1", 0, false)
+
+			assert.Equal(t, tt.expectedUsername, got.Username)
+			assert.Equal(t, tt.expectedPrincipalID, got.PrincipalID)
+		})
+	}
+}

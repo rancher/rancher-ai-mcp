@@ -331,9 +331,13 @@ func truncateBody(body json.RawMessage, limit int) any {
 	return fmt.Sprintf("%s... (truncated, %d of %d bytes shown)", strings.ToValidUTF8(string(body[:limit]), ""), limit, len(body))
 }
 
+// first returns the first non-empty value, or an empty string if there is none. Rancher may write empty
+// values in the extras of a user, which must not hide the real value.
 func first(s []string) string {
-	if len(s) == 0 {
-		return ""
+	for _, v := range s {
+		if v != "" {
+			return v
+		}
 	}
-	return s[0]
+	return ""
 }
