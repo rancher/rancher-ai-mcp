@@ -24,8 +24,11 @@ import (
 
 type investigateFailedPlanApplicationParams struct {
 	Cluster     string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
-	NodeName    string `json:"nodeName" jsonschema:"the name of the node which is failing to execute a plan"`
+	MachineName string `json:"machineName" jsonschema:"the name of the CAPI Machine which is failing to execute a plan"`
 	LogLineTail int    `json:"logLineTail" jsonschema:"an optional number of log lines to retrieve from the system-agent logs, defaults to 150. Returns the last N lines of logs. Must be between 30 and 1000."`
+
+	// nodeName is the downstream Node object for MachineName. It is resolved by validate.
+	nodeName string
 }
 
 const defaultLogLineTail = 150
@@ -33,7 +36,7 @@ const defaultLogLineTail = 150
 func (params *investigateFailedPlanApplicationParams) validate(ctx context.Context, t *Tools, toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
 	log := utils.NewChildLogger(toolReq, map[string]string{
 		"cluster":     params.Cluster,
-		"nodeName":    params.NodeName,
+		"machineName": params.MachineName,
 		"logLineTail": fmt.Sprintf("%d", params.LogLineTail),
 	})
 
@@ -43,8 +46,8 @@ func (params *investigateFailedPlanApplicationParams) validate(ctx context.Conte
 		return nil, fmt.Errorf("plans are not used to control the local cluster")
 	}
 
-	if strings.TrimSpace(params.NodeName) == "" {
-		return nil, fmt.Errorf("node name is required")
+	if strings.TrimSpace(params.MachineName) == "" {
+		return nil, fmt.Errorf("machine name is required")
 	}
 
 	// explicitly allow a zero value and silently convert it to the default value. This handles
@@ -58,7 +61,7 @@ func (params *investigateFailedPlanApplicationParams) validate(ctx context.Conte
 		params.LogLineTail = defaultLogLineTail
 	}
 
-	// ensure that the provided node name is actually valid for the specified cluster and
+	// ensure that the provided machine name is actually valid for the specified cluster and
 	// that it is managed by Rancher machine plans (i.e. CAPI compliant)
 	machines, _, _, err := t.getAllCAPIMachineResources(ctx, log, getCAPIMachineResourcesParams{
 		namespace:     DefaultClusterResourcesNamespace,
@@ -75,17 +78,30 @@ func (params *investigateFailedPlanApplicationParams) validate(ctx context.Conte
 		return nil, fmt.Errorf("did not find any CAPI machine resources for cluster %s. This cluster is likely not managed by Rancher machine plans or the system agent. This tool cannot be run against clusters which do not utilize CAPI (aks,eks,gke,k3k,etc.)", params.Cluster)
 	}
 
-	found := false
-	for _, machine := range machines {
-		if machine.GetName() == params.NodeName {
-			found = true
+	var machine *unstructured.Unstructured
+	for _, m := range machines {
+		if m.GetName() == params.MachineName {
+			machine = m
 			break
 		}
 	}
 
-	if !found {
-		return nil, fmt.Errorf("failed to find node %s", params.NodeName)
+	if machine == nil {
+		return nil, fmt.Errorf("failed to find machine %s", params.MachineName)
 	}
+
+	// the machine name is not the node name (e.g. custom clusters use the host's name), so resolve
+	// the downstream node from the machine's node reference.
+	nodeName, _, err := unstructured.NestedString(machine.Object, "status", "nodeRef", "name")
+	if err != nil {
+		return nil, fmt.Errorf("failed to read the node reference of machine %s: %w", params.MachineName, err)
+	}
+
+	if nodeName == "" {
+		return nil, fmt.Errorf("machine %s has not registered a node in cluster %s yet, so there is no node to gather logs from", params.MachineName, params.Cluster)
+	}
+
+	params.nodeName = nodeName
 
 	return log, nil
 }
@@ -99,7 +115,7 @@ func (t *Tools) investigateFailedPlanApplication(ctx context.Context, toolReq *m
 	log.Debug("retrieving machine plan for node")
 
 	// get select fields from the machine plan for the requested node and the overall plan hash
-	machinePlanFields, planHash, err := getMachinePlanFields(ctx, params.NodeName, t.client, log)
+	machinePlanFields, planHash, err := getMachinePlanFields(ctx, params.MachineName, t.client, log)
 	if err != nil {
 		log.Error("failed to get machine plan", zap.Error(err))
 		return nil, nil, err
@@ -199,7 +215,7 @@ func buildFailedPlanLogGathererJob(params investigateFailedPlanApplicationParams
 		fmt.Sprintf("%s; %s", logCommand, systemctl),
 	}
 
-	job, err := nodeUtils.CreateSystemdLogGathererJob(fmt.Sprintf("%s-systemd-log-gatherer", name.SafeConcatName(params.NodeName)), params.NodeName, "rancher-system-agent", image, log, journaldCommand...)
+	job, err := nodeUtils.CreateSystemdLogGathererJob(fmt.Sprintf("%s-systemd-log-gatherer", name.SafeConcatName(params.MachineName)), params.nodeName, "rancher-system-agent", image, log, journaldCommand...)
 	if err != nil {
 		log.Error("failed to create systemd job", zap.Error(err))
 		return nil, err
