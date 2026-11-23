@@ -39,7 +39,6 @@ type getClusterRegistrationCommandParams struct {
 // registrationCommands contains the registration details of a cluster.
 type registrationCommands struct {
 	Name                       string `json:"name"`
-	Token                      string `json:"token,omitempty"`
 	NodeCommand                string `json:"nodeCommand,omitempty"`
 	InsecureNodeCommand        string `json:"insecureNodeCommand,omitempty"`
 	WindowsNodeCommand         string `json:"windowsNodeCommand,omitempty"`
@@ -51,10 +50,11 @@ type registrationCommands struct {
 	InsecureCommand            string `json:"insecureCommand,omitempty"`
 }
 
-// isEmpty returns true if the token has nothing to report: no token, no secret to read it from,
-// and none of the commands or URLs. Name and ExpiresAt are not enough on their own.
+// isEmpty returns true if the token has nothing to report: no secret to read it from, and none of
+// the commands or URLs. Name and ExpiresAt are not enough on their own.
+// The token value is not returned as a separate field: it is only exposed inside the commands and URLs.
 func (rc *registrationCommands) isEmpty() bool {
-	return rc.Token == "" && rc.TokenSecretName == "" &&
+	return rc.TokenSecretName == "" &&
 		rc.NodeCommand == "" && rc.InsecureNodeCommand == "" &&
 		rc.WindowsNodeCommand == "" && rc.InsecureWindowsNodeCommand == "" &&
 		rc.ManifestURL == "" && rc.Command == "" && rc.InsecureCommand == ""
@@ -150,7 +150,6 @@ func (t *Tools) getClusterRegistrationCommand(ctx context.Context, toolReq *mcp.
 		str := func(k string) string { s, _ := status[k].(string); return s }
 		rc := registrationCommands{
 			Name:                       obj.GetName(),
-			Token:                      str("token"),
 			NodeCommand:                str("nodeCommand"),
 			InsecureNodeCommand:        str("insecureNodeCommand"),
 			WindowsNodeCommand:         str("windowsNodeCommand"),
