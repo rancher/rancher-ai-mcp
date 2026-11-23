@@ -129,6 +129,11 @@ func TestUpdateProjectQuotaErrors(t *testing.T) {
 			params:        updateProjectQuotaParams{ProjectQuota: map[string]string{"bogus": "1"}},
 			expectedError: "unsupported quota resource",
 		},
+		"negative quota": {
+			spec:          map[string]any{},
+			params:        updateProjectQuotaParams{ProjectQuota: map[string]string{"limitsCpu": "-1"}, NamespaceDefaultQuota: map[string]string{"limitsCpu": "-1"}},
+			expectedError: "can't be negative",
+		},
 		"invalid quantity": {
 			spec:          map[string]any{},
 			params:        updateProjectQuotaParams{ProjectQuota: map[string]string{"limitsCpu": "lots"}},
@@ -245,4 +250,16 @@ func quotaTestToolsFromUnstructured(objs ...*unstructured.Unstructured) (*Tools,
 	}
 
 	return quotaTestTools(runtimeObjs...)
+}
+
+func TestNamespaceQuotaUsesSmallestHardAndLargestUsed(t *testing.T) {
+	hard, used := namespaceQuota([]*unstructured.Unstructured{
+		quotaTestResourceQuota("a", map[string]any{"limits.cpu": "10"}, map[string]any{"limits.cpu": "1"}),
+		quotaTestResourceQuota("a", map[string]any{"limits.cpu": "5"}, map[string]any{"limits.cpu": "3"}),
+		quotaTestResourceQuota("a", map[string]any{"limits.cpu": "8"}, map[string]any{"limits.cpu": "2"}),
+	})
+
+	cpuHard, cpuUsed := hard["limitsCpu"], used["limitsCpu"]
+	assert.Equal(t, "5", cpuHard.String())
+	assert.Equal(t, "3", cpuUsed.String())
 }

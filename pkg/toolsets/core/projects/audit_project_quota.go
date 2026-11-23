@@ -189,7 +189,9 @@ func namespaceQuota(quotas []*unstructured.Unstructured) (hard, used map[string]
 					key = name
 				}
 
-				if existing, found := entry.target[key]; !found || q.Cmp(existing) > 0 {
+				// Overlapping quotas are enforced together, so the effective limit is the smallest hard value.
+				// The largest used value is kept, as the same objects count towards each quota.
+				if existing, found := entry.target[key]; !found || (entry.path == "hard") == (q.Cmp(existing) < 0) {
 					entry.target[key] = q
 				}
 			}

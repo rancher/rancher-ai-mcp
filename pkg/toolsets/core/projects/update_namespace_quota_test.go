@@ -2,12 +2,15 @@ package projects
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	clienttesting "k8s.io/client-go/testing"
 
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
@@ -128,4 +131,23 @@ func TestUpdateNamespaceQuotaErrors(t *testing.T) {
 			assert.Contains(t, err.Error(), test.expectedError)
 		})
 	}
+}
+
+func TestUpdateNamespaceQuotaFailsWhenListingNamespacesFails(t *testing.T) {
+	tools, dynClient := quotaTestTools(namespaceQuotaTestProject(), namespaceWithQuota("web-frontend", ""))
+	dynClient.PrependReactor("list", "namespaces", func(clienttesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("boom")
+	})
+	ctx := middleware.WithToken(t.Context(), quotaToken)
+	params := updateNamespaceQuotaParams{Cluster: quotaClusterID, Namespace: "web-frontend", Quota: map[string]string{"limitsCpu": "6"}}
+
+	_, _, err := tools.updateNamespaceQuota(ctx, &mcp.CallToolRequest{}, params)
+	require.ErrorContains(t, err, "failed to list the namespaces")
+
+	_, _, err = tools.updateNamespaceQuotaPlan(ctx, &mcp.CallToolRequest{}, params)
+	require.ErrorContains(t, err, "failed to list the namespaces")
+
+	updated, err := tools.client.GetResource(ctx, client.GetParams{Cluster: quotaClusterID, Kind: "namespace", Name: "web-frontend", Token: quotaToken})
+	require.NoError(t, err)
+	assert.Empty(t, updated.GetAnnotations()[namespaceQuotaAnnotation], "the namespace must not be patched")
 }

@@ -81,6 +81,10 @@ func normalizeQuota(quota map[string]string) (map[string]string, error) {
 			return nil, fmt.Errorf("invalid quantity %q for %q: %w", value, key, err)
 		}
 
+		if q, _ := resource.ParseQuantity(value); q.Sign() < 0 {
+			return nil, fmt.Errorf("quota for %q can't be negative: %s", key, value)
+		}
+
 		flat[normalized] = value
 	}
 

@@ -95,7 +95,12 @@ func (t *Tools) resolveNamespaceQuotaUpdate(ctx context.Context, params updateNa
 	merged := maps.Clone(current)
 	maps.Copy(merged, requested)
 
-	if err := validateNamespaceQuotaFit(params.Namespace, merged, projectQuota, t.otherNamespaceQuotas(ctx, clusterID, projectID, params.Namespace, namespaceDefault)); err != nil {
+	others, err := t.otherNamespaceQuotas(ctx, clusterID, projectID, params.Namespace, namespaceDefault)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := validateNamespaceQuotaFit(params.Namespace, merged, projectQuota, others); err != nil {
 		return nil, err
 	}
 
@@ -135,10 +140,10 @@ func effectiveNamespaceQuota(namespace *unstructured.Unstructured, namespaceDefa
 }
 
 // otherNamespaceQuotas returns the effective quota of every other namespace of the project.
-func (t *Tools) otherNamespaceQuotas(ctx context.Context, clusterID, projectID, namespace string, namespaceDefault map[string]string) []map[string]string {
+func (t *Tools) otherNamespaceQuotas(ctx context.Context, clusterID, projectID, namespace string, namespaceDefault map[string]string) ([]map[string]string, error) {
 	selector, err := metav1.LabelSelectorAsSelector(&metav1.LabelSelector{MatchLabels: map[string]string{projectIDKey: projectID}})
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf("failed to build namespace selector: %w", err)
 	}
 
 	namespaces, err := t.client.GetResources(ctx, client.ListParams{
@@ -148,8 +153,7 @@ func (t *Tools) otherNamespaceQuotas(ctx context.Context, clusterID, projectID, 
 		Token:         middleware.Token(ctx),
 	})
 	if err != nil {
-		zap.L().Warn("failed to list namespaces of project, skipping the fit check against them", zap.String("project", projectID), zap.Error(err))
-		return nil
+		return nil, fmt.Errorf("failed to list the namespaces of project %q to check that the quota fits: %w", projectID, err)
 	}
 
 	var quotas []map[string]string
@@ -160,7 +164,7 @@ func (t *Tools) otherNamespaceQuotas(ctx context.Context, clusterID, projectID, 
 		}
 	}
 
-	return quotas
+	return quotas, nil
 }
 
 // validateNamespaceQuotaFit checks that the quota of a namespace together with the quotas of the other namespaces
