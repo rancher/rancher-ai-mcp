@@ -3,6 +3,7 @@ package provisioning
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
@@ -16,7 +17,7 @@ import (
 )
 
 type inspectClusterMachinesParams struct {
-	Cluster                   string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
+	Cluster                   string `json:"cluster" jsonschema:"the Rancher cluster ID (c-...) or display name; provisioning cluster names are also accepted"`
 	Namespace                 string `json:"namespace,omitempty" jsonschema:"the namespace where the resource is located. The default namespace will be used if not provided"`
 	IncludeMachineDeployments bool   `json:"includeMachineDeployments" jsonschema:"set to true to return the cluster's CAPI MachineDeployments, which summarize desired and ready replicas for each machine pool"`
 	IncludeMachineSets        bool   `json:"includeMachineSets" jsonschema:"set to true to return the cluster's CAPI MachineSets, which sit between MachineDeployments and Machines and reflect rollout state"`
@@ -33,9 +34,9 @@ func (params *inspectClusterMachinesParams) validate(toolReq *mcp.CallToolReques
 		"cluster":   params.Cluster,
 		"namespace": params.Namespace,
 	})
-	if err := validateClusterName(params.Cluster); err != nil {
+	if strings.TrimSpace(params.Cluster) == "" {
 		log.Error("invalid cluster name")
-		return nil, err
+		return nil, fmt.Errorf("cluster name is required")
 	}
 	if !params.IncludeMachineDeployments && !params.IncludeMachineSets && !params.IncludeMachines {
 		return nil, fmt.Errorf("at least one of includeMachineDeployments, includeMachineSets, or includeMachines must be true")
@@ -52,9 +53,15 @@ func (t *Tools) analyzeClusterMachines(ctx context.Context, toolReq *mcp.CallToo
 
 	log.Debug("Analyzing Cluster Machines")
 
+	clusterName, clusterID, err := t.resolveMachineCluster(ctx, log, params.Namespace, params.Cluster)
+	if err != nil {
+		log.Error("failed to resolve cluster", zap.Error(err))
+		return nil, nil, err
+	}
+
 	machines, machineSets, machineDeployments, err := t.getAllCAPIMachineResources(ctx, log, getCAPIMachineResourcesParams{
 		namespace:     params.Namespace,
-		targetCluster: params.Cluster,
+		targetCluster: clusterName,
 		kinds: &capiResourceKinds{
 			machines:           params.IncludeMachines,
 			machineSets:        params.IncludeMachineSets,
@@ -73,11 +80,13 @@ func (t *Tools) analyzeClusterMachines(ctx context.Context, toolReq *mcp.CallToo
 	var responseOptions []response.Option
 	if params.IncludeMachines && len(machines) == 0 {
 		token := middleware.Token(ctx)
-		clusterID, err := t.client.GetClusterID(ctx, token, params.Cluster)
-		if err != nil {
-			err = fmt.Errorf("failed to resolve cluster %s: %w", params.Cluster, err)
-			log.Error("failed to lookup management nodes", zap.Error(err))
-			return nil, nil, err
+		if clusterID == "" {
+			clusterID, err = t.client.GetClusterID(ctx, token, params.Cluster)
+			if err != nil {
+				err = fmt.Errorf("failed to resolve cluster %s: %w", params.Cluster, err)
+				log.Error("failed to lookup management nodes", zap.Error(err))
+				return nil, nil, err
+			}
 		}
 
 		// Management nodes live in a namespace named after their cluster ID.
@@ -148,4 +157,39 @@ func (t *Tools) analyzeClusterMachines(ctx context.Context, toolReq *mcp.CallToo
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
 	}, nil, nil
+}
+
+func (t *Tools) resolveMachineCluster(ctx context.Context, log *zap.Logger, namespace, cluster string) (string, string, error) {
+	_, provisioningCluster, err := t.getProvisioningCluster(ctx, log, namespace, cluster)
+	if err == nil {
+		return provisioningCluster.Name, provisioningCluster.Status.ClusterName, nil
+	}
+	if !errors.IsNotFound(err) {
+		return "", "", fmt.Errorf("failed to resolve provisioning cluster %s: %w", cluster, err)
+	}
+
+	token := middleware.Token(ctx)
+	clusterID, err := t.client.GetClusterID(ctx, token, cluster)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to resolve cluster %s: %w", cluster, err)
+	}
+	clusters, err := t.client.GetResources(ctx, client.ListParams{
+		Cluster:   LocalCluster,
+		Kind:      converter.ProvisioningClusterResourceKind,
+		Namespace: namespace,
+		Token:     token,
+	})
+	if err != nil {
+		return "", "", fmt.Errorf("failed to list provisioning clusters in namespace %s: %w", namespace, err)
+	}
+	for _, candidate := range clusters {
+		managementID, _, err := unstructured.NestedString(candidate.Object, "status", "clusterName")
+		if err != nil {
+			return "", "", fmt.Errorf("failed to read management cluster ID of provisioning cluster %s: %w", candidate.GetName(), err)
+		}
+		if managementID == clusterID {
+			return candidate.GetName(), clusterID, nil
+		}
+	}
+	return clusterID, clusterID, nil
 }

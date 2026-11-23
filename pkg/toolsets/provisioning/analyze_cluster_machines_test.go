@@ -1,13 +1,18 @@
 package provisioning
 
 import (
+	"errors"
+	"fmt"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	dynamicfake "k8s.io/client-go/dynamic/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 var fakeCAPIMachine = &unstructured.Unstructured{
@@ -137,7 +142,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 	}{
 		"analyze cluster with machines, machine sets, and deployments": {
 			params: inspectClusterMachinesParams{
-				Cluster:                   "test-cluster",
+				Cluster:                   "c-analyze-machines",
 				Namespace:                 "fleet-default",
 				IncludeMachineDeployments: true,
 				IncludeMachineSets:        true,
@@ -268,12 +273,12 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				IncludeMachineSets:        true,
 				IncludeMachines:           true,
 			},
-			objects:        nil,
+			objects:        []runtime.Object{newManagementCluster("empty-cluster", true)},
 			expectedResult: `{"llm":"no resources found"}`,
 		},
 		"analyze cluster with default namespace": {
 			params: inspectClusterMachinesParams{
-				Cluster:                   "test-cluster",
+				Cluster:                   "Production Cluster",
 				Namespace:                 "",
 				IncludeMachineDeployments: true,
 				IncludeMachineSets:        true,
@@ -426,7 +431,7 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 				IncludeMachineSets:        true,
 				IncludeMachines:           true,
 			},
-			objects:        nil,
+			objects:        []runtime.Object{newManagementCluster("empty-cluster", true)},
 			expectedResult: `{"llm":"no resources found"}`,
 		},
 		"analyze cluster with only machine deployments selected": {
@@ -568,13 +573,20 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			tools := newTestProvisioningTools(tt.objects...)
+			managementCluster := newManagementCluster("c-analyze-machines", true)
+			require.NoError(t, unstructured.SetNestedField(managementCluster.Object, "Production Cluster", "spec", "displayName"))
+			objects := append([]runtime.Object{
+				managementCluster,
+				newProvisioningCluster("test-cluster", "fleet-default", managementCluster.GetName()),
+			}, tt.objects...)
+			dynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), provisioningCustomListKinds(), objects...)
+			tools := newTestTools(dynClient)
 			result, _, err := tools.analyzeClusterMachines(middleware.WithToken(t.Context(), testToken), newToolRequest("analyze-cluster-machines"), tt.params)
 
 			if tt.expectedError != "" {
 				assert.ErrorContains(t, err, tt.expectedError)
 			} else {
-				assert.NoError(t, err)
+				require.NoError(t, err)
 				text, ok := result.Content[0].(*mcp.TextContent)
 				assert.Truef(t, ok, "expected type *mcp.TextContent")
 				assert.Truef(t, ok, "expected expectedResult to be a JSON string")
@@ -582,4 +594,230 @@ func TestAnalyzeClusterMachines(t *testing.T) {
 			}
 		})
 	}
+}
+
+// withNodeRole sets spec.worker on a management node, which is dropped when the node is trimmed.
+func withNodeRole(node *unstructured.Unstructured, worker bool) *unstructured.Unstructured {
+	_ = unstructured.SetNestedField(node.Object, worker, "spec", "worker")
+	return node
+}
+
+func TestAnalyzeClusterMachinesManagementNodes(t *testing.T) {
+	const (
+		fullNodeStatus = `"status": {
+			"nodeName": %q,
+			"conditions": [{"type": "Ready", "status": "True"}],
+			"internalNodeStatus": {"capacity": {"cpu": "4"}}
+		}`
+		trimmedNodeStatus = `"status": {
+			"nodeName": %q,
+			"conditions": [{"type": "Ready", "status": "True"}]
+		}`
+	)
+
+	nodeJSON := func(name, clusterID, nodeName string, full bool) string {
+		status := trimmedNodeStatus
+		extra := ""
+		if full {
+			status = fullNodeStatus
+			extra = `"labels": {"example": "label"},`
+		}
+		spec := ""
+		if full {
+			spec = `"spec": {"worker": true},`
+		}
+
+		return fmt.Sprintf(`{
+			"apiVersion": "management.cattle.io/v3",
+			"kind": "Node",
+			"metadata": {%s "name": %q, "namespace": %q},
+			%s
+			`+status+`
+		}`, extra, name, clusterID, spec, nodeName)
+	}
+	uiContextJSON := func(name, clusterID string) string {
+		return fmt.Sprintf(`{"cluster": "local", "kind": "Node", "name": %q, "namespace": %q, "type": "management.cattle.io.node"}`, name, clusterID)
+	}
+
+	trimmedNote := "Cluster %s has no CAPI machines, so its Rancher management node objects are returned instead. status.nodeName is the name of the Kubernetes node. Only the names and conditions of the nodes are included, set fullNodes to true for the complete objects."
+	fullNote := "Cluster %s has no CAPI machines, so its Rancher management node objects are returned instead. status.nodeName is the name of the Kubernetes node."
+
+	tests := map[string]struct {
+		params         inspectClusterMachinesParams
+		objects        []runtime.Object
+		expectedResult string
+		expectedError  string
+	}{
+		"nodes are trimmed by default": {
+			params: inspectClusterMachinesParams{Cluster: "nodes-trimmed", IncludeMachines: true},
+			objects: []runtime.Object{
+				newManagementCluster("nodes-trimmed", true),
+				newManagementNode("m-1", "nodes-trimmed", "worker-1"),
+				newManagementNode("m-2", "nodes-trimmed", "worker-2"),
+			},
+			expectedResult: fmt.Sprintf(`{
+				"llm": {
+					"note": %q,
+					"resources": [%s, %s]
+				},
+				"uiContext": [%s, %s]
+			}`, fmt.Sprintf(trimmedNote, "nodes-trimmed"),
+				nodeJSON("m-1", "nodes-trimmed", "worker-1", false), nodeJSON("m-2", "nodes-trimmed", "worker-2", false),
+				uiContextJSON("m-1", "nodes-trimmed"), uiContextJSON("m-2", "nodes-trimmed")),
+		},
+		"full nodes are returned when requested": {
+			params: inspectClusterMachinesParams{Cluster: "nodes-full", IncludeMachines: true, FullNodes: true},
+			objects: []runtime.Object{
+				newManagementCluster("nodes-full", true),
+				newManagementNode("m-1", "nodes-full", "worker-1"),
+			},
+			expectedResult: fmt.Sprintf(`{
+				"llm": {
+					"note": %q,
+					"resources": [%s]
+				},
+				"uiContext": [%s]
+			}`, fmt.Sprintf(fullNote, "nodes-full"),
+				nodeJSON("m-1", "nodes-full", "worker-1", true), uiContextJSON("m-1", "nodes-full")),
+		},
+		"only the nodes of the requested cluster are returned": {
+			params: inspectClusterMachinesParams{Cluster: "nodes-scoped", IncludeMachines: true},
+			objects: []runtime.Object{
+				newManagementCluster("nodes-scoped", true),
+				newManagementCluster("nodes-other", true),
+				newManagementNode("m-1", "nodes-scoped", "worker-1"),
+				newManagementNode("m-other", "nodes-other", "worker-other"),
+			},
+			expectedResult: fmt.Sprintf(`{
+				"llm": {
+					"note": %q,
+					"resources": [%s]
+				},
+				"uiContext": [%s]
+			}`, fmt.Sprintf(trimmedNote, "nodes-scoped"),
+				nodeJSON("m-1", "nodes-scoped", "worker-1", false), uiContextJSON("m-1", "nodes-scoped")),
+		},
+		"the jsonPath filter is evaluated on the complete nodes before trimming": {
+			// spec.worker is removed by trimming, so the filter only matches if it ran first
+			params: inspectClusterMachinesParams{Cluster: "nodes-filter", IncludeMachines: true, JSONPath: `@.spec.worker==false`},
+			objects: []runtime.Object{
+				newManagementCluster("nodes-filter", true),
+				newManagementNode("m-1", "nodes-filter", "worker-1"),
+				withNodeRole(newManagementNode("m-2", "nodes-filter", "worker-2"), false),
+			},
+			expectedResult: fmt.Sprintf(`{
+				"llm": {
+					"note": %q,
+					"resources": [%s]
+				},
+				"uiContext": [%s]
+			}`, fmt.Sprintf(trimmedNote, "nodes-filter"),
+				nodeJSON("m-2", "nodes-filter", "worker-2", false), uiContextJSON("m-2", "nodes-filter")),
+		},
+		"the jsonPath filter can exclude every node": {
+			params: inspectClusterMachinesParams{Cluster: "nodes-filter-none", IncludeMachines: true, JSONPath: `@.status.nodeName=="missing"`},
+			objects: []runtime.Object{
+				newManagementCluster("nodes-filter-none", true),
+				newManagementNode("m-1", "nodes-filter-none", "worker-1"),
+			},
+			expectedResult: fmt.Sprintf(`{
+				"llm": {
+					"note": %q,
+					"resources": "no resources found"
+				}
+			}`, fmt.Sprintf(trimmedNote, "nodes-filter-none")),
+		},
+		"an invalid jsonPath filter is an error": {
+			params: inspectClusterMachinesParams{Cluster: "nodes-filter-invalid", IncludeMachines: true, JSONPath: `@.status.nodeName==`},
+			objects: []runtime.Object{
+				newManagementCluster("nodes-filter-invalid", true),
+				newManagementNode("m-1", "nodes-filter-invalid", "worker-1"),
+			},
+			expectedError: "invalid jsonPath filter",
+		},
+		"a cluster without machines or nodes has no note": {
+			params:         inspectClusterMachinesParams{Cluster: "nodes-none", IncludeMachines: true},
+			objects:        []runtime.Object{newManagementCluster("nodes-none", true)},
+			expectedResult: `{"llm": "no resources found"}`,
+		},
+		"nodes are not looked up when machines are not requested": {
+			params: inspectClusterMachinesParams{Cluster: "nodes-not-requested", IncludeMachineSets: true},
+			objects: []runtime.Object{
+				newManagementCluster("nodes-not-requested", true),
+				newManagementNode("m-1", "nodes-not-requested", "worker-1"),
+			},
+			expectedResult: `{"llm": "no resources found"}`,
+		},
+		"nodes are not returned when the cluster has machines": {
+			params: inspectClusterMachinesParams{Cluster: "test-cluster", IncludeMachines: true},
+			objects: []runtime.Object{
+				fakeCAPIMachine,
+				newManagementCluster("test-cluster", true),
+				newManagementNode("m-1", "test-cluster", "worker-1"),
+			},
+			expectedResult: `{
+				"llm": [
+					{
+						"apiVersion": "cluster.x-k8s.io/v1beta1",
+						"kind": "Machine",
+						"metadata": {
+							"labels": {"cluster.x-k8s.io/cluster-name": "test-cluster"},
+							"name": "test-cluster-machine-1",
+							"namespace": "fleet-default"
+						},
+						"spec": {
+							"bootstrap": {"configRef": {"kind": "RKEBootstrap", "name": "test-cluster-machine-1"}},
+							"clusterName": "test-cluster"
+						},
+						"status": {"phase": "Running"}
+					}
+				],
+				"uiContext": [
+					{
+						"cluster": "local",
+						"kind": "Machine",
+						"name": "test-cluster-machine-1",
+						"namespace": "fleet-default",
+						"type": "cluster.x-k8s.io.machine"
+					}
+				]
+			}`,
+		},
+		"a cluster unknown to rancher is an error": {
+			params:        inspectClusterMachinesParams{Cluster: "nodes-unknown-cluster", IncludeMachines: true},
+			expectedError: "failed to resolve cluster nodes-unknown-cluster",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tools := newTestProvisioningTools(tt.objects...)
+			result, _, err := tools.analyzeClusterMachines(middleware.WithToken(t.Context(), testToken), newToolRequest("analyze-cluster-machines"), tt.params)
+
+			if tt.expectedError != "" {
+				assert.ErrorContains(t, err, tt.expectedError)
+				return
+			}
+
+			require.NoError(t, err)
+			text, ok := result.Content[0].(*mcp.TextContent)
+			require.True(t, ok, "expected type *mcp.TextContent")
+			assert.JSONEq(t, tt.expectedResult, text.Text)
+		})
+	}
+}
+
+func TestAnalyzeClusterMachinesManagementNodesListError(t *testing.T) {
+	dynClient := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), provisioningCustomListKinds(),
+		newManagementCluster("nodes-list-error", true))
+	dynClient.PrependReactor("list", "nodes", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, errors.New("nodes are unavailable")
+	})
+
+	tools := newTestTools(dynClient)
+	_, _, err := tools.analyzeClusterMachines(middleware.WithToken(t.Context(), testToken), newToolRequest("analyze-cluster-machines"),
+		inspectClusterMachinesParams{Cluster: "nodes-list-error", IncludeMachines: true})
+
+	assert.ErrorContains(t, err, "failed to list nodes of cluster nodes-list-error")
+	assert.ErrorContains(t, err, "nodes are unavailable")
 }
