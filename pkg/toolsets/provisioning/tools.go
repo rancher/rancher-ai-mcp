@@ -58,7 +58,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: ToolsSet,
 		},
-		Description: `Lists selected CAPI MachineDeployments, MachineSets, and/or Machines for a cluster. Set at least one include flag. Use when the machine name is unknown or an issue spans multiple machines; use getClusterMachine for a known machine.`},
+		Description: `Lists selected CAPI MachineDeployments, MachineSets, and/or Machines for a cluster. Set at least one include flag. Use when the machine name is unknown or an issue spans multiple machines; use getClusterMachine for a known machine. Clusters with no CAPI Machines (e.g. imported and hosted clusters) return their Rancher management node objects instead when includeMachines is set, trimmed to their names and conditions unless fullNodes is true. status.nodeName is the Kubernetes node name. Supports an optional JSONPath predicate to filter which resources are returned.`},
 		t.analyzeClusterMachines)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{

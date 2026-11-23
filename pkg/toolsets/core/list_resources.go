@@ -2,15 +2,13 @@ package core
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
+	"github.com/rancher/rancher-ai-mcp/pkg/utils"
 	"go.uber.org/zap"
-	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
-	"k8s.io/client-go/util/jsonpath"
 )
 
 // listKubernetesResourcesParams specifies the parameters needed to list kubernetes resources.
@@ -41,7 +39,7 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 	}
 
 	if params.JSONPath != "" {
-		resources, err = filterByJSONPath(resources, params.JSONPath)
+		resources, err = utils.FilterByJSONPath(resources, params.JSONPath)
 		if err != nil {
 			zap.L().Error("failed to filter resources by jsonpath", zap.String("tool", "listKubernetesResources"), zap.Error(err))
 			return nil, nil, err
@@ -69,37 +67,4 @@ func (t *Tools) listKubernetesResources(ctx context.Context, toolReq *mcp.CallTo
 	return &mcp.CallToolResult{
 		Content: []mcp.Content{&mcp.TextContent{Text: mcpResponse}},
 	}, nil, nil
-}
-
-// filterByJSONPath returns the subset of objs matching the given JSONPath predicate
-// expression (the body of a kubectl-style [?(...)] filter, e.g. `@.status.phase=="Running"`).
-// The objects are wrapped as a list so the filter can iterate over them, mirroring
-// kubectl's `{.items[?(<predicate>)]}` selector semantics.
-func filterByJSONPath(objs []*unstructured.Unstructured, expr string) ([]*unstructured.Unstructured, error) {
-	items := make([]interface{}, len(objs))
-	for i, obj := range objs {
-		items[i] = obj.Object
-	}
-	input := map[string]interface{}{"items": items}
-
-	jp := jsonpath.New("filter").AllowMissingKeys(true)
-	if err := jp.Parse("{.items[?(" + expr + ")]}"); err != nil {
-		return nil, fmt.Errorf("invalid jsonPath filter %q: %w", expr, err)
-	}
-
-	results, err := jp.FindResults(input)
-	if err != nil {
-		return nil, fmt.Errorf("failed to evaluate jsonPath filter %q: %w", expr, err)
-	}
-
-	filtered := make([]*unstructured.Unstructured, 0)
-	for _, group := range results {
-		for _, v := range group {
-			if m, ok := v.Interface().(map[string]interface{}); ok {
-				filtered = append(filtered, &unstructured.Unstructured{Object: m})
-			}
-		}
-	}
-
-	return filtered, nil
 }
