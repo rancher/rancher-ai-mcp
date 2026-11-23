@@ -114,6 +114,15 @@ func TestGetClusterRegistrationCommand(t *testing.T) {
 			}}},
 			expectedText: []string{"kubectl apply"},
 		},
+		"token with only a windows command": {
+			params: getClusterRegistrationCommandParams{Cluster: "custom"},
+			objects: []runtime.Object{newProvCluster("custom", "c-abcde", false), &unstructured.Unstructured{Object: map[string]any{
+				"apiVersion": "management.cattle.io/v3", "kind": "ClusterRegistrationToken",
+				"metadata": map[string]any{"name": "default-token", "namespace": "c-abcde"},
+				"status":   map[string]any{"insecureWindowsNodeCommand": "PowerShell -Command insecure-windows"},
+			}}},
+			expectedText: []string{"insecure-windows"},
+		},
 		"display name annotation without matching management cluster": {
 			params:        getClusterRegistrationCommandParams{Cluster: "testing-cluster"},
 			objects:       []runtime.Object{displayNameCluster("c-fake"), newMgmtCluster("c-fake", "something-else")},

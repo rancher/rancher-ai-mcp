@@ -51,6 +51,15 @@ type registrationCommands struct {
 	InsecureCommand            string `json:"insecureCommand,omitempty"`
 }
 
+// isEmpty returns true if the token has nothing to report: no token, no secret to read it from,
+// and none of the commands or URLs. Name and ExpiresAt are not enough on their own.
+func (rc *registrationCommands) isEmpty() bool {
+	return rc.Token == "" && rc.TokenSecretName == "" &&
+		rc.NodeCommand == "" && rc.InsecureNodeCommand == "" &&
+		rc.WindowsNodeCommand == "" && rc.InsecureWindowsNodeCommand == "" &&
+		rc.ManifestURL == "" && rc.Command == "" && rc.InsecureCommand == ""
+}
+
 func (params *getClusterRegistrationCommandParams) validate(toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
 	params.Namespace = clusterResourcesNamespace(params.Cluster, params.Namespace)
 
@@ -139,14 +148,6 @@ func (t *Tools) getClusterRegistrationCommand(ctx context.Context, toolReq *mcp.
 		obj := &tokens[i]
 		status, _ := obj.Object["status"].(map[string]any)
 		str := func(k string) string { s, _ := status[k].(string); return s }
-		// newer Rancher versions keep the token in a secret and leave
-		// status.token empty, with a {token} placeholder in the commands.
-		// The commands can also be blank when the caller can't read the secret, so
-		// entries with a tokenSecretName are kept and the secret read reports the error.
-		if str("token") == "" && str("nodeCommand") == "" && str("manifestUrl") == "" &&
-			str("command") == "" && str("insecureCommand") == "" && str("tokenSecretName") == "" {
-			continue
-		}
 		rc := registrationCommands{
 			Name:                       obj.GetName(),
 			Token:                      str("token"),
@@ -159,6 +160,13 @@ func (t *Tools) getClusterRegistrationCommand(ctx context.Context, toolReq *mcp.
 			ManifestURL:                str("manifestUrl"),
 			Command:                    str("command"),
 			InsecureCommand:            str("insecureCommand"),
+		}
+		// newer Rancher versions keep the token in a secret and leave
+		// status.token empty, with a {token} placeholder in the commands.
+		// The commands can also be blank when the caller can't read the secret, so
+		// entries with a tokenSecretName are kept and the secret read reports the error.
+		if rc.isEmpty() {
+			continue
 		}
 		if rc.Token == "" && rc.TokenSecretName != "" {
 			if err := t.interpolateToken(ctx, log, &rc, mgmtName, token); err != nil {
