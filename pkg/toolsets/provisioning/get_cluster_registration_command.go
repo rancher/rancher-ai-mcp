@@ -106,11 +106,6 @@ func (t *Tools) getClusterRegistrationCommand(ctx context.Context, toolReq *mcp.
 		return nil, nil, err
 	}
 
-	clusterType := "imported"
-	if _, found, _ := unstructured.NestedMap(provCluster.Object, "spec", "rkeConfig"); found {
-		clusterType = "custom"
-	}
-
 	if pools, _, _ := unstructured.NestedSlice(provCluster.Object, "spec", "rkeConfig", "machinePools"); len(pools) > 0 {
 		return nil, nil, fmt.Errorf("cluster %q is provisioned with machine pools and does not use registration commands, use scaleClusterNodePool to add machines", params.Cluster)
 	}
@@ -119,6 +114,8 @@ func (t *Tools) getClusterRegistrationCommand(ctx context.Context, toolReq *mcp.
 	if mgmtName == "" {
 		return nil, nil, fmt.Errorf("cluster %q has no management cluster yet, try again once it has been created", params.Cluster)
 	}
+
+	clusterType := t.registrationClusterType(ctx, provCluster, mgmtName, token)
 
 	// The GVR is passed explicitly instead of looking the kind up by name:
 	// see clusterRegistrationTokenGVR.
@@ -146,7 +143,8 @@ func (t *Tools) getClusterRegistrationCommand(ctx context.Context, toolReq *mcp.
 		// status.token empty, with a {token} placeholder in the commands.
 		// The commands can also be blank when the caller can't read the secret, so
 		// entries with a tokenSecretName are kept and the secret read reports the error.
-		if str("token") == "" && str("nodeCommand") == "" && str("manifestUrl") == "" && str("tokenSecretName") == "" {
+		if str("token") == "" && str("nodeCommand") == "" && str("manifestUrl") == "" &&
+			str("command") == "" && str("insecureCommand") == "" && str("tokenSecretName") == "" {
 			continue
 		}
 		rc := registrationCommands{
@@ -170,7 +168,7 @@ func (t *Tools) getClusterRegistrationCommand(ctx context.Context, toolReq *mcp.
 		results = append(results, rc)
 	}
 
-	var data any = results
+	var data any
 	if len(results) == 0 {
 		data = "no registration token found for this cluster"
 	} else {
@@ -232,11 +230,40 @@ func (t *Tools) interpolateToken(ctx context.Context, log *zap.Logger, rc *regis
 	return nil
 }
 
+// registrationClusterType returns "custom" for clusters with an rkeConfig, "hosted" for EKS, AKS and GKE
+// clusters, and "imported" otherwise. The management cluster is only read to tell hosted clusters from
+// imported ones; if it can't be read the cluster is reported as imported.
+func (t *Tools) registrationClusterType(ctx context.Context, provCluster *unstructured.Unstructured, mgmtName, token string) string {
+	if _, found, _ := unstructured.NestedMap(provCluster.Object, "spec", "rkeConfig"); found {
+		return "custom"
+	}
+
+	mgmtCluster, err := t.client.GetResource(ctx, client.GetParams{
+		Cluster: LocalCluster,
+		Kind:    converter.ManagementClusterResourceKind,
+		Name:    mgmtName,
+		Token:   token,
+	})
+	if err != nil {
+		return "imported"
+	}
+	for _, key := range []string{"eksConfig", "aksConfig", "gkeConfig"} {
+		if cfg, found, _ := unstructured.NestedMap(mgmtCluster.Object, "spec", key); found && len(cfg) > 0 {
+			return "hosted"
+		}
+	}
+
+	return "imported"
+}
+
 func registrationNote(clusterType string) string {
 	if clusterType == "custom" {
-		return "Run nodeCommand on the new machine, adding the role flags (--etcd, --controlplane, --worker) for the node. Prefer the secure commands: the insecure variants skip TLS certificate verification, so only use them when the Rancher certificate is not trusted and the network is."
+		return "Run nodeCommand on the new machine, adding the role flags (--etcd, --controlplane, --worker) for the node. Prefer the secure commands: the insecure variants skip TLS certificate verification, so only use them when the Rancher certificate is not trusted but the network is otherwise trusted."
 	}
-	return "This is an imported cluster: machines are not added through Rancher. Use command (or insecureCommand) only to register the cluster's agent; add nodes with the cluster's own tooling. Prefer the secure commands: the insecure variants skip TLS certificate verification, so only use them when the Rancher certificate is not trusted and the network is."
+	if clusterType == "hosted" {
+		return "This is a hosted cluster (EKS, AKS or GKE): its nodes are managed by the cloud provider, not added through Rancher. Use command (or insecureCommand) only to register the cluster's agent. Prefer the secure commands: the insecure variants skip TLS certificate verification, so only use them when the Rancher certificate is not trusted but the network is otherwise trusted."
+	}
+	return "This is an imported cluster: machines are not added through Rancher. Use command (or insecureCommand) only to register the cluster's agent; add nodes with the cluster's own tooling. Prefer the secure commands: the insecure variants skip TLS certificate verification, so only use them when the Rancher certificate is not trusted but the network is otherwise trusted."
 }
 
 // findProvisioningClusterByDisplayName finds a provisioning cluster by the display name of its management cluster.

@@ -2,19 +2,20 @@ package provisioning
 
 import (
 	"fmt"
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	k8stesting "k8s.io/client-go/testing"
 	"testing"
 
+	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
 	provisioningV1 "github.com/rancher/rancher/pkg/apis/provisioning.cattle.io/v1"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	dynamicfake "k8s.io/client-go/dynamic/fake"
+	k8stesting "k8s.io/client-go/testing"
 )
 
 // newProvCluster returns a provisioning cluster. Passing true as the optional last
@@ -65,7 +66,7 @@ func TestGetClusterRegistrationCommand(t *testing.T) {
 			objects:      []runtime.Object{newProvCluster("custom", "c-abcde", false), newRegToken("default-token", "c-abcde", "tok123")},
 			expectedText: []string{"tok123", "nodeCommand", "manifestUrl"},
 		},
-		"token stored in a missing secret": {
+		"token secret not found": {
 			params: getClusterRegistrationCommandParams{Cluster: "custom"},
 			objects: []runtime.Object{newProvCluster("custom", "c-abcde", false), &unstructured.Unstructured{Object: map[string]any{
 				"apiVersion": "management.cattle.io/v3", "kind": "ClusterRegistrationToken",
@@ -93,7 +94,25 @@ func TestGetClusterRegistrationCommand(t *testing.T) {
 				ObjectMeta: metav1.ObjectMeta{Name: "c-xyz", Namespace: "fleet-default", Annotations: map[string]string{"provisioning.cattle.io/management-cluster-display-name": "testing-cluster"}},
 				Status:     provisioningV1.ClusterStatus{ClusterName: "c-xyz"},
 			}, newMgmtCluster("c-xyz", "testing-cluster"), newRegToken("default-token", "c-xyz", "tok")},
-			expectedText: []string{"c-xyz", `\"clusterType\":\"imported\"`},
+			expectedText: []string{"c-xyz", `"clusterType":"imported"`},
+		},
+		"hosted cluster reports its type": {
+			params: getClusterRegistrationCommandParams{Cluster: "hosted"},
+			objects: []runtime.Object{newProvCluster("hosted", "c-host", false), &unstructured.Unstructured{Object: map[string]any{
+				"apiVersion": "management.cattle.io/v3", "kind": "Cluster",
+				"metadata": map[string]any{"name": "c-host"},
+				"spec":     map[string]any{"eksConfig": map[string]any{"region": "eu-west-1"}},
+			}}, newRegToken("default-token", "c-host", "tok")},
+			expectedText: []string{`"clusterType":"hosted"`},
+		},
+		"token with only a command": {
+			params: getClusterRegistrationCommandParams{Cluster: "custom"},
+			objects: []runtime.Object{newProvCluster("custom", "c-abcde", false), &unstructured.Unstructured{Object: map[string]any{
+				"apiVersion": "management.cattle.io/v3", "kind": "ClusterRegistrationToken",
+				"metadata": map[string]any{"name": "default-token", "namespace": "c-abcde"},
+				"status":   map[string]any{"command": "kubectl apply -f https://rancher/import.yaml"},
+			}}},
+			expectedText: []string{"kubectl apply"},
 		},
 		"display name annotation without matching management cluster": {
 			params:        getClusterRegistrationCommandParams{Cluster: "testing-cluster"},
@@ -113,7 +132,7 @@ func TestGetClusterRegistrationCommand(t *testing.T) {
 		"custom cluster reports its type": {
 			params:       getClusterRegistrationCommandParams{Cluster: "custom"},
 			objects:      []runtime.Object{newProvCluster("custom", "c-abcde", false, true), newRegToken("default-token", "c-abcde", "tok")},
-			expectedText: []string{`\"clusterType\":\"custom\"`, "role flags"},
+			expectedText: []string{`"clusterType":"custom"`, "role flags"},
 		},
 		"display name that isn't a valid resource name": {
 			params: getClusterRegistrationCommandParams{Cluster: "My Cluster"},
@@ -161,10 +180,10 @@ func TestGetClusterRegistrationCommand(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-			text := result.Content[0].(interface{ MarshalJSON() ([]byte, error) })
-			b, _ := text.MarshalJSON()
+			text, ok := result.Content[0].(*mcp.TextContent)
+			require.True(t, ok)
 			for _, s := range test.expectedText {
-				assert.Contains(t, string(b), s)
+				assert.Contains(t, text.Text, s)
 			}
 		})
 	}
