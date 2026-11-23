@@ -86,3 +86,21 @@ func TestAddToolsReadOnly(t *testing.T) {
 		assert.NotEqual(t, "moveNamespacePlan", tool.Name)
 	}
 }
+
+func TestAddToolsRequiresHumanValidation(t *testing.T) {
+	c, err := client.NewClient(true, "https://localhost:8080")
+	require.NoError(t, err)
+	session := startProjectsMCPServer(t, NewTools(c, false))
+
+	toolsResult, err := session.ListTools(t.Context(), &mcp.ListToolsParams{})
+	require.NoError(t, err)
+
+	marked := map[string]bool{}
+	for _, tool := range toolsResult.Tools {
+		if tool.Meta[requiresHumanValidationAnn] == true {
+			marked[tool.Name] = true
+		}
+	}
+
+	assert.Equal(t, map[string]bool{"updateProjectQuota": true, "updateNamespaceQuota": true}, marked)
+}
