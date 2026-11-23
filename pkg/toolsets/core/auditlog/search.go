@@ -115,11 +115,19 @@ func (t *Tools) searchAuditLogs(ctx context.Context, _ *mcp.CallToolRequest, par
 	if err != nil {
 		return nil, nil, err
 	}
-	offset, limit := max(params.Offset, 0), params.Limit
-	if limit <= 0 {
+	// Values out of range are rejected instead of adjusted, so that the caller does not assume it got what it asked for.
+	switch {
+	case params.Offset < 0:
+		return nil, nil, fmt.Errorf("offset must not be negative, got %d", params.Offset)
+	case params.Limit < 0:
+		return nil, nil, fmt.Errorf("limit must not be negative, got %d", params.Limit)
+	case params.Limit > maxLimit:
+		return nil, nil, fmt.Errorf("limit must be at most %d, got %d, use offset to page through the results", maxLimit, params.Limit)
+	}
+	offset, limit := params.Offset, params.Limit
+	if limit == 0 {
 		limit = defaultLimit
 	}
-	limit = min(limit, maxLimit)
 	if offset > maxWindow-limit {
 		return nil, nil, fmt.Errorf("offset+limit must be at most %d, use filters such as since, until, user, method or search to narrow the results instead", maxWindow)
 	}

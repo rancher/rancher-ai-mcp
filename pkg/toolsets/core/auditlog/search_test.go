@@ -217,13 +217,29 @@ func TestSearchAuditLogs(t *testing.T) {
 				"note": "Returned 0 audit log entries (offset 10, limit 5) out of 3 matching entries, newest first. Use filters to narrow results."
 			}}`,
 		},
-		"caps limit at the maximum": {
-			params: searchAuditLogsParams{Method: "DELETE", Offset: 1, Limit: 100000},
+		"error when limit is over the maximum": {
+			params:        searchAuditLogsParams{Limit: 501},
+			expectedError: "limit must be at most 500, got 501, use offset to page through the results",
+		},
+		"error when limit is far over the maximum": {
+			params:        searchAuditLogsParams{Limit: 10000},
+			expectedError: "limit must be at most 500, got 10000",
+		},
+		"error when limit is negative": {
+			params:        searchAuditLogsParams{Limit: -1},
+			expectedError: "limit must not be negative, got -1",
+		},
+		"error when offset is negative": {
+			params:        searchAuditLogsParams{Offset: -1},
+			expectedError: "offset must not be negative, got -1",
+		},
+		"uses the default limit when limit is not set": {
+			params: searchAuditLogsParams{Method: "GET,POST", Offset: 3},
 			pods:   []runtime.Object{rancher1, rancher2},
 			logs:   logs,
 			expectedResult: `{"llm": {
 				"entries": [],
-				"note": "Returned 0 audit log entries (offset 1, limit 500) out of 1 matching entries, newest first. Use filters to narrow results."
+				"note": "Returned 0 audit log entries (offset 3, limit 50) out of 3 matching entries, newest first. Use filters to narrow results."
 			}}`,
 		},
 		"error when offset+limit exceeds the maximum window": {
@@ -234,9 +250,9 @@ func TestSearchAuditLogs(t *testing.T) {
 			params:        searchAuditLogsParams{Offset: math.MaxInt},
 			expectedError: "offset+limit must be at most 5000",
 		},
-		"error when offset is the maximum and limit is capped": {
+		"error when offset and limit are the maximum integer": {
 			params:        searchAuditLogsParams{Offset: math.MaxInt, Limit: math.MaxInt},
-			expectedError: "offset+limit must be at most 5000",
+			expectedError: "limit must be at most 500",
 		},
 		"allows offset+limit equal to the maximum window": {
 			params: searchAuditLogsParams{Method: "GET,POST", Offset: 4500, Limit: 500},
