@@ -255,3 +255,28 @@ func TestGetClusterRegistrationCommandBlankedSecretBackedToken(t *testing.T) {
 	require.Error(t, err)
 	assert.True(t, apierrors.IsForbidden(err))
 }
+
+func TestGetClusterRegistrationCommandSecretForbiddenWithPopulatedToken(t *testing.T) {
+	kinds := provisioningCustomListKinds()
+	kinds[schema.GroupVersionResource{Group: "management.cattle.io", Version: "v3", Resource: "clusterregistrationtokens"}] = "ClusterRegistrationTokenList"
+	fakeDyn := dynamicfake.NewSimpleDynamicClientWithCustomListKinds(provisioningSchemes(), kinds,
+		newProvCluster("custom", "c-abcde", false),
+		&unstructured.Unstructured{Object: map[string]any{
+			"apiVersion": "management.cattle.io/v3", "kind": "ClusterRegistrationToken",
+			"metadata": map[string]any{"name": "default-token", "namespace": "c-abcde"},
+			"status": map[string]any{
+				"token":           "leaked-token",
+				"nodeCommand":     "curl x --token leaked-token",
+				"tokenSecretName": "crt-token-default-token",
+			},
+		}})
+	fakeDyn.PrependReactor("get", "secrets", func(k8stesting.Action) (bool, runtime.Object, error) {
+		return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "secrets"}, "crt-token-default-token", fmt.Errorf("denied"))
+	})
+
+	result, _, err := newTestTools(fakeDyn).getClusterRegistrationCommand(middleware.WithToken(t.Context(), testToken), newToolRequest("getClusterRegistrationCommand"), getClusterRegistrationCommandParams{Cluster: "custom"})
+	require.Error(t, err)
+	assert.Nil(t, result)
+	assert.True(t, apierrors.IsForbidden(err))
+	assert.NotContains(t, err.Error(), "leaked-token")
+}

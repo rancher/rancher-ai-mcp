@@ -168,7 +168,9 @@ func (t *Tools) getClusterRegistrationCommand(ctx context.Context, toolReq *mcp.
 		if rc.isEmpty() {
 			continue
 		}
-		if rc.Token == "" && rc.TokenSecretName != "" {
+		// status.token can be filled in before this tool sees the object, so a populated token
+		// doesn't show that the caller can read the secret: always read it when there is one.
+		if rc.TokenSecretName != "" {
 			if err := t.interpolateToken(ctx, log, &rc, mgmtName, token); err != nil {
 				return nil, nil, err
 			}
