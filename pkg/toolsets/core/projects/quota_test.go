@@ -3,6 +3,7 @@ package projects
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -311,4 +312,29 @@ func TestUpdateProjectQuotaGuardsAgainstConcurrentChanges(t *testing.T) {
 	result, _, err := tools.updateProjectQuotaPlan(ctx, &mcp.CallToolRequest{}, params)
 	require.NoError(t, err)
 	assert.NotContains(t, result.Content[0].(*mcp.TextContent).Text, "resourceVersion")
+}
+
+func TestAuditProjectQuotaNamespaceWithOnlyScopedQuota(t *testing.T) {
+	project := quotaTestProject(map[string]any{
+		"resourceQuota":                 map[string]any{"limit": map[string]any{"pods": "50"}},
+		"namespaceDefaultResourceQuota": map[string]any{"limit": map[string]any{"pods": "25"}},
+	})
+	scopedQuota := quotaTestResourceQuota("scoped", map[string]any{"pods": "5"}, map[string]any{"pods": "1"})
+	require.NoError(t, unstructured.SetNestedStringSlice(scopedQuota.Object, []string{"BestEffort"}, "spec", "scopes"))
+
+	tools, _ := quotaTestTools(project, quotaTestNamespace("scoped"), quotaTestNamespace("unlimited"), scopedQuota)
+
+	result, _, err := tools.auditProjectQuota(middleware.WithToken(t.Context(), quotaToken), &mcp.CallToolRequest{}, auditProjectQuotaParams{Cluster: quotaClusterID, Project: "web"})
+	require.NoError(t, err)
+
+	var out struct {
+		LLM struct {
+			Findings []string `json:"findings"`
+			Without  []string `json:"namespacesWithoutQuota"`
+		} `json:"llm"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(result.Content[0].(*mcp.TextContent).Text), &out))
+
+	assert.Equal(t, []string{"unlimited"}, out.LLM.Without, "a namespace with a scoped quota is limited")
+	assert.Contains(t, strings.Join(out.LLM.Findings, "\n"), "scoped resource quotas")
 }

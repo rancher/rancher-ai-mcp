@@ -102,7 +102,11 @@ func (t *Tools) auditProjectQuota(ctx context.Context, _ *mcp.CallToolRequest, p
 		}
 
 		if len(hard) == 0 {
-			withoutQuota = append(withoutQuota, ns.GetName())
+			// A namespace with only scoped quotas is limited, just not in a way that can be added up here.
+			if !scoped {
+				withoutQuota = append(withoutQuota, ns.GetName())
+			}
+
 			continue
 		}
 
