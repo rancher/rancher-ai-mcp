@@ -57,7 +57,7 @@ func TestGetProjectID(t *testing.T) {
 
 	tests := map[string]struct {
 		projectName string
-		getResult  *unstructured.Unstructured
+		getResult   *unstructured.Unstructured
 		getErr      error
 		listResult  []*unstructured.Unstructured
 		listErr     error
