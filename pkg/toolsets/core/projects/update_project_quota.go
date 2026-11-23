@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"maps"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -31,7 +32,10 @@ type quotaUpdate struct {
 	clusterID string
 	project   *unstructured.Unstructured
 	patch     []byte
-	noChange  bool
+	// applyPatch is patch with the resource version of the project, so that the update fails instead of
+	// overwriting a quota changed in the meantime. It is not shown in plans.
+	applyPatch []byte
+	noChange   bool
 }
 
 // resolveQuotaUpdate resolves the project, merges the requested quotas with the existing ones, validates the
@@ -88,11 +92,24 @@ func (t *Tools) resolveQuotaUpdate(ctx context.Context, params updateProjectQuot
 		return nil, fmt.Errorf("failed to marshal patch: %w", err)
 	}
 
+	applyPatch := patch
+
+	if resourceVersion := project.GetResourceVersion(); resourceVersion != "" {
+		applyPatch, err = json.Marshal(map[string]any{
+			"metadata": map[string]any{"resourceVersion": resourceVersion},
+			"spec":     spec,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal patch: %w", err)
+		}
+	}
+
 	return &quotaUpdate{
-		clusterID: clusterID,
-		project:   project,
-		patch:     patch,
-		noChange:  maps.Equal(mergedProject, currentProject) && maps.Equal(mergedDefault, currentDefault),
+		clusterID:  clusterID,
+		project:    project,
+		patch:      patch,
+		applyPatch: applyPatch,
+		noChange:   maps.Equal(mergedProject, currentProject) && maps.Equal(mergedDefault, currentDefault),
 	}, nil
 }
 
@@ -118,7 +135,11 @@ func (t *Tools) updateProjectQuota(ctx context.Context, _ *mcp.CallToolRequest, 
 		return nil, nil, err
 	}
 
-	updated, err := resourceInterface.Patch(ctx, update.project.GetName(), types.MergePatchType, update.patch, metav1.PatchOptions{})
+	updated, err := resourceInterface.Patch(ctx, update.project.GetName(), types.MergePatchType, update.applyPatch, metav1.PatchOptions{})
+	if apierrors.IsConflict(err) {
+		return nil, nil, fmt.Errorf("project %q was changed while updating its quota, nothing was applied: run the tool again", update.project.GetName())
+	}
+
 	if err != nil {
 		zap.L().Error("failed to patch project quota", zap.String("tool", "updateProjectQuota"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to update project quota: %w", err)

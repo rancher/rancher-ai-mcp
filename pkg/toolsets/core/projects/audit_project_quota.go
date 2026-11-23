@@ -82,6 +82,7 @@ func (t *Tools) auditProjectQuota(ctx context.Context, _ *mcp.CallToolRequest, p
 	sums := make(map[string]*quotaSums)
 	namespaceSummary := []map[string]any{}
 	withoutQuota := []string{}
+	withScopedQuotas := []string{}
 
 	for _, ns := range namespaces {
 		quotas, err := t.client.GetResources(ctx, client.ListParams{
@@ -95,7 +96,11 @@ func (t *Tools) auditProjectQuota(ctx context.Context, _ *mcp.CallToolRequest, p
 			return nil, nil, fmt.Errorf("failed to list resource quotas of namespace %s: %w", ns.GetName(), err)
 		}
 
-		hard, used := namespaceQuota(quotas)
+		hard, used, scoped := namespaceQuota(quotas)
+		if scoped {
+			withScopedQuotas = append(withScopedQuotas, ns.GetName())
+		}
+
 		if len(hard) == 0 {
 			withoutQuota = append(withoutQuota, ns.GetName())
 			continue
@@ -137,6 +142,11 @@ func (t *Tools) auditProjectQuota(ctx context.Context, _ *mcp.CallToolRequest, p
 		findings = append(findings, fmt.Sprintf("Namespaces without a resource quota are not limited and don't count against the project quota: %v.", withoutQuota))
 	}
 
+	if len(withScopedQuotas) > 0 {
+		slices.Sort(withScopedQuotas)
+		findings = append(findings, fmt.Sprintf("Namespaces with scoped resource quotas (scopes or scopeSelector), which are not included in the figures because they only cover some of the workloads: %v.", withScopedQuotas))
+	}
+
 	result := map[string]any{
 		"cluster":     clusterID,
 		"project":     projectID,
@@ -162,8 +172,8 @@ func (t *Tools) auditProjectQuota(ctx context.Context, _ *mcp.CallToolRequest, p
 
 // namespaceQuota returns the hard limits and usage of a namespace, from its Kubernetes ResourceQuotas,
 // keyed like the flat representation of a project quota. Usage of a resource covered by several
-// ResourceQuotas isn't added up, as every quota counts the same usage; the highest is used instead.
-func namespaceQuota(quotas []*unstructured.Unstructured) (hard, used map[string]resource.Quantity) {
+// unscoped ResourceQuotas isn't added up, as every quota counts the same usage; the highest is used instead. Scoped quotas are skipped.
+func namespaceQuota(quotas []*unstructured.Unstructured) (hard, used map[string]resource.Quantity, scoped bool) {
 	hard = map[string]resource.Quantity{}
 	used = map[string]resource.Quantity{}
 
@@ -173,6 +183,18 @@ func namespaceQuota(quotas []*unstructured.Unstructured) (hard, used map[string]
 	}
 
 	for _, quota := range quotas {
+		// Quotas with scopes only cover some of the objects, so they can't be combined with the others.
+		// The quota Rancher sets on a namespace has no scope.
+		if scopes, _, _ := unstructured.NestedSlice(quota.Object, "spec", "scopes"); len(scopes) > 0 {
+			scoped = true
+			continue
+		}
+
+		if _, found, _ := unstructured.NestedMap(quota.Object, "spec", "scopeSelector"); found {
+			scoped = true
+			continue
+		}
+
 		for _, entry := range []struct {
 			path   string
 			target map[string]resource.Quantity
@@ -198,7 +220,7 @@ func namespaceQuota(quotas []*unstructured.Unstructured) (hard, used map[string]
 		}
 	}
 
-	return hard, used
+	return hard, used, scoped
 }
 
 // summarizeQuota builds the per-resource summary of a project quota and findings worth acting on.

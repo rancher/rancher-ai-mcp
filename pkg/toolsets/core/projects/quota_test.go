@@ -2,16 +2,19 @@ package projects
 
 import (
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/rest"
+	clienttesting "k8s.io/client-go/testing"
 
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 
@@ -253,13 +256,59 @@ func quotaTestToolsFromUnstructured(objs ...*unstructured.Unstructured) (*Tools,
 }
 
 func TestNamespaceQuotaUsesSmallestHardAndLargestUsed(t *testing.T) {
-	hard, used := namespaceQuota([]*unstructured.Unstructured{
+	hard, used, scoped := namespaceQuota([]*unstructured.Unstructured{
 		quotaTestResourceQuota("a", map[string]any{"limits.cpu": "10"}, map[string]any{"limits.cpu": "1"}),
 		quotaTestResourceQuota("a", map[string]any{"limits.cpu": "5"}, map[string]any{"limits.cpu": "3"}),
 		quotaTestResourceQuota("a", map[string]any{"limits.cpu": "8"}, map[string]any{"limits.cpu": "2"}),
 	})
 
+	assert.False(t, scoped)
+
 	cpuHard, cpuUsed := hard["limitsCpu"], used["limitsCpu"]
 	assert.Equal(t, "5", cpuHard.String())
 	assert.Equal(t, "3", cpuUsed.String())
+}
+
+func TestNamespaceQuotaSkipsScopedQuotas(t *testing.T) {
+	scopedQuota := quotaTestResourceQuota("a", map[string]any{"limits.cpu": "1"}, map[string]any{"limits.cpu": "9"})
+	require.NoError(t, unstructured.SetNestedStringSlice(scopedQuota.Object, []string{"BestEffort"}, "spec", "scopes"))
+
+	hard, used, scoped := namespaceQuota([]*unstructured.Unstructured{
+		quotaTestResourceQuota("a", map[string]any{"limits.cpu": "5"}, map[string]any{"limits.cpu": "3"}),
+		scopedQuota,
+	})
+
+	cpuHard, cpuUsed := hard["limitsCpu"], used["limitsCpu"]
+	assert.True(t, scoped)
+	assert.Equal(t, "5", cpuHard.String())
+	assert.Equal(t, "3", cpuUsed.String())
+}
+
+func TestUpdateProjectQuotaGuardsAgainstConcurrentChanges(t *testing.T) {
+	project := quotaTestProject(map[string]any{
+		"resourceQuota":                 map[string]any{"limit": map[string]any{"limitsCpu": "10"}},
+		"namespaceDefaultResourceQuota": map[string]any{"limit": map[string]any{"limitsCpu": "2"}},
+	})
+	project.SetResourceVersion("42")
+
+	tools, dynClient := quotaTestTools(project)
+	ctx := middleware.WithToken(t.Context(), quotaToken)
+	params := updateProjectQuotaParams{Cluster: quotaClusterID, Project: "web", ProjectQuota: map[string]string{"limitsCpu": "20"}}
+
+	var patched []byte
+
+	dynClient.PrependReactor("patch", "projects", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		patched = action.(clienttesting.PatchAction).GetPatch()
+
+		return true, nil, apierrors.NewConflict(schema.GroupResource{Resource: "projects"}, quotaProjectID, errors.New("stale"))
+	})
+
+	_, _, err := tools.updateProjectQuota(ctx, &mcp.CallToolRequest{}, params)
+	require.ErrorContains(t, err, "was changed while updating its quota")
+	assert.Contains(t, string(patched), `"resourceVersion":"42"`)
+
+	// The plan shows the change without the resource version.
+	result, _, err := tools.updateProjectQuotaPlan(ctx, &mcp.CallToolRequest{}, params)
+	require.NoError(t, err)
+	assert.NotContains(t, result.Content[0].(*mcp.TextContent).Text, "resourceVersion")
 }
