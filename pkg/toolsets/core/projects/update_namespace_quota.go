@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"maps"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -36,7 +37,10 @@ type namespaceQuotaUpdate struct {
 	clusterID string
 	namespace *unstructured.Unstructured
 	patch     []byte
-	noChange  bool
+	// applyPatch is patch with the resource version of the namespace, so that the update fails instead of
+	// overwriting a quota changed in the meantime. It is not shown in plans.
+	applyPatch []byte
+	noChange   bool
 }
 
 // resolveNamespaceQuotaUpdate resolves the namespace and its project, merges the requested quota with the current
@@ -109,18 +113,30 @@ func (t *Tools) resolveNamespaceQuotaUpdate(ctx context.Context, params updateNa
 		return nil, fmt.Errorf("failed to marshal namespace quota: %w", err)
 	}
 
-	patch, err := json.Marshal(map[string]any{
-		"metadata": map[string]any{"annotations": map[string]string{namespaceQuotaAnnotation: string(value)}},
-	})
+	metadata := map[string]any{"annotations": map[string]string{namespaceQuotaAnnotation: string(value)}}
+
+	patch, err := json.Marshal(map[string]any{"metadata": metadata})
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal patch: %w", err)
 	}
 
+	applyPatch := patch
+
+	if resourceVersion := namespace.GetResourceVersion(); resourceVersion != "" {
+		metadata["resourceVersion"] = resourceVersion
+
+		applyPatch, err = json.Marshal(map[string]any{"metadata": metadata})
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal patch: %w", err)
+		}
+	}
+
 	return &namespaceQuotaUpdate{
-		clusterID: clusterID,
-		namespace: namespace,
-		patch:     patch,
-		noChange:  maps.Equal(merged, current),
+		clusterID:  clusterID,
+		namespace:  namespace,
+		patch:      patch,
+		applyPatch: applyPatch,
+		noChange:   maps.Equal(merged, current),
 	}, nil
 }
 
@@ -227,7 +243,11 @@ func (t *Tools) updateNamespaceQuota(ctx context.Context, _ *mcp.CallToolRequest
 		return nil, nil, err
 	}
 
-	updated, err := resourceInterface.Patch(ctx, update.namespace.GetName(), types.MergePatchType, update.patch, metav1.PatchOptions{})
+	updated, err := resourceInterface.Patch(ctx, update.namespace.GetName(), types.MergePatchType, update.applyPatch, metav1.PatchOptions{})
+	if apierrors.IsConflict(err) {
+		return nil, nil, fmt.Errorf("namespace %q was changed while updating its quota, nothing was applied: run the tool again", update.namespace.GetName())
+	}
+
 	if err != nil {
 		zap.L().Error("failed to patch namespace quota", zap.String("tool", "updateNamespaceQuota"), zap.Error(err))
 		return nil, nil, fmt.Errorf("failed to update namespace quota: %w", err)

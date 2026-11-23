@@ -8,8 +8,10 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	clienttesting "k8s.io/client-go/testing"
 
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
@@ -150,4 +152,30 @@ func TestUpdateNamespaceQuotaFailsWhenListingNamespacesFails(t *testing.T) {
 	updated, err := tools.client.GetResource(ctx, client.GetParams{Cluster: quotaClusterID, Kind: "namespace", Name: "web-frontend", Token: quotaToken})
 	require.NoError(t, err)
 	assert.Empty(t, updated.GetAnnotations()[namespaceQuotaAnnotation], "the namespace must not be patched")
+}
+
+func TestUpdateNamespaceQuotaGuardsAgainstConcurrentChanges(t *testing.T) {
+	namespace := namespaceWithQuota("web-frontend", "")
+	namespace.SetResourceVersion("42")
+
+	tools, dynClient := quotaTestTools(namespaceQuotaTestProject(), namespace)
+	ctx := middleware.WithToken(t.Context(), quotaToken)
+	params := updateNamespaceQuotaParams{Cluster: quotaClusterID, Namespace: "web-frontend", Quota: map[string]string{"limitsCpu": "6"}}
+
+	var patched []byte
+
+	dynClient.PrependReactor("patch", "namespaces", func(action clienttesting.Action) (bool, runtime.Object, error) {
+		patched = action.(clienttesting.PatchAction).GetPatch()
+
+		return true, nil, apierrors.NewConflict(schema.GroupResource{Resource: "namespaces"}, "web-frontend", errors.New("stale"))
+	})
+
+	_, _, err := tools.updateNamespaceQuota(ctx, &mcp.CallToolRequest{}, params)
+	require.ErrorContains(t, err, "was changed while updating its quota")
+	assert.Contains(t, string(patched), `"resourceVersion":"42"`)
+
+	// The plan shows the change without the resource version.
+	result, _, err := tools.updateNamespaceQuotaPlan(ctx, &mcp.CallToolRequest{}, params)
+	require.NoError(t, err)
+	assert.NotContains(t, result.Content[0].(*mcp.TextContent).Text, "resourceVersion")
 }
