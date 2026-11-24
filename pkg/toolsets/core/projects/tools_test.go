@@ -8,9 +8,10 @@ import (
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
-	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 )
 
 // startProjectsMCPServer serves the project tools on a random local port and returns a client session connected to it.
@@ -26,16 +27,20 @@ func startProjectsMCPServer(t *testing.T, tools *Tools) *mcp.ClientSession {
 	require.NoError(t, err)
 
 	server := &http.Server{Handler: handler}
+
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- server.Serve(listener) }()
+
 	t.Cleanup(func() {
 		assert.NoError(t, server.Shutdown(context.WithoutCancel(t.Context())))
 		assert.ErrorIs(t, <-serveErr, http.ErrServerClosed)
 	})
 
 	var session *mcp.ClientSession
+
 	mcpClient := mcp.NewClient(&mcp.Implementation{Name: "mcp-client", Version: "v1.0.0"}, nil)
 	transport := &mcp.StreamableClientTransport{Endpoint: "http://" + listener.Addr().String()}
+
 	assert.Eventually(t, func() bool {
 		session, err = mcpClient.Connect(t.Context(), transport, nil)
 		return err == nil
@@ -53,13 +58,14 @@ func TestAddTools(t *testing.T) {
 
 	toolsResult, err := session.ListTools(t.Context(), &mcp.ListToolsParams{})
 	require.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 8, "incorrect number of project tools registered")
+	assert.Len(t, toolsResult.Tools, 13, "incorrect number of project tools registered")
 
 	toolNames := make(map[string]bool)
 	for _, tool := range toolsResult.Tools {
 		toolNames[tool.Name] = true
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 	}
+
 	assert.True(t, toolNames["moveNamespace"])
 	assert.True(t, toolNames["moveNamespacePlan"])
 	assert.True(t, toolNames["getClusterResourceUsage"])
@@ -72,11 +78,29 @@ func TestAddToolsReadOnly(t *testing.T) {
 
 	toolsResult, err := session.ListTools(t.Context(), &mcp.ListToolsParams{})
 	require.NoError(t, err)
-	assert.Len(t, toolsResult.Tools, 4, "incorrect number of read-only project tools registered")
+	assert.Len(t, toolsResult.Tools, 5, "incorrect number of read-only project tools registered")
 
 	for _, tool := range toolsResult.Tools {
 		assert.Equal(t, toolsSet, tool.Meta[toolsSetAnn])
 		assert.NotEqual(t, "moveNamespace", tool.Name)
 		assert.NotEqual(t, "moveNamespacePlan", tool.Name)
 	}
+}
+
+func TestAddToolsRequiresHumanValidation(t *testing.T) {
+	c, err := client.NewClient(true, "https://localhost:8080")
+	require.NoError(t, err)
+	session := startProjectsMCPServer(t, NewTools(c, false))
+
+	toolsResult, err := session.ListTools(t.Context(), &mcp.ListToolsParams{})
+	require.NoError(t, err)
+
+	marked := map[string]bool{}
+	for _, tool := range toolsResult.Tools {
+		if tool.Meta[requiresHumanValidationAnn] == true {
+			marked[tool.Name] = true
+		}
+	}
+
+	assert.Equal(t, map[string]bool{"updateProjectQuota": true, "updateNamespaceQuota": true}, marked)
 }
