@@ -131,7 +131,6 @@ It also lists findings such as resources close to their limit, over-provisioned 
 			},
 			Description: `Sets or updates the resource quota of a project. Only the given resources are changed, the others keep their value.
 projectQuota is the total quota of the project and namespaceDefaultQuota is the default quota of each namespace in it. Rancher requires both to cover the same resources, and a namespace default can't exceed the project quota, so set both when adding a resource.
-Resources are requestsCpu, limitsCpu, requestsMemory, limitsMemory, requestsStorage, pods, services, replicationControllers, secrets, configMaps, persistentVolumeClaims, servicesNodePorts, servicesLoadBalancers, or an extended resource such as nvidia.com/gpu.
 Use auditProjectQuota first to see the current quota and usage.`,
 		},
 			t.updateProjectQuota)
@@ -153,7 +152,6 @@ Use auditProjectQuota first to see the current quota and usage.`,
 			},
 			Description: `Sets or updates the resource quota of a single namespace in a project, instead of the default given to every namespace.
 Only the given resources are changed, the others keep their value. Each resource must already have a namespace default in the project (see updateProjectQuota), and the quotas of all namespaces in the project together can't exceed the project quota, otherwise Rancher ignores the change.
-Resources are requestsCpu, limitsCpu, requestsMemory, limitsMemory, requestsStorage, pods, services, replicationControllers, secrets, configMaps, persistentVolumeClaims, servicesNodePorts, servicesLoadBalancers, or an extended resource such as nvidia.com/gpu.
 Use auditProjectQuota first to see the quota and usage of each namespace.`,
 		},
 			t.updateNamespaceQuota)
