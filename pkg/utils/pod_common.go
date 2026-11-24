@@ -3,6 +3,7 @@ package utils
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 
@@ -19,6 +20,7 @@ func GetPodLogs(ctx context.Context, clientset kubernetes.Interface, pod corev1.
 	logs := ContainerLogs{
 		Logs: make(map[string]any),
 	}
+	var logErrors []error
 	for _, container := range pod.Spec.Containers {
 		podLogOptions := corev1.PodLogOptions{
 			TailLines: new(int64(tailLogLines)),
@@ -27,12 +29,11 @@ func GetPodLogs(ctx context.Context, clientset kubernetes.Interface, pod corev1.
 		req := clientset.CoreV1().Pods(pod.Namespace).GetLogs(pod.Name, &podLogOptions)
 		podLogs, err := req.Stream(ctx)
 		if err != nil {
-			// The container may not exist or may have terminated, so we log the error and continue with other containers instead of failing the entire function.
 			zap.L().Warn("unable to retrieve logs for container",
 				zap.String("container", container.Name),
 				zap.String("pod", pod.Name),
 				zap.Error(err))
-			logs.Logs[container.Name] = fmt.Sprintf("unable to retrieve logs: %v", err)
+			logErrors = append(logErrors, fmt.Errorf("container %s: unable to retrieve logs: %w", container.Name, err))
 			continue
 		}
 		buf := new(bytes.Buffer)
@@ -42,7 +43,7 @@ func GetPodLogs(ctx context.Context, clientset kubernetes.Interface, pod corev1.
 				zap.String("container", container.Name),
 				zap.String("pod", pod.Name),
 				zap.Error(err))
-			logs.Logs[container.Name] = fmt.Sprintf("failed to read logs: %v", err)
+			logErrors = append(logErrors, fmt.Errorf("container %s: failed to read logs: %w", container.Name, err))
 			if err := podLogs.Close(); err != nil {
 				zap.L().Warn("failed to close pod logs stream", zap.Error(err))
 			}
@@ -51,8 +52,12 @@ func GetPodLogs(ctx context.Context, clientset kubernetes.Interface, pod corev1.
 		logs.Logs[container.Name] = buf.String()
 		if err := podLogs.Close(); err != nil {
 			zap.L().Warn("failed to close pod logs stream", zap.Error(err))
+			logErrors = append(logErrors, fmt.Errorf("container %s: failed to close logs stream: %w", container.Name, err))
 		}
 	}
 
+	if len(logErrors) > 0 {
+		return logs, fmt.Errorf("failed to retrieve all container logs: %w", errors.Join(logErrors...))
+	}
 	return logs, nil
 }

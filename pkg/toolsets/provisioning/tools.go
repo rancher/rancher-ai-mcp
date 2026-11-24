@@ -18,6 +18,7 @@ const (
 )
 
 type toolsClient interface {
+	GetClusterID(ctx context.Context, token string, clusterNameOrID string) (string, error)
 	GetResource(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error)
 	GetResourceAtAnyAPIVersion(ctx context.Context, params client.GetParams) (*unstructured.Unstructured, error)
 	GetResourcesAtAnyAPIVersion(ctx context.Context, params client.ListParams) ([]*unstructured.Unstructured, error)
@@ -58,7 +59,7 @@ func (t *Tools) AddTools(mcpServer *mcp.Server) {
 		Meta: map[string]any{
 			toolsSetAnn: ToolsSet,
 		},
-		Description: `Lists selected CAPI MachineDeployments, MachineSets, and/or Machines for a cluster. Set at least one include flag. Use when the machine name is unknown or an issue spans multiple machines; use getClusterMachine for a known machine. Clusters with no CAPI Machines (e.g. imported and hosted clusters) return their Rancher management node objects instead when includeMachines is set, trimmed to their names and conditions unless fullNodes is true. status.nodeName is the Kubernetes node name. Supports an optional JSONPath predicate to filter which resources are returned.`},
+		Description: `Lists selected CAPI MachineDeployments, MachineSets, and/or Machines for a cluster by Rancher cluster ID or display name. Set at least one include flag. Use when the machine name is unknown or an issue spans multiple machines; use getClusterMachine for a known machine. Clusters with no CAPI Machines (e.g. imported and hosted clusters) return their Rancher management node objects instead when includeMachines is set, trimmed to their names and conditions unless fullNodes is true. status.nodeName is the Kubernetes node name. Supports an optional JSONPath predicate to filter which resources are returned.`},
 		t.analyzeClusterMachines)
 
 	mcp.AddTool(mcpServer, &mcp.Tool{
@@ -127,10 +128,8 @@ Returns the name, creation time, node, location, storage type (local or s3), siz
 				Meta: map[string]any{
 					toolsSetAnn: ToolsSet,
 				},
-				Description: `Diagnoses a failing machine plan on a single node. Deploys a short-lived privileged job that reads the node's rancher-system-agent journald logs.
-Only call this after a plan failure has been observed on that node.
-Returns log excerpts and plan fields (checksum, failure-count, last-apply-time, max-failures, plan-revision, plan-state, probe-statuses), not the full plan.
-Not available for the local cluster or non-CAPI clusters (aks, eks, gke, k3k, etc.). Do not show the logs unless explicitly asked.`},
+				Description: `After a plan failure, collects recent rancher-system-agent logs and available plan status from one node using a temporary privileged job. Waits up to 3 minutes 30 seconds; cancellation may leave the job running. Returns unfiltered logs if plan data is unavailable.
+Supports Rancher-provisioned and custom clusters (machineName is the CAPI Machine), and imported clusters with day-two operations enabled (nodeName is the Kubernetes node). Does not support local, hosted, or other non-CAPI clusters. Do not show full logs unless asked.`},
 				t.investigateFailedPlanApplication)
 
 			mcp.AddTool(mcpServer, &mcp.Tool{
@@ -138,7 +137,7 @@ Not available for the local cluster or non-CAPI clusters (aks, eks, gke, k3k, et
 				Meta: map[string]any{
 					toolsSetAnn: ToolsSet,
 				},
-				Description: `Dry-run of investigateFailedProvisioningPlanApplication. Returns the JSON of the privileged log-gathering job that would be deployed, without deploying or running it.`},
+				Description: `Previews the temporary privileged log-gathering job used by investigateFailedProvisioningPlanApplication. Does not deploy or run it.`},
 				t.investigateFailedPlanApplicationPlan)
 		}
 

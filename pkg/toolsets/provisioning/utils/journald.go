@@ -3,12 +3,16 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
+
+// SystemdLogGathererJobDeadline bounds the lifetime of a log-gathering Job.
+const SystemdLogGathererJobDeadline = 3 * time.Minute
 
 // CreateSystemdLogGathererJob builds a job which reads the journal of a systemd unit on a single node.
 // nodeName must be the name of the Kubernetes Node object. It is not the hostname, which is not
@@ -40,7 +44,7 @@ func CreateSystemdLogGathererJob(jobName, nodeName, unit, image string, log *zap
 			BackoffLimit:            new(int32(1)),
 			Completions:             new(int32(1)),
 			TTLSecondsAfterFinished: new(int32(120)),
-			ActiveDeadlineSeconds:   new(int64(300)),
+			ActiveDeadlineSeconds:   new(int64(SystemdLogGathererJobDeadline / time.Second)),
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,

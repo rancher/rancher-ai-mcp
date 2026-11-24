@@ -31,12 +31,13 @@ func TestInvestigateFailedPlanApplicationPlan(t *testing.T) {
 	}{
 		"plan investigation of a failed plan": {
 			params: investigateFailedPlanApplicationParams{
-				Cluster:  "test-cluster",
-				NodeName: testPlanNode,
+				Cluster:     "test-cluster",
+				MachineName: testPlanNode,
 			},
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: newPlanApplicationDynClient(
-				newCAPIMachine(testPlanNode, "fleet-default", "test-cluster", "Running", "")),
+				newPlanMachine(testPlanNode, "test-cluster"),
+				newFullMachinePlanSecret(testPlanNode)),
 			expectedResult: `[
 				{
 					"type": "create",
@@ -44,11 +45,11 @@ func TestInvestigateFailedPlanApplicationPlan(t *testing.T) {
 						"apiVersion": "batch/v1",
 						"kind": "Job",
 						"metadata": {
-							"name": "test-cluster-node-1-systemd-log-gatherer",
+							"generateName": "test-cluster-node-1-systemd-log-gatherer-",
 							"namespace": "cattle-system"
 						},
 						"spec": {
-							"activeDeadlineSeconds": 10,
+							"activeDeadlineSeconds": 180,
 							"backoffLimit": 1,
 							"completions": 1,
 							"template": {
@@ -61,7 +62,7 @@ func TestInvestigateFailedPlanApplicationPlan(t *testing.T) {
 												"/host",
 												"bash",
 												"-c",
-												"if ! journalctl -eu rancher-system-agent.service --no-pager -o cat | grep PLAN_HASH -A 15 -B 10; then echo 'No logs found for the machine plan hash; showing the last 25 lines of service logs currently available'; journalctl -eu rancher-system-agent.service --no-pager -o cat | tail -n 25; fi; systemctl status rancher-system-agent.service -n 0; status=$?; if [ \"$status\" -eq 3 ]; then echo 'Service is inactive or failed'; exit 0; fi; exit \"$status\""
+												"if ! journalctl -eu rancher-system-agent.service --no-pager -o cat | grep PLAN_HASH -A 15 -B 10; then echo 'No logs found for the machine plan hash; showing the last 25 lines of service logs currently available'; journalctl -eu rancher-system-agent.service --no-pager -o cat | tail -n 25; fi; systemctl status rancher-system-agent.service -n 0; status=$?; if [ \"$status\" -ne 0 ]; then echo \"systemctl status returned exit code $status\"; fi; exit 0"
 											],
 											"image": "test-toolbox-image",
 											"name": "journald-reader",
@@ -83,10 +84,9 @@ func TestInvestigateFailedPlanApplicationPlan(t *testing.T) {
 											]
 										}
 									],
-									"nodeSelector": {
-										"kubernetes.io/hostname": "test-cluster-node-1"
-									},
+									"nodeName": "test-node-1",
 									"restartPolicy": "Never",
+									"tolerations": [{"operator": "Exists"}],
 									"volumes": [
 										{
 											"hostPath": {
@@ -103,7 +103,7 @@ func TestInvestigateFailedPlanApplicationPlan(t *testing.T) {
 						"status": {}
 					},
 					"resource": {
-						"name": "test-cluster-node-1-systemd-log-gatherer",
+						"name": "test-cluster-node-1-systemd-log-gatherer-<generated>",
 						"kind": "Job",
 						"cluster": "test-cluster",
 						"namespace": "cattle-system"
@@ -113,8 +113,8 @@ func TestInvestigateFailedPlanApplicationPlan(t *testing.T) {
 		},
 		"plan investigation on the local cluster": {
 			params: investigateFailedPlanApplicationParams{
-				Cluster:  "local",
-				NodeName: testPlanNode,
+				Cluster:     "local",
+				MachineName: testPlanNode,
 			},
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: newPlanApplicationDynClient(),
@@ -122,31 +122,32 @@ func TestInvestigateFailedPlanApplicationPlan(t *testing.T) {
 		},
 		"plan investigation with empty node name": {
 			params: investigateFailedPlanApplicationParams{
-				Cluster:  "test-cluster",
-				NodeName: "",
+				Cluster:     "test-cluster",
+				MachineName: "",
 			},
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: newPlanApplicationDynClient(),
-			expectedError: "node name is required",
+			expectedError: "machine name is required",
 		},
 		"plan investigation on a cluster without CAPI machines": {
 			params: investigateFailedPlanApplicationParams{
-				Cluster:  "test-cluster",
-				NodeName: testPlanNode,
-			},
-			fakeClientset: newFakeClientSet(),
-			fakeDynClient: newPlanApplicationDynClient(),
-			expectedError: "did not find any CAPI machine resources for cluster test-cluster",
-		},
-		"plan investigation on an unknown node": {
-			params: investigateFailedPlanApplicationParams{
-				Cluster:  "test-cluster",
-				NodeName: "unknown-node",
+				Cluster:     "test-cluster",
+				MachineName: testPlanNode,
 			},
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: newPlanApplicationDynClient(
-				newCAPIMachine(testPlanNode, "fleet-default", "test-cluster", "Running", "")),
-			expectedError: "failed to find node unknown-node",
+				newManagementCluster("test-cluster", true)),
+			expectedError: `no CAPI machine resources and its machine provider is ""`,
+		},
+		"plan investigation on an unknown node": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				MachineName: "unknown-node",
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(
+				newPlanMachine(testPlanNode, "test-cluster")),
+			expectedError: "failed to find machine unknown-node",
 		},
 	}
 
@@ -182,7 +183,7 @@ func TestInvestigateFailedPlanApplicationPlan(t *testing.T) {
 
 			// the plan is a dry run, so no job should have been created
 			_, err = tt.fakeDynClient.Resource(converter.K8sKindsToGVRs["job"]).Namespace(DefaultRancherResourcesNamespace).
-				Get(t.Context(), fmt.Sprintf("%s-systemd-log-gatherer", tt.params.NodeName), metav1.GetOptions{})
+				Get(t.Context(), fmt.Sprintf("%s-systemd-log-gatherer", tt.params.MachineName), metav1.GetOptions{})
 			assert.True(t, apierrors.IsNotFound(err), "expected no job to be created, got: %v", err)
 		})
 	}

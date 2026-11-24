@@ -3,11 +3,14 @@ package provisioning
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/rancher/rancher-ai-mcp/internal/middleware"
+	"github.com/rancher/rancher-ai-mcp/pkg/client"
 	"github.com/rancher/rancher-ai-mcp/pkg/converter"
 	"github.com/rancher/rancher-ai-mcp/pkg/response"
 	nodeUtils "github.com/rancher/rancher-ai-mcp/pkg/toolsets/provisioning/utils"
@@ -16,19 +19,23 @@ import (
 	"github.com/rancher/wrangler/v3/pkg/name"
 	"go.uber.org/zap"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/selection"
+	"k8s.io/client-go/dynamic"
 )
 
 type investigateFailedPlanApplicationParams struct {
 	Cluster     string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
-	MachineName string `json:"machineName" jsonschema:"the name of the CAPI Machine which is failing to execute a plan"`
+	MachineName string `json:"machineName" jsonschema:"the CAPI Machine name of the machine failing to execute a plan. For imported clusters, identifies the machine in the log-gathering job name."`
+	NodeName    string `json:"nodeName,omitempty" jsonschema:"the Kubernetes node name. Required for imported clusters; ignored for clusters with CAPI Machines."`
 	LogLineTail int    `json:"logLineTail" jsonschema:"an optional number of log lines to retrieve from the system-agent logs, defaults to 150. Returns the last N lines of logs. Must be between 30 and 1000."`
 
-	// nodeName is the downstream Node object for MachineName. It is resolved by validate.
-	nodeName string
+	// target is the downstream node for MachineName and the location of its machine plan. It is resolved by validate.
+	target planTarget
 }
 
 const defaultLogLineTail = 150
@@ -44,6 +51,10 @@ func (params *investigateFailedPlanApplicationParams) validate(ctx context.Conte
 
 	if params.Cluster == "local" {
 		return nil, fmt.Errorf("plans are not used to control the local cluster")
+	}
+
+	if err := validateClusterName(params.Cluster); err != nil {
+		return nil, err
 	}
 
 	if strings.TrimSpace(params.MachineName) == "" {
@@ -70,12 +81,38 @@ func (params *investigateFailedPlanApplicationParams) validate(ctx context.Conte
 			machines: true,
 		},
 	})
-	if err != nil && !errors.IsNotFound(err) {
-		return nil, fmt.Errorf("did not find any CAPI machine resources for cluster %s. This cluster is likely not managed by Rancher machine plans or the system agent. This tool cannot be run against clusters which do not utilize CAPI (aks,eks,gke,k3k,etc.): %w", params.Cluster, err)
+	if err != nil && !apierrors.IsNotFound(err) {
+		return nil, fmt.Errorf("failed to list CAPI machines for cluster %s: %w", params.Cluster, err)
 	}
 
+	// imported clusters have no CAPI machines. They are handled separately, and only when the
+	// system-agent is expected to be running on them.
 	if len(machines) == 0 {
-		return nil, fmt.Errorf("did not find any CAPI machine resources for cluster %s. This cluster is likely not managed by Rancher machine plans or the system agent. This tool cannot be run against clusters which do not utilize CAPI (aks,eks,gke,k3k,etc.)", params.Cluster)
+
+		// confirms that the cluster is a 'generic' imported cluster (e.g. not aks,eks,gke,etc.)
+		// and that the relevant features and settings are configured for imported day2ops.
+		target, err := t.resolveImportedPlanTarget(ctx, log, params.Cluster, params.NodeName)
+		if err != nil {
+			return nil, err
+		}
+
+		params.target = target
+		log = log.With(zap.Any("target", params.target))
+
+		_, err = t.client.GetResource(ctx, client.GetParams{
+			Cluster: params.Cluster,
+			Kind:    "node",
+			Name:    target.nodeName,
+			Token:   middleware.Token(ctx),
+		})
+		if apierrors.IsNotFound(err) {
+			return nil, fmt.Errorf("Kubernetes node %q does not exist in cluster %s; check the nodeName parameter", target.nodeName, params.Cluster)
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to verify Kubernetes node %q in cluster %s: %w", target.nodeName, params.Cluster, err)
+		}
+
+		return log, nil
 	}
 
 	var machine *unstructured.Unstructured
@@ -87,7 +124,7 @@ func (params *investigateFailedPlanApplicationParams) validate(ctx context.Conte
 	}
 
 	if machine == nil {
-		return nil, fmt.Errorf("failed to find machine %s", params.MachineName)
+		return nil, fmt.Errorf("failed to find machine %s in cluster %s; machineName must be the CAPI Machine name", params.MachineName, params.Cluster)
 	}
 
 	// the machine name is not the node name (e.g. custom clusters use the host's name), so resolve
@@ -101,9 +138,13 @@ func (params *investigateFailedPlanApplicationParams) validate(ctx context.Conte
 		return nil, fmt.Errorf("machine %s has not registered a node in cluster %s yet, so there is no node to gather logs from", params.MachineName, params.Cluster)
 	}
 
-	params.nodeName = nodeName
+	params.target = planTarget{
+		nodeName:            nodeName,
+		planSecretNamespace: DefaultClusterResourcesNamespace,
+		planSecretName:      fmt.Sprintf("%s-machine-plan", params.MachineName),
+	}
 
-	return log, nil
+	return log.With(zap.Any("target", params.target)), nil
 }
 
 func (t *Tools) investigateFailedPlanApplication(ctx context.Context, toolReq *mcp.CallToolRequest, params investigateFailedPlanApplicationParams) (*mcp.CallToolResult, any, error) {
@@ -115,19 +156,25 @@ func (t *Tools) investigateFailedPlanApplication(ctx context.Context, toolReq *m
 	log.Debug("retrieving machine plan for node")
 
 	// get select fields from the machine plan for the requested node and the overall plan hash
-	machinePlanFields, planHash, err := getMachinePlanFields(ctx, params.MachineName, t.client, log)
-	if err != nil {
-		log.Error("failed to get machine plan", zap.Error(err))
-		return nil, nil, err
+	machinePlanFields, planHash, planErr := getMachinePlanFields(ctx, params.target, t.client, log)
+	var responseOptions []response.Option
+	if planErr != nil {
+		if ctx.Err() != nil {
+			return nil, nil, ctx.Err()
+		}
+		log.Warn("machine plan unavailable, retrieving recent system-agent logs", zap.Error(planErr))
+		responseOptions = append(responseOptions, response.WithNotes(fmt.Sprintf("Machine plan unavailable: %v. Returned recent system-agent logs without filtering by plan hash.", planErr)))
 	}
 
 	log.Debug("deploying systemd log gatherer job to retrieve system-agent logs for node", zap.String("planHash", planHash))
 
-	// get system-agent journald logs from the downstream node, filtering on the current machine
-	// plan hash.
+	// Filter logs on the plan hash when available.
 	logs, err := createJobAndPollPod(ctx, params, t.client, t.toolboxImage, planHash, log)
 	if err != nil {
-		log.Error("failed to create job", zap.Error(err))
+		log.Error("failed to collect system-agent logs or clean up the log-gatherer Job", zap.Error(err))
+		if planErr != nil {
+			return nil, nil, fmt.Errorf("machine plan unavailable: %w; failed to retrieve system-agent logs: %w", planErr, err)
+		}
 		return nil, nil, err
 	}
 
@@ -136,9 +183,11 @@ func (t *Tools) investigateFailedPlanApplication(ctx context.Context, toolReq *m
 		return nil, nil, fmt.Errorf("failed to convert logs: %w", err)
 	}
 
-	mcpResponse, err := response.CreateMcpResponse([]*unstructured.Unstructured{
-		{Object: ulogs},
-		{Object: machinePlanFields}}, params.Cluster)
+	resources := []*unstructured.Unstructured{{Object: ulogs}}
+	if planErr == nil {
+		resources = append(resources, &unstructured.Unstructured{Object: machinePlanFields})
+	}
+	mcpResponse, err := response.CreateMcpResponse(resources, params.Cluster, responseOptions...)
 	if err != nil {
 		log.Error("failed to create mcp response", zap.Error(err))
 		return nil, nil, err
@@ -151,7 +200,7 @@ func (t *Tools) investigateFailedPlanApplication(ctx context.Context, toolReq *m
 	}, nil, nil
 }
 
-func createJobAndPollPod(ctx context.Context, params investigateFailedPlanApplicationParams, client toolsClient, image, planHash string, log *zap.Logger) (utils.ContainerLogs, error) {
+func createJobAndPollPod(ctx context.Context, params investigateFailedPlanApplicationParams, client toolsClient, image, planHash string, log *zap.Logger) (logs utils.ContainerLogs, err error) {
 	jobManifest, err := buildFailedPlanLogGathererJob(params, image, planHash, log)
 	if err != nil {
 		log.Error("failed to create systemd job", zap.Error(err))
@@ -161,52 +210,89 @@ func createJobAndPollPod(ctx context.Context, params investigateFailedPlanApplic
 	ji, err := client.GetResourceInterface(ctx, middleware.Token(ctx), DefaultRancherResourcesNamespace, params.Cluster, converter.K8sKindsToGVRs["job"])
 	if err != nil {
 		log.Error("failed to get job resource", zap.Error(err))
-		return utils.ContainerLogs{}, err
+		return utils.ContainerLogs{}, fmt.Errorf("failed to access log-gatherer Jobs in namespace %s on cluster %s: %w", DefaultRancherResourcesNamespace, params.Cluster, err)
 	}
 
-	log.Debug("creating log gathered job", zap.String("jobName", jobManifest.GetName()), zap.String("namespace", jobManifest.GetNamespace()))
+	log.Debug("creating log gatherer job", zap.String("generateName", jobManifest.GetGenerateName()), zap.String("namespace", jobManifest.GetNamespace()))
 
 	job, err := ji.Create(ctx, jobManifest, metav1.CreateOptions{})
 	if err != nil {
 		log.Error("failed to create job resource", zap.Error(err))
-		return utils.ContainerLogs{}, err
+		return utils.ContainerLogs{}, fmt.Errorf("failed to create log-gatherer Job with prefix %s in namespace %s on cluster %s for node %s: %w", jobManifest.GetGenerateName(), DefaultRancherResourcesNamespace, params.Cluster, params.target.nodeName, err)
 	}
+
+	// Always remove the Job, including on early error returns.
+	defer func() {
+		if cleanupErr := deleteLogGathererJob(ctx, ji, job); cleanupErr != nil {
+			err = errors.Join(err, fmt.Errorf("failed to clean up log-gatherer Job %s in namespace %s on cluster %s: %w", job.GetName(), job.GetNamespace(), params.Cluster, cleanupErr))
+		}
+	}()
 
 	pi, err := client.GetResourceInterface(ctx, middleware.Token(ctx), DefaultRancherResourcesNamespace, params.Cluster, converter.K8sKindsToGVRs["pod"])
 	if err != nil {
 		log.Error("failed to get pod resource", zap.Error(err))
-		return utils.ContainerLogs{}, err
+		return utils.ContainerLogs{}, fmt.Errorf("failed to access Pods for log-gatherer Job %s in namespace %s on cluster %s: %w", job.GetName(), DefaultRancherResourcesNamespace, params.Cluster, err)
 	}
 
 	log.Debug("waiting for log gatherer pod to roll out", zap.String("jobName", job.GetName()), zap.String("namespace", job.GetNamespace()))
 
-	// Wait for the jobs pod to roll out
-	pod, err := nodeUtils.PollForPod(ctx, fmt.Sprintf("%s=%s", "job-name", job.GetName()), pi, log)
-	if err != nil {
-		return utils.ContainerLogs{}, err
-	}
-
 	clientset, err := client.CreateClientSet(ctx, middleware.Token(ctx), params.Cluster)
 	if err != nil {
-		return utils.ContainerLogs{}, fmt.Errorf("failed to create clientset: %w", err)
+		return utils.ContainerLogs{}, fmt.Errorf("failed to create Kubernetes client for log-gatherer Job %s on cluster %s: %w", job.GetName(), params.Cluster, err)
+	}
+
+	// Allow time after the Job deadline for Kubernetes to report the final pod state.
+	pollCtx, cancel := context.WithTimeout(ctx, nodeUtils.SystemdLogGathererJobDeadline+30*time.Second)
+	selector := nodeUtils.JobPodSelector(job)
+	pod, err := nodeUtils.PollForJobPod(pollCtx, ji, job.GetName(), selector, pi, log)
+	cancel()
+	if err != nil {
+		details := nodeUtils.JobDiagnostics(ctx, ji, pi, clientset, job)
+		return utils.ContainerLogs{}, fmt.Errorf("log-gatherer Job %s in namespace %s on cluster %s did not produce a completed Pod for node %s: %w%s", job.GetName(), job.GetNamespace(), params.Cluster, params.target.nodeName, err, details)
 	}
 
 	log.Debug("retrieving logs from log gatherer pod", zap.String("podName", pod.GetName()), zap.String("namespace", pod.GetNamespace()))
 
 	// Read the logs from stdout
-	logs, err := utils.GetPodLogs(ctx, clientset, pod, params.LogLineTail)
+	logs, err = utils.GetPodLogs(ctx, clientset, pod, params.LogLineTail)
+	if err != nil && len(logs.Logs) > 0 {
+		// Keep the containers that were read successfully.
+		log.Warn("partial log retrieval from log-gatherer pod", zap.Error(err))
+		err = nil
+	}
 	if err != nil {
-		return utils.ContainerLogs{}, fmt.Errorf("failed to get pod logs: %w", err)
+		return utils.ContainerLogs{}, fmt.Errorf("failed to retrieve logs from Pod %s for Job %s in namespace %s on cluster %s (pod status: %s): %w", pod.GetName(), job.GetName(), pod.GetNamespace(), params.Cluster, nodeUtils.PodStatusSummary(pod), err)
+	}
+	if pod.Status.Phase == corev1.PodFailed {
+		err = fmt.Errorf("log-gatherer Pod %s for Job %s failed on node %s: %s; output: %v", pod.GetName(), job.GetName(), params.target.nodeName, nodeUtils.PodStatusSummary(pod), logs.Logs)
 	}
 
-	return logs, nil
+	return logs, err
+}
+
+func deleteLogGathererJob(ctx context.Context, jobs dynamic.ResourceInterface, job *unstructured.Unstructured) error {
+	cleanupCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+	defer cancel()
+
+	options := metav1.DeleteOptions{PropagationPolicy: new(metav1.DeletePropagationBackground)}
+	if uid := job.GetUID(); uid != "" {
+		options.Preconditions = &metav1.Preconditions{UID: &uid}
+	}
+	err := jobs.Delete(cleanupCtx, job.GetName(), options)
+	if apierrors.IsNotFound(err) {
+		return nil
+	}
+	return err
 }
 
 func buildFailedPlanLogGathererJob(params investigateFailedPlanApplicationParams, image, planHash string, log *zap.Logger) (*unstructured.Unstructured, error) {
 	journald := "journalctl -eu rancher-system-agent.service --no-pager -o cat"
-	grep := fmt.Sprintf("grep %s -A 15 -B 10", planHash)
-	systemctl := "systemctl status rancher-system-agent.service -n 0; status=$?; if [ \"$status\" -eq 3 ]; then echo 'Service is inactive or failed'; exit 0; fi; exit \"$status\""
-	logCommand := fmt.Sprintf("if ! %s | %s; then echo 'No logs found for the machine plan hash; showing the last 25 lines of service logs currently available'; %s | tail -n 25; fi", journald, grep, journald)
+	systemctl := "systemctl status rancher-system-agent.service -n 0; status=$?; if [ \"$status\" -ne 0 ]; then echo \"systemctl status returned exit code $status\"; fi; exit 0"
+	logCommand := fmt.Sprintf("echo 'Machine plan unavailable; showing recent system-agent logs'; %s | tail -n %d", journald, params.LogLineTail)
+	if planHash != "" {
+		grep := fmt.Sprintf("grep %s -A 15 -B 10", planHash)
+		logCommand = fmt.Sprintf("if ! %s | %s; then echo 'No logs found for the machine plan hash; showing the last 25 lines of service logs currently available'; %s | tail -n 25; fi", journald, grep, journald)
+	}
 	journaldCommand := []string{
 		"chroot",
 		"/host",
@@ -215,48 +301,95 @@ func buildFailedPlanLogGathererJob(params investigateFailedPlanApplicationParams
 		fmt.Sprintf("%s; %s", logCommand, systemctl),
 	}
 
-	job, err := nodeUtils.CreateSystemdLogGathererJob(fmt.Sprintf("%s-systemd-log-gatherer", name.SafeConcatName(params.MachineName)), params.nodeName, "rancher-system-agent", image, log, journaldCommand...)
+	job, err := nodeUtils.CreateSystemdLogGathererJob("", params.target.nodeName, "rancher-system-agent", image, log, journaldCommand...)
 	if err != nil {
 		log.Error("failed to create systemd job", zap.Error(err))
 		return nil, err
 	}
 
-	return job, err
+	job.SetGenerateName(name.SafeConcatName(params.MachineName, "systemd-log-gatherer") + "-")
+	return job, nil
 }
 
-func getMachinePlanFields(ctx context.Context, nodeName string, client toolsClient, log *zap.Logger) (map[string]interface{}, string, error) {
-	si, err := client.GetResourceInterface(ctx, middleware.Token(ctx), DefaultClusterResourcesNamespace, "local", converter.K8sKindsToGVRs["secret"])
-	if err != nil {
-		log.Error("failed to get secret resource interface", zap.Error(err))
-		return nil, "", err
-	}
+func getMachinePlanFields(ctx context.Context, target planTarget, c toolsClient, log *zap.Logger) (map[string]interface{}, string, error) {
+	var machinePlanUnstruct *unstructured.Unstructured
+	var err error
 
-	machinePlanUnstruct, err := si.Get(ctx, fmt.Sprintf("%s-machine-plan", nodeName), metav1.GetOptions{})
-	if err != nil {
-		log.Error("failed to get machine plan resource interface", zap.Error(err))
-		return nil, "", err
+	// Imported nodes do not use the CAPI machine name when naming the machine plan secret.
+	// Instead, the cluster and node names are tracked as labels on the secret.
+	if target.imported {
+		clusterRequirement, err := labels.NewRequirement(importedPlanClusterLabel, selection.Equals, []string{target.planSecretNamespace})
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid cluster ID for imported machine plan lookup: %w", err)
+		}
+		nodeRequirement, err := labels.NewRequirement(importedPlanNodeLabel, selection.Equals, []string{target.nodeName})
+		if err != nil {
+			return nil, "", fmt.Errorf("invalid node name for imported machine plan lookup: %w", err)
+		}
+		selector := labels.NewSelector().Add(*clusterRequirement, *nodeRequirement).String()
+		secrets, err := c.GetResources(ctx, client.ListParams{
+			Cluster:       LocalCluster,
+			Kind:          "secret",
+			Namespace:     target.planSecretNamespace,
+			LabelSelector: selector,
+			Token:         middleware.Token(ctx),
+		})
+		if err != nil {
+			return nil, "", fmt.Errorf("failed to list imported machine plans for node %s: %w", target.nodeName, err)
+		}
+
+		for _, secret := range secrets {
+			secretType, _, err := unstructured.NestedString(secret.Object, "type")
+			if err != nil {
+				return nil, "", fmt.Errorf("failed to read type of secret %s: %w", secret.GetName(), err)
+			}
+			if secretType != machinePlanSecretType {
+				continue
+			}
+			if machinePlanUnstruct != nil {
+				return nil, "", fmt.Errorf("multiple machine plans found for node %s in cluster %s", target.nodeName, target.planSecretNamespace)
+			}
+			machinePlanUnstruct = secret
+		}
+		if machinePlanUnstruct == nil {
+			return nil, "", fmt.Errorf("machine plan not found for node %s in cluster %s", target.nodeName, target.planSecretNamespace)
+		}
+	} else {
+		si, err := c.GetResourceInterface(ctx, middleware.Token(ctx), target.planSecretNamespace, "local", converter.K8sKindsToGVRs["secret"])
+		if err != nil {
+			log.Error("failed to get secret resource interface", zap.Error(err))
+			return nil, "", fmt.Errorf("failed to access machine plan secret %s in namespace %s: %w", target.planSecretName, target.planSecretNamespace, err)
+		}
+
+		machinePlanUnstruct, err = si.Get(ctx, target.planSecretName, metav1.GetOptions{})
+		if err != nil {
+			log.Error("failed to get machine plan resource", zap.Error(err))
+			return nil, "", fmt.Errorf("failed to get machine plan secret %s in namespace %s: %w", target.planSecretName, target.planSecretNamespace, err)
+		}
 	}
 
 	machinePlan := &corev1.Secret{}
 	j, err := machinePlanUnstruct.MarshalJSON()
 	if err != nil {
 		log.Error("failed to marshal machine plan resource interface", zap.Error(err))
-		return nil, "", err
+		return nil, "", fmt.Errorf("failed to encode machine plan secret %s: %w", machinePlanUnstruct.GetName(), err)
 	}
 
 	err = json.Unmarshal(j, &machinePlan)
 	if err != nil {
 		log.Error("failed to unmarshal machine plan resource interface", zap.Error(err))
-		return nil, "", err
+		return nil, "", fmt.Errorf("failed to decode machine plan secret %s: %w", machinePlanUnstruct.GetName(), err)
 	}
 
+	// A one time plan may have its data removed by the orchestrator after a failed
+	// application, however its other details are still useful.
 	if machinePlan.Data == nil || machinePlan.Data["plan"] == nil {
-		return nil, "", fmt.Errorf("no plan found in machine plan resource")
+		log.Debug("no plan found in machine plan resource")
 	}
 
 	currentPlanChecksum := plan.Checksum(machinePlan.Data["plan"])
 	if currentPlanChecksum == "" {
-		log.Error("failed to calculate checksum of plan resource", zap.Error(err))
+		return nil, "", fmt.Errorf("failed to calculate checksum of plan resource")
 	}
 
 	out := map[string]string{
@@ -275,7 +408,7 @@ func getMachinePlanFields(ctx context.Context, nodeName string, client toolsClie
 
 	uFields, err := runtime.DefaultUnstructuredConverter.ToUnstructured(&out)
 	if err != nil {
-		return nil, "", fmt.Errorf("failed to convert logs: %w", err)
+		return nil, "", fmt.Errorf("failed to convert machine plan fields: %w", err)
 	}
 
 	return uFields, currentPlanChecksum, nil

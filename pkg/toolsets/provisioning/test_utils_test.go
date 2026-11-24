@@ -68,6 +68,7 @@ func provisioningCustomListKinds() map[schema.GroupVersionResource]string {
 		{Group: "cluster.x-k8s.io", Version: "v1beta1", Resource: "machinesets"}:             "MachineSetList",
 		{Group: "cluster.x-k8s.io", Version: "v1beta1", Resource: "machinedeployments"}:      "MachineDeploymentList",
 		{Group: "management.cattle.io", Version: "v3", Resource: "clusters"}:                 "ClusterList",
+		{Group: "management.cattle.io", Version: "v3", Resource: "nodes"}:                    "NodeList",
 		{Group: "rke-machine-config.cattle.io", Version: "v1", Resource: "amazonec2configs"}: "Amazonec2ConfigList",
 	}
 }
