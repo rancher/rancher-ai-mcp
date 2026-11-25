@@ -176,6 +176,30 @@ func TestPollForJobPod(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, "failed", got.Name)
 	})
+
+	t.Run("returns the newest failed pod when the job has exhausted retries", func(t *testing.T) {
+		// the names are in the opposite order to the creation times, so neither order of the list is the newest
+		for name, newestName := range map[string]string{"newest is listed first": "a-second-attempt", "newest is listed last": "z-second-attempt"} {
+			t.Run(name, func(t *testing.T) {
+				older, newer := failedPod.DeepCopy(), failedPod.DeepCopy()
+				older.SetCreationTimestamp(metav1.NewTime(time.Date(2026, 11, 25, 15, 0, 0, 0, time.UTC)))
+				newer.SetCreationTimestamp(metav1.NewTime(time.Date(2026, 11, 25, 15, 1, 0, 0, time.UTC)))
+				newer.SetName(newestName)
+				if newestName == "a-second-attempt" {
+					older.SetName("z-first-attempt")
+				} else {
+					older.SetName("a-first-attempt")
+				}
+
+				client := testPodClient(terminalJob, older, newer)
+				got, err := PollForJobPod(t.Context(),
+					client.Resource(jobGVR).Namespace("cattle-system"), "job", "job-name=job",
+					client.Resource(podGVR).Namespace("cattle-system"), zap.NewNop())
+				require.NoError(t, err)
+				assert.Equal(t, newestName, got.Name)
+			})
+		}
+	})
 }
 
 func TestPodStatusSummary(t *testing.T) {

@@ -697,10 +697,10 @@ func verifyLogGathererJob(t *testing.T, dynClient *dynamicfake.FakeDynamicClient
 	applyinatorFilter := fmt.Sprintf("Applying one-time instructions for plan with checksum %s/ {split(\"\", l); n=0; seen=1}", expectedChecksum)
 	require.Contains(t, command, applyinatorFilter)
 	// the output of the plan's instructions is prefixed with the checksum and the index of the instruction
-	require.Contains(t, command, fmt.Sprintf("grep -F -e '[Applyinator]' -e 'error executing instruction' -e '[%s_' | head -n", expectedChecksum))
+	require.Contains(t, command, fmt.Sprintf("grep -F -e '[Applyinator]' -e 'error executing instruction' -e '[%s_' | awk -v head=", expectedChecksum))
 	assert.Greater(t, strings.Index(command, applyinatorFilter), strings.Index(command, fmt.Sprintf("grep %s -A 15 -B 10", expectedChecksum)))
 	assert.Contains(t, command, "-A 15 -B 10 | tail -n ")
-	assert.Contains(t, command, "journalctl -eu rancher-system-agent.service")
+	assert.Contains(t, command, "journalctl -u rancher-system-agent.service")
 }
 
 // verifyUnfilteredLogGathererJob asserts that the log gatherer job was created on the node and returns the tail of
@@ -710,7 +710,7 @@ func verifyUnfilteredLogGathererJob(t *testing.T, dynClient *dynamicfake.FakeDyn
 
 	command := verifyLogGathererJobPodSpec(t, dynClient, machineName, nodeName)
 	assert.NotContains(t, command, "grep")
-	assert.Contains(t, command, "journalctl -eu rancher-system-agent.service --no-pager -o cat | tail -n "+strconv.Itoa(logLineTail))
+	assert.Contains(t, command, "journalctl -u rancher-system-agent.service --no-pager -o cat | tail -n "+strconv.Itoa(logLineTail))
 }
 
 // verifyLogGathererJobPodSpec asserts what is common to all log gatherer jobs and returns the script they run.
@@ -844,7 +844,8 @@ func runLogScript(t *testing.T, opts logScriptOptions) string {
 
 	// the script runs in the node's root, where the journal and systemctl exist. Stand in for them.
 	systemctl := fmt.Sprintf("%sreturn %d", strings.Repeat("echo 'status line'; ", opts.statusLines), opts.statusExitCode)
-	journalctl := fmt.Sprintf(`[ "$*" = "-eu rancher-system-agent.service --no-pager -o cat" ] || { echo "unexpected journalctl arguments: $*" >&2; return 1; }; cat %s`, journalFile)
+	// -e implies -n1000, which hides everything but the last 1000 entries of the journal
+	journalctl := fmt.Sprintf(`case "$*" in "-u rancher-system-agent.service --no-pager -o cat") cat %[1]s;; "-eu rancher-system-agent.service --no-pager -o cat") tail -n 1000 %[1]s;; *) echo "unexpected journalctl arguments: $*" >&2; return 1;; esac`, journalFile)
 	stubs := fmt.Sprintf("journalctl() { %s; }; systemctl() { %s; }; ", journalctl, systemctl)
 	out, err := exec.Command(requireBash(t), "-c", stubs+script).CombinedOutput()
 	require.NoError(t, err, string(out))
@@ -1006,16 +1007,18 @@ func TestFailedPlanLogCommandWithoutTheApplicationInALongJournal(t *testing.T) {
 }
 
 // TestFailedPlanLogCommandFitsTheMinimumLogLineTail checks that at the smallest allowed tail, the last mention of the
-// checksum and the whole execution survive when the pod logs are tailed, even with a full size execution and a long
-// service status.
+// checksum and the failure of the execution survive when the pod logs are tailed, even with a full size execution and a
+// long service status.
 func TestFailedPlanLogCommandFitsTheMinimumLogLineTail(t *testing.T) {
 	requireBash(t)
 
 	// the execution is capped at half the tail
+	failure := logsTestPrefix + `error msg="error executing instruction 0: <nil>"`
 	execution := []string{applyingLine()}
-	for i := 1; i < minLogLineTail/2; i++ {
+	for i := 1; i < 2*minLogLineTail; i++ {
 		execution = append(execution, applyinatorLine(fmt.Sprintf("Running command: step %d", i)))
 	}
+	execution = append(execution, failure)
 	lastMention := logsTestPrefix + `error msg="last mention of ` + logsTestChecksum + `"`
 
 	var journal []string
@@ -1039,14 +1042,97 @@ func TestFailedPlanLogCommandFitsTheMinimumLogLineTail(t *testing.T) {
 	out := runLogScript(t, logScriptOptions{logLineTail: minLogLineTail, journal: journal, statusLines: statusLines})
 
 	// the context, separator, execution and status make up the output, which the pod then tails
+	const contextLines, executionLines = 40, minLogLineTail / 2
 	lines := strings.Split(strings.TrimSpace(out), "\n")
-	assert.Len(t, lines, 40+1+len(execution)+statusLines)
+	assert.Len(t, lines, contextLines+1+executionLines+statusLines)
 	podLogs := strings.Join(lines[len(lines)-minLogLineTail:], "\n")
 
 	assert.Contains(t, podLogs, lastMention)
-	for _, line := range execution {
-		assert.Contains(t, podLogs, line)
+	assert.Contains(t, podLogs, failure)
+	assert.Contains(t, podLogs, "Running command: step 1\"")
+	assert.NotContains(t, podLogs, "Running periodic instruction")
+}
+
+// TestFailedPlanLogCommandWithMoreThanAThousandEntries checks that the execution is found when it is older than the last
+// 1000 entries of the journal.
+func TestFailedPlanLogCommandWithMoreThanAThousandEntries(t *testing.T) {
+	requireBash(t)
+
+	execution := []string{
+		applyingLine(),
+		applyinatorLine("Running command: failing"),
+		logsTestPrefix + `error msg="error executing instruction 0: <nil>"`,
 	}
+	journal := append([]string{}, execution...)
+	for range 2000 {
+		journal = append(journal, repeatedFailureLine())
+	}
+
+	out := runLogScript(t, logScriptOptions{logLineTail: defaultLogLineTail, journal: journal})
+
+	_, executionSection, found := strings.Cut(out, executionHeader+"\n")
+	require.True(t, found, out)
+	assert.Equal(t, strings.Join(execution, "\n"), strings.TrimSpace(executionSection))
+}
+
+// TestFailedPlanLogCommandWithAShortExecution checks that when an execution fails within the lines kept from its start,
+// the periodic logs which follow the failure are not shown with it.
+func TestFailedPlanLogCommandWithAShortExecution(t *testing.T) {
+	requireBash(t)
+
+	execution := []string{
+		applyingLine(),
+		applyinatorLine("Running command: failing"),
+		logsTestPrefix + `error msg="error executing instruction 0: <nil>"`,
+	}
+	journal := append([]string{}, execution...)
+	for range 10 {
+		journal = append(journal, applyinatorLine("Running periodic instruction"))
+	}
+	journal = append(journal, repeatedFailureLine())
+
+	out := runLogScript(t, logScriptOptions{logLineTail: defaultLogLineTail, journal: journal})
+
+	_, executionSection, found := strings.Cut(out, executionHeader+"\n")
+	require.True(t, found, out)
+	assert.Equal(t, strings.Join(execution, "\n"), strings.TrimSpace(executionSection))
+}
+
+// TestFailedPlanLogCommandWithAVerboseExecution checks that when an instruction is very verbose, the lines leading up to
+// its failure are kept with the start of the execution, and are not displaced by the periodic logs which follow.
+func TestFailedPlanLogCommandWithAVerboseExecution(t *testing.T) {
+	requireBash(t)
+
+	failure := logsTestPrefix + `error msg="error executing instruction 0: <nil>"`
+	cause := logsTestPrefix + `info msg="[` + logsTestChecksum + `_0:stderr]: fatal: unable to join the cluster"`
+	execution := []string{applyingLine()}
+	for i := range 300 {
+		execution = append(execution, logsTestPrefix+fmt.Sprintf(`info msg="[%s_0:stdout]: output line %d"`, logsTestChecksum, i))
+	}
+	execution = append(execution, cause, failure)
+
+	journal := append([]string{}, execution...)
+	for range 100 {
+		journal = append(journal, applyinatorLine("Running periodic instruction"), repeatedFailureLine())
+	}
+
+	out := runLogScript(t, logScriptOptions{logLineTail: defaultLogLineTail, journal: journal})
+
+	_, executionSection, found := strings.Cut(out, executionHeader+"\n")
+	require.True(t, found, out)
+	lines := strings.Split(strings.TrimSpace(executionSection), "\n")
+
+	// half of the budget is the start of the execution
+	const headLines = defaultLogLineTail / 4
+	assert.Equal(t, execution[:headLines], lines[:headLines])
+	assert.Contains(t, lines[headLines], "execution lines omitted")
+
+	// the rest is what led to the failure, which is the last thing shown
+	assert.Equal(t, execution[len(execution)-(len(lines)-headLines-1):], lines[headLines+1:])
+	assert.Contains(t, lines, cause)
+	assert.Equal(t, failure, lines[len(lines)-1])
+	assert.LessOrEqual(t, len(lines), defaultLogLineTail/2)
+	assert.NotContains(t, executionSection, "Running periodic instruction")
 }
 
 // TestFailedPlanLogCommandWithoutMatchingLogs checks that the tail of the service logs is returned when the checksum is

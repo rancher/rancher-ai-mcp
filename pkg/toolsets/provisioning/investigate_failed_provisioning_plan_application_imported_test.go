@@ -141,12 +141,21 @@ func TestCheckImportedDay2Ops(t *testing.T) {
 			},
 			cluster: newImportedCluster("c-setting-default", ""),
 		},
-		"setting value is case insensitive": {
+		"setting value is compared exactly": {
 			objects: []runtime.Object{
 				newTestFeature(importedDay2OpsFeature, true),
 				newTestSetting(importedDay2OpsSetting, " TRUE ", ""),
 			},
-			cluster: newImportedCluster("c-setting-case", ""),
+			cluster:       newImportedCluster("c-setting-case", ""),
+			expectedError: "day two operations are not enabled for imported cluster c-setting-case",
+		},
+		"whitespace setting value does not fall back to an enabled default": {
+			objects: []runtime.Object{
+				newTestFeature(importedDay2OpsFeature, true),
+				newTestSetting(importedDay2OpsSetting, "   ", "true"),
+			},
+			cluster:       newImportedCluster("c-setting-whitespace", ""),
+			expectedError: "day two operations are not enabled for imported cluster c-setting-whitespace",
 		},
 		"setting disabled without an annotation": {
 			objects: []runtime.Object{
@@ -163,22 +172,22 @@ func TestCheckImportedDay2Ops(t *testing.T) {
 			},
 			cluster: newImportedCluster("c-annotation-true", "true"),
 		},
-		"annotation is case insensitive and ignores whitespace": {
+		"annotation is compared exactly and defers to a disabled setting": {
 			objects: []runtime.Object{
 				newTestFeature(importedDay2OpsFeature, true),
 				newTestSetting(importedDay2OpsSetting, "false", ""),
 			},
-			cluster: newImportedCluster("c-annotation-case", " True "),
+			cluster:       newImportedCluster("c-annotation-case", " True "),
+			expectedError: "day two operations are not enabled for imported cluster c-annotation-case",
 		},
 		"annotation disables a cluster when the setting is enabled": {
 			objects:       day2OpsEnabled(),
 			cluster:       newImportedCluster("c-annotation-false", "false"),
 			expectedError: "disabled for imported cluster c-annotation-false by its rancher.io/operations-enabled annotation",
 		},
-		"annotation false is case insensitive": {
-			objects:       day2OpsEnabled(),
-			cluster:       newImportedCluster("c-annotation-false-case", "FALSE"),
-			expectedError: "disabled for imported cluster c-annotation-false-case by its rancher.io/operations-enabled annotation",
+		"annotation false is compared exactly and defers to an enabled setting": {
+			objects: day2OpsEnabled(),
+			cluster: newImportedCluster("c-annotation-false-case", "FALSE"),
 		},
 		"unrecognized annotation falls back to an enabled setting": {
 			objects: day2OpsEnabled(),
@@ -571,7 +580,7 @@ func previewedJob(t *testing.T, result *mcp.CallToolResult) batchv1.Job {
 }
 
 func TestInvestigateFailedPlanApplicationPlanPlanAvailability(t *testing.T) {
-	const unfilteredScript = "echo 'Machine plan unavailable; showing recent system-agent logs'; journalctl -eu rancher-system-agent.service --no-pager -o cat | tail -n 150"
+	const unfilteredScript = "echo 'Machine plan unavailable; showing recent system-agent logs'; journalctl -u rancher-system-agent.service --no-pager -o cat | tail -n 150"
 
 	planSecretType := machinePlanSecretType
 
@@ -704,7 +713,7 @@ func TestInvestigateFailedPlanApplicationPlanPlanAvailability(t *testing.T) {
 				assert.NotContains(t, script, "PLAN_HASH")
 				expected := unfilteredScript
 				if tt.params.LogLineTail != 0 {
-					expected = fmt.Sprintf("echo 'Machine plan unavailable; showing recent system-agent logs'; journalctl -eu rancher-system-agent.service --no-pager -o cat | tail -n %d", tt.params.LogLineTail)
+					expected = fmt.Sprintf("echo 'Machine plan unavailable; showing recent system-agent logs'; journalctl -u rancher-system-agent.service --no-pager -o cat | tail -n %d", tt.params.LogLineTail)
 				}
 				assert.Contains(t, script, expected)
 			}

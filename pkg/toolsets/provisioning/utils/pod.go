@@ -63,7 +63,8 @@ func pollForPod(ctx context.Context, labelSelector string, pods, jobs dynamic.Re
 			if candidate.Status.Phase == corev1.PodSucceeded {
 				return true, nil
 			}
-			if candidate.Status.Phase == corev1.PodFailed && failedPod == nil {
+			// the Job may retry, so the latest failed pod is the one which explains the terminal failure.
+			if candidate.Status.Phase == corev1.PodFailed && (failedPod == nil || candidate.CreationTimestamp.After(failedPod.CreationTimestamp.Time)) {
 				failedPod = &candidate
 			}
 		}

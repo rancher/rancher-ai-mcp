@@ -78,7 +78,8 @@ func GetSettingValue(ctx context.Context, c ResourceGetter, name string) (value 
 		return "", false, fmt.Errorf("failed to read the value of setting %s: %w", name, err)
 	}
 
-	if strings.TrimSpace(value) != "" {
+	// Rancher falls back to the default only for an empty value, so a value of only whitespace is kept as it is.
+	if value != "" {
 		return value, true, nil
 	}
 
@@ -90,9 +91,10 @@ func GetSettingValue(ctx context.Context, c ResourceGetter, name string) (value 
 	return value, true, nil
 }
 
-// IsTrue reports whether a setting or annotation value is "true", ignoring case and surrounding whitespace.
+// IsTrue reports whether a setting or annotation value is exactly "true". Rancher compares these values exactly, so
+// "True" and " true " are not true.
 func IsTrue(value string) bool {
-	return strings.EqualFold(strings.TrimSpace(value), "true")
+	return value == "true"
 }
 
 // optionalBool reads a boolean field which may be absent or null. set is false in both of those cases.

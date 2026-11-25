@@ -196,9 +196,9 @@ func TestGetSettingValue(t *testing.T) {
 			expectedValue: "false",
 			expectedFound: true,
 		},
-		"whitespace value falls back to the default": {
+		"whitespace value is kept instead of the default": {
 			setting:       map[string]interface{}{"value": "   ", "default": "true"},
-			expectedValue: "true",
+			expectedValue: "   ",
 			expectedFound: true,
 		},
 		"missing value falls back to the default": {
@@ -258,9 +258,9 @@ func TestIsTrue(t *testing.T) {
 		expected bool
 	}{
 		"true":                  {value: "true", expected: true},
-		"mixed case":            {value: "True", expected: true},
-		"upper case":            {value: "TRUE", expected: true},
-		"surrounding space":     {value: "  true\n", expected: true},
+		"mixed case":            {value: "True", expected: false},
+		"upper case":            {value: "TRUE", expected: false},
+		"surrounding space":     {value: "  true\n", expected: false},
 		"false":                 {value: "false", expected: false},
 		"empty":                 {value: "", expected: false},
 		"only whitespace":       {value: "  ", expected: false},

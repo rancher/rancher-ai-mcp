@@ -111,12 +111,14 @@ func checkImportedDay2Ops(ctx context.Context, log *zap.Logger, c utils.Resource
 		return fmt.Errorf("the %s setting does not exist, so day two operations cannot be used on imported cluster %s. The %s annotation has no effect without it", importedDay2OpsSetting, clusterID, operationsEnabledAnnotation)
 	}
 
-	annotation := strings.TrimSpace(managementCluster.GetAnnotations()[operationsEnabledAnnotation])
-	if strings.EqualFold(annotation, "true") {
+	// Rancher compares these values exactly, so a value such as "True" or " true " is not true to it either. Any
+	// annotation other than true or false defers to the setting.
+	annotation := managementCluster.GetAnnotations()[operationsEnabledAnnotation]
+	if annotation == "true" {
 		return nil
 	}
 
-	if strings.EqualFold(annotation, "false") {
+	if annotation == "false" {
 		return fmt.Errorf("day two operations are disabled for imported cluster %s by its %s annotation, so the system-agent is not expected to be running on its nodes", clusterID, operationsEnabledAnnotation)
 	}
 

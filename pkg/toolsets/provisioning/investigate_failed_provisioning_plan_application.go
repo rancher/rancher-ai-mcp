@@ -317,7 +317,7 @@ func deleteLogGathererJob(ctx context.Context, jobs dynamic.ResourceInterface, j
 }
 
 func buildFailedPlanLogGathererJob(params investigateFailedPlanApplicationParams, image, planHash string, log *zap.Logger) (*unstructured.Unstructured, error) {
-	journald := "journalctl -eu rancher-system-agent.service --no-pager -o cat"
+	journald := "journalctl -u rancher-system-agent.service --no-pager -o cat"
 	systemctl := "systemctl status rancher-system-agent.service -n 0; status=$?; if [ \"$status\" -ne 0 ]; then echo \"systemctl status returned exit code $status\"; fi; exit 0"
 	logCommand := fmt.Sprintf("echo 'Machine plan unavailable; showing recent system-agent logs'; %s | tail -n %d", journald, params.LogLineTail)
 	if planHash != "" {
@@ -335,7 +335,10 @@ func buildFailedPlanLogGathererJob(params investigateFailedPlanApplicationParams
 		// output. So the system-agent's execution lines are emitted last. Not all of them mention the checksum, so
 		// everything from the start of the latest application onward is kept. That includes the output of its
 		// instructions, which the system-agent logs with the prefix [<checksum>_<instruction index>:stdout or :stderr].
-		applyinator := fmt.Sprintf("%s | awk '%s' | grep -F -e '[Applyinator]' -e 'error executing instruction' -e '[%s_' | head -n %d", journald, fromLastApplication(planHash), planHash, executionLines)
+		// A verbose execution is trimmed to its beginning and to the lines leading up to its failure.
+		headLines := executionLines / 2
+		tailLines := executionLines - headLines - 1
+		applyinator := fmt.Sprintf("%s | awk '%s' | grep -F -e '[Applyinator]' -e 'error executing instruction' -e '[%s_' | awk -v head=%d -v tail=%d '%s'", journald, fromLastApplication(planHash), planHash, headLines, tailLines, trimExecutionProgram)
 		logCommand = fmt.Sprintf("hits=$(%s | grep %s -A 15 -B 10 | tail -n %d); if [ -n \"$hits\" ]; then printf '%%s\\n' \"$hits\"; echo '--- system-agent execution lines for the machine plan hash ---'; %s; else echo 'No logs found for the machine plan hash; showing the last 25 lines of service logs currently available'; %s | tail -n 25; fi", journald, planHash, contextLines, applyinator, journald)
 	}
 	journaldCommand := []string{
@@ -358,6 +361,21 @@ func buildFailedPlanLogGathererJob(params investigateFailedPlanApplicationParams
 
 // maxExecutionScanLines bounds how many lines of the journal are held in memory when looking for the execution.
 const maxExecutionScanLines = 5000
+
+// trimExecutionProgram is an awk program which keeps the first head lines of an execution, and the tail lines which lead
+// up to its failure, noting how many lines were left out. The lines after the failure are periodic and are not kept. If
+// there is no failure, the last tail lines are kept.
+const trimExecutionProgram = `stopped { next }
+{ total++ }
+total <= head { print; if (index($0, "error executing instruction")) stopped = 1; next }
+{ ring[cnt++ % tail] = $0; if (index($0, "error executing instruction")) stopped = 1 }
+END {
+  omitted = (cnt > tail) ? cnt - tail : 0
+  if (omitted > 0) print "... " omitted " execution lines omitted ..."
+  start = (omitted > 0) ? cnt % tail : 0
+  n = (omitted > 0) ? tail : cnt
+  for (i = 0; i < n; i++) print ring[(start + i) % tail]
+}`
 
 // fromLastApplication returns an awk program which prints the journal starting from the latest line announcing the
 // application of the plan, or from the first mention of the hash if no such line is in the journal. Only the first
