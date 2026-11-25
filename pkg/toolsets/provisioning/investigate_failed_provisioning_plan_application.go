@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
 	"time"
 
@@ -32,13 +33,26 @@ type investigateFailedPlanApplicationParams struct {
 	Cluster     string `json:"cluster" jsonschema:"the name of the Kubernetes cluster"`
 	MachineName string `json:"machineName" jsonschema:"the CAPI Machine name of the machine failing to execute a plan. For imported clusters, identifies the machine in the log-gathering job name."`
 	NodeName    string `json:"nodeName,omitempty" jsonschema:"the Kubernetes node name. Required for imported clusters; ignored for clusters with CAPI Machines."`
-	LogLineTail int    `json:"logLineTail" jsonschema:"an optional number of log lines to retrieve from the system-agent logs, defaults to 150. Returns the last N lines of logs. Must be between 30 and 1000."`
+	LogLineTail int    `json:"logLineTail" jsonschema:"an optional number of log lines to retrieve from the system-agent logs, defaults to 150. Returns the last N lines of logs. Must be between 100 and 1000."`
 
 	// target is the downstream node for MachineName and the location of its machine plan. It is resolved by validate.
 	target planTarget
 }
 
 const defaultLogLineTail = 150
+
+// minLogLineTail is large enough for the log gatherer's output to fit in the tail of the pod logs. That is a full match
+// of the plan hash (the matching line with the 10 lines before and 15 lines after it), the system-agent's execution
+// lines, and the service status.
+const minLogLineTail = 100
+
+var (
+	// checksumRegex matches a plan checksum, which is a hex encoded sha256.
+	checksumRegex = regexp.MustCompile(`^[0-9a-f]{64}$`)
+	// safePlanHashRegex matches the characters allowed in a plan hash which is placed in a script. It also allows the
+	// placeholder used by plan previews.
+	safePlanHashRegex = regexp.MustCompile(`^[0-9A-Za-z_]+$`)
+)
 
 func (params *investigateFailedPlanApplicationParams) validate(ctx context.Context, t *Tools, toolReq *mcp.CallToolRequest) (*zap.Logger, error) {
 	log := utils.NewChildLogger(toolReq, map[string]string{
@@ -53,8 +67,8 @@ func (params *investigateFailedPlanApplicationParams) validate(ctx context.Conte
 		return nil, fmt.Errorf("plans are not used to control the local cluster")
 	}
 
-	if err := validateClusterName(params.Cluster); err != nil {
-		return nil, err
+	if strings.TrimSpace(params.Cluster) == "" {
+		return nil, fmt.Errorf("cluster name is required")
 	}
 
 	if strings.TrimSpace(params.MachineName) == "" {
@@ -64,19 +78,36 @@ func (params *investigateFailedPlanApplicationParams) validate(ctx context.Conte
 	// explicitly allow a zero value and silently convert it to the default value. This handles
 	// cases where the model omits the parameter entirely, with the intent of using default value as
 	// described in the tool's schema.
-	if (params.LogLineTail < 30 && params.LogLineTail != 0) || params.LogLineTail > 1000 {
-		return nil, fmt.Errorf("logLineTail must be between 30 and 1000")
+	if (params.LogLineTail < minLogLineTail && params.LogLineTail != 0) || params.LogLineTail > 1000 {
+		return nil, fmt.Errorf("logLineTail must be between %d and 1000", minLogLineTail)
 	}
 
 	if params.LogLineTail == 0 {
 		params.LogLineTail = defaultLogLineTail
 	}
 
+	// the cluster may be given as a display name, so resolve it to the provisioning name (the CAPI cluster label)
+	// and the management ID, which is used for all downstream access.
+	provisioningName, clusterID, err := t.resolveMachineCluster(ctx, log, DefaultClusterResourcesNamespace, params.Cluster)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateClusterName(provisioningName); err != nil {
+		return nil, err
+	}
+	if clusterID == "" {
+		return nil, fmt.Errorf("cluster %s has not been assigned a management cluster yet", params.Cluster)
+	}
+	if clusterID == "local" {
+		return nil, fmt.Errorf("plans are not used to control the local cluster")
+	}
+	params.Cluster = clusterID
+
 	// ensure that the provided machine name is actually valid for the specified cluster and
 	// that it is managed by Rancher machine plans (i.e. CAPI compliant)
 	machines, _, _, err := t.getAllCAPIMachineResources(ctx, log, getCAPIMachineResourcesParams{
 		namespace:     DefaultClusterResourcesNamespace,
-		targetCluster: params.Cluster,
+		targetCluster: provisioningName,
 		kinds: &capiResourceKinds{
 			machines: true,
 		},
@@ -290,8 +321,22 @@ func buildFailedPlanLogGathererJob(params investigateFailedPlanApplicationParams
 	systemctl := "systemctl status rancher-system-agent.service -n 0; status=$?; if [ \"$status\" -ne 0 ]; then echo \"systemctl status returned exit code $status\"; fi; exit 0"
 	logCommand := fmt.Sprintf("echo 'Machine plan unavailable; showing recent system-agent logs'; %s | tail -n %d", journald, params.LogLineTail)
 	if planHash != "" {
-		grep := fmt.Sprintf("grep %s -A 15 -B 10", planHash)
-		logCommand = fmt.Sprintf("if ! %s | %s; then echo 'No logs found for the machine plan hash; showing the last 25 lines of service logs currently available'; %s | tail -n 25; fi", journald, grep, journald)
+		// the hash is interpolated into a script which runs on the node, so it must never contain anything but plain characters
+		if !safePlanHashRegex.MatchString(planHash) {
+			return nil, fmt.Errorf("invalid plan hash %q", planHash)
+		}
+
+		// The pod logs are tailed to LogLineTail, so the budget is split between the two sections, leaving some
+		// room for the separator and the service status which follow.
+		executionLines := params.LogLineTail / 2
+		contextLines := params.LogLineTail - executionLines - 10
+
+		// A plan which keeps failing may log its checksum many times, pushing the application out of the tailed
+		// output. So the system-agent's execution lines are emitted last. Not all of them mention the checksum, so
+		// everything from the start of the latest application onward is kept. That includes the output of its
+		// instructions, which the system-agent logs with the prefix [<checksum>_<instruction index>:stdout or :stderr].
+		applyinator := fmt.Sprintf("%s | awk '%s' | grep -F -e '[Applyinator]' -e 'error executing instruction' -e '[%s_' | head -n %d", journald, fromLastApplication(planHash), planHash, executionLines)
+		logCommand = fmt.Sprintf("hits=$(%s | grep %s -A 15 -B 10 | tail -n %d); if [ -n \"$hits\" ]; then printf '%%s\\n' \"$hits\"; echo '--- system-agent execution lines for the machine plan hash ---'; %s; else echo 'No logs found for the machine plan hash; showing the last 25 lines of service logs currently available'; %s | tail -n 25; fi", journald, planHash, contextLines, applyinator, journald)
 	}
 	journaldCommand := []string{
 		"chroot",
@@ -309,6 +354,17 @@ func buildFailedPlanLogGathererJob(params investigateFailedPlanApplicationParams
 
 	job.SetGenerateName(name.SafeConcatName(params.MachineName, "systemd-log-gatherer") + "-")
 	return job, nil
+}
+
+// maxExecutionScanLines bounds how many lines of the journal are held in memory when looking for the execution.
+const maxExecutionScanLines = 5000
+
+// fromLastApplication returns an awk program which prints the journal starting from the latest line announcing the
+// application of the plan, or from the first mention of the hash if no such line is in the journal. Only the first
+// maxExecutionScanLines lines of that are kept, so that the memory used does not grow with a long running node's journal.
+// The hash must already be validated, as it is placed in a script.
+func fromLastApplication(planHash string) string {
+	return fmt.Sprintf("/%[1]s/ && !seen {seen=1} /Applying one-time instructions for plan with checksum %[1]s/ {split(\"\", l); n=0; seen=1} seen && n < %[2]d {l[++n]=$0} END {for (i=1; i<=n; i++) print l[i]}", planHash, maxExecutionScanLines)
 }
 
 func getMachinePlanFields(ctx context.Context, target planTarget, c toolsClient, log *zap.Logger) (map[string]interface{}, string, error) {
@@ -381,19 +437,66 @@ func getMachinePlanFields(ctx context.Context, target planTarget, c toolsClient,
 		return nil, "", fmt.Errorf("failed to decode machine plan secret %s: %w", machinePlanUnstruct.GetName(), err)
 	}
 
-	// A one time plan may have its data removed by the orchestrator after a failed
-	// application, however its other details are still useful.
-	if machinePlan.Data == nil || machinePlan.Data["plan"] == nil {
-		log.Debug("no plan found in machine plan resource")
+	// A machine-plan may have its plan instructions removed by the orchestrator after a failed
+	// application, however its other details are still useful for understanding the recent failures.
+	currentPlanChecksum := ""
+	if len(machinePlan.Data["plan"]) != 0 {
+		currentPlanChecksum = plan.Checksum(machinePlan.Data["plan"])
 	}
 
-	currentPlanChecksum := plan.Checksum(machinePlan.Data["plan"])
-	if currentPlanChecksum == "" {
-		return nil, "", fmt.Errorf("failed to calculate checksum of plan resource")
+	// The system-agent tracks the checksum of the last plan which failed. When the plan has failed, or has been removed,
+	// that is the one to investigate. Otherwise the orchestrator has delivered a newer plan since, which is the one being
+	// applied now. The value is untrusted, as it is used to filter logs on the node, so only accept what a checksum
+	// looks like.
+	failedChecksum := string(machinePlan.Data["failed-checksum"])
+	validFailedChecksum := checksumRegex.MatchString(failedChecksum)
+	if failedChecksum != "" && !validFailedChecksum {
+		log.Warn("ignoring malformed failed-checksum in machine plan resource")
+		if currentPlanChecksum == "" {
+			return nil, "", fmt.Errorf("no plan found in machine plan resource, and its failed-checksum is not a valid checksum")
+		}
+	}
+
+	planState := string(machinePlan.Data["plan-state"])
+	planHasFailed := planState == "" || planState == "failed"
+
+	checksum := currentPlanChecksum
+	checksumNote := "The checksum is of the current plan. The system-agent has not recorded a failed plan checksum."
+	switch {
+	case failedChecksum != "" && !validFailedChecksum:
+		checksumNote = "The checksum is of the current plan. The failed-checksum recorded by the system-agent is not a valid checksum, so it was ignored."
+	case validFailedChecksum && currentPlanChecksum != "" && !planHasFailed:
+		checksumNote = "The checksum is of the current plan, which is not in a failed state. A plan failed before it, but that plan is not shown."
+		if failedChecksum == currentPlanChecksum {
+			checksumNote = "The checksum is of the current plan, which failed before and is not in a failed state now."
+		}
+	case validFailedChecksum:
+		checksum = failedChecksum
+		switch currentPlanChecksum {
+		case "":
+			checksumNote = "The checksum is of the last failed plan, as recorded by the system-agent. The plan has been removed from the machine plan."
+		case failedChecksum:
+			checksumNote = "The checksum is of the last failed plan, as recorded by the system-agent. It is also the current plan."
+		default:
+			checksumNote = fmt.Sprintf("The checksum is of the last failed plan, as recorded by the system-agent. The current plan has a different checksum (%s), so it has not been applied yet or has not failed since.", currentPlanChecksum)
+			if planState == "failed" {
+				checksumNote = fmt.Sprintf("The checksum is of the last failed plan, as recorded by the system-agent. The plan state is failed, but the current plan has a different checksum (%s), so the failure may be of an earlier plan.", currentPlanChecksum)
+			}
+		}
+	}
+
+	if checksum == "" {
+		return nil, "", fmt.Errorf("no plan found in machine plan resource")
 	}
 
 	out := map[string]string{
-		"checksum": currentPlanChecksum,
+		"checksum":      checksum,
+		"checksum-note": checksumNote,
+		// only a value which looks like a checksum is reported, as the secret is not trusted
+		"failed-checksum": "",
+	}
+	if validFailedChecksum {
+		out["failed-checksum"] = failedChecksum
 	}
 	for _, field := range []string{
 		"failure-count",
@@ -411,5 +514,5 @@ func getMachinePlanFields(ctx context.Context, target planTarget, c toolsClient,
 		return nil, "", fmt.Errorf("failed to convert machine plan fields: %w", err)
 	}
 
-	return uFields, currentPlanChecksum, nil
+	return uFields, checksum, nil
 }

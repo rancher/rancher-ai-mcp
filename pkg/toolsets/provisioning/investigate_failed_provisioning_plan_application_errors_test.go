@@ -30,7 +30,7 @@ import (
 
 func TestInvestigatePlanValidationErrors(t *testing.T) {
 	t.Run("CAPI lookup failure is not classified as unsupported", func(t *testing.T) {
-		dynClient := newPlanApplicationDynClient()
+		dynClient := newPlanApplicationDynClient(newImportedCluster("c-error-capi", ""))
 		forbidden := apierrors.NewForbidden(schema.GroupResource{Group: converter.CAPIGroup, Resource: "machines"}, "", errors.New("list denied"))
 		dynClient.PrependReactor("list", "machines", func(k8stesting.Action) (bool, runtime.Object, error) {
 			return true, nil, forbidden
@@ -163,7 +163,7 @@ func TestLogGathererTimedOutPod(t *testing.T) {
 	dynClient := newPlanApplicationDynClient(newManagementCluster(cluster, true), pod)
 	tools := newTestTools(dynClient)
 	params := investigateFailedPlanApplicationParams{
-		Cluster: cluster, MachineName: testPlanNode, LogLineTail: 30,
+		Cluster: cluster, MachineName: testPlanNode, LogLineTail: 100,
 		target: planTarget{nodeName: testPlanNodeName},
 	}
 	ctx, cancel := context.WithTimeout(middleware.WithToken(t.Context(), testToken), 50*time.Millisecond)
@@ -193,7 +193,7 @@ func TestLogGathererIgnoresPodsFromPreviousRuns(t *testing.T) {
 	clientset, err := kubernetes.NewForConfig(&rest.Config{Host: server.URL})
 	require.NoError(t, err)
 	params := investigateFailedPlanApplicationParams{
-		Cluster: cluster, MachineName: testPlanNode, LogLineTail: 30,
+		Cluster: cluster, MachineName: testPlanNode, LogLineTail: 100,
 		target: planTarget{nodeName: testPlanNodeName},
 	}
 
@@ -246,7 +246,7 @@ func TestLogGathererFailedPod(t *testing.T) {
 	dynClient := newPlanApplicationDynClient(newManagementCluster(cluster, true), pod)
 	tools := newTestTools(dynClient)
 	params := investigateFailedPlanApplicationParams{
-		Cluster: cluster, MachineName: testPlanNode, LogLineTail: 30,
+		Cluster: cluster, MachineName: testPlanNode, LogLineTail: 100,
 		target: planTarget{nodeName: testPlanNodeName},
 	}
 	_, err := createJobAndPollPod(middleware.WithToken(t.Context(), testToken), params, tools.client, testToolboxImage, "", zap.NewNop())
@@ -286,7 +286,7 @@ func TestLogGathererPodLogAccessError(t *testing.T) {
 	}
 	tools := newTestTools(newPlanApplicationDynClient(newManagementCluster(cluster, true), pod))
 	params := investigateFailedPlanApplicationParams{
-		Cluster: cluster, MachineName: testPlanNode, LogLineTail: 30,
+		Cluster: cluster, MachineName: testPlanNode, LogLineTail: 100,
 		target: planTarget{nodeName: testPlanNodeName},
 	}
 	_, err = createJobAndPollPod(middleware.WithToken(t.Context(), testToken), params,

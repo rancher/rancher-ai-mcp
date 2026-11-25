@@ -62,7 +62,7 @@ func TestInvestigateFailedPlanApplicationPlan(t *testing.T) {
 												"/host",
 												"bash",
 												"-c",
-												"if ! journalctl -eu rancher-system-agent.service --no-pager -o cat | grep PLAN_HASH -A 15 -B 10; then echo 'No logs found for the machine plan hash; showing the last 25 lines of service logs currently available'; journalctl -eu rancher-system-agent.service --no-pager -o cat | tail -n 25; fi; systemctl status rancher-system-agent.service -n 0; status=$?; if [ \"$status\" -ne 0 ]; then echo \"systemctl status returned exit code $status\"; fi; exit 0"
+												"hits=$(journalctl -eu rancher-system-agent.service --no-pager -o cat | grep PLAN_HASH -A 15 -B 10 | tail -n 65); if [ -n \"$hits\" ]; then printf '%s\\n' \"$hits\"; echo '--- system-agent execution lines for the machine plan hash ---'; journalctl -eu rancher-system-agent.service --no-pager -o cat | awk '/PLAN_HASH/ \u0026\u0026 !seen {seen=1} /Applying one-time instructions for plan with checksum PLAN_HASH/ {split(\"\", l); n=0; seen=1} seen \u0026\u0026 n \u003c 5000 {l[++n]=$0} END {for (i=1; i\u003c=n; i++) print l[i]}' | grep -F -e '[Applyinator]' -e 'error executing instruction' -e '[PLAN_HASH_' | head -n 75; else echo 'No logs found for the machine plan hash; showing the last 25 lines of service logs currently available'; journalctl -eu rancher-system-agent.service --no-pager -o cat | tail -n 25; fi; systemctl status rancher-system-agent.service -n 0; status=$?; if [ \"$status\" -ne 0 ]; then echo \"systemctl status returned exit code $status\"; fi; exit 0"
 											],
 											"image": "test-toolbox-image",
 											"name": "journald-reader",

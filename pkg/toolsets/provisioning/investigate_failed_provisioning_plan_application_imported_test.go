@@ -366,6 +366,8 @@ func TestInvestigateFailedPlanApplicationImported(t *testing.T) {
 			{"logs": {"journald-reader": "fake logs"}},
 			{
 				"checksum": %q,
+				"checksum-note": %q,
+				"failed-checksum": "",
 				"failure-count": "3",
 				"last-apply-time": "2026-10-20T12:00:00Z",
 				"max-failures": "5",
@@ -374,7 +376,7 @@ func TestInvestigateFailedPlanApplicationImported(t *testing.T) {
 				"probe-statuses": "{\"kubelet\":{\"healthy\":false}}"
 			}
 		]
-	}`, expectedChecksum)
+	}`, expectedChecksum, "The checksum is of the current plan. The system-agent has not recorded a failed plan checksum.")
 
 	fallbackResult := `{
 		"llm": {
@@ -604,7 +606,7 @@ func TestInvestigateFailedPlanApplicationPlanPlanAvailability(t *testing.T) {
 			expectedDetail: "no plan found in machine plan resource",
 		},
 		"log line tail is used when the machine plan is unavailable": {
-			params:         investigateFailedPlanApplicationParams{Cluster: "test-cluster", MachineName: testPlanNode, LogLineTail: 50},
+			params:         investigateFailedPlanApplicationParams{Cluster: "test-cluster", MachineName: testPlanNode, LogLineTail: 123},
 			objects:        []runtime.Object{newPlanMachine(testPlanNode, "test-cluster")},
 			expectedNode:   testPlanNodeName,
 			expectedDetail: "failed to get machine plan secret",

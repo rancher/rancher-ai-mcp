@@ -3,6 +3,9 @@ package provisioning
 import (
 	"context"
 	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"testing"
@@ -16,6 +19,7 @@ import (
 	"github.com/rancher/rancher/pkg/plan"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -166,6 +170,11 @@ func newLogGathererJob(nodeName string) *unstructured.Unstructured {
 func TestInvestigateFailedPlanApplication(t *testing.T) {
 	fakeToken := "fakeToken"
 	expectedChecksum := plan.Checksum([]byte(testPlan))
+	const (
+		olderFailedChecksum     = "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+		currentPlanChecksumNote = "The checksum is of the current plan. The system-agent has not recorded a failed plan checksum."
+		removedPlanChecksumNote = "The checksum is of the last failed plan, as recorded by the system-agent. The plan has been removed from the machine plan."
+	)
 
 	expectedSuccessResult := fmt.Sprintf(`{
 		"llm": [
@@ -176,6 +185,8 @@ func TestInvestigateFailedPlanApplication(t *testing.T) {
 			},
 			{
 				"checksum": %q,
+				"checksum-note": %q,
+				"failed-checksum": "",
 				"failure-count": "3",
 				"last-apply-time": "2026-10-20T12:00:00Z",
 				"max-failures": "5",
@@ -184,7 +195,7 @@ func TestInvestigateFailedPlanApplication(t *testing.T) {
 				"probe-statuses": "{\"kubelet\":{\"healthy\":false}}"
 			}
 		]
-	}`, expectedChecksum)
+	}`, expectedChecksum, currentPlanChecksumNote)
 
 	// the logs are returned alone, with a note explaining why they were not filtered by the plan
 	expectedFallbackResult := `{
@@ -201,6 +212,8 @@ func TestInvestigateFailedPlanApplication(t *testing.T) {
 		ctxTimeout    time.Duration
 		cancelCtx     bool
 		verifyJob     bool
+		// verifyJobChecksum checks the job filters the logs on this checksum, instead of the one of the test plan
+		verifyJobChecksum string
 		// verifyUnfilteredJob checks the job which is created when there is no plan hash to filter on
 		verifyUnfilteredJob bool
 		expectedResult      string
@@ -237,7 +250,7 @@ func TestInvestigateFailedPlanApplication(t *testing.T) {
 			params: investigateFailedPlanApplicationParams{
 				Cluster:     "test-cluster",
 				MachineName: testPlanNode,
-				LogLineTail: 50,
+				LogLineTail: 200,
 			},
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: newPlanApplicationDynClient(
@@ -252,7 +265,7 @@ func TestInvestigateFailedPlanApplication(t *testing.T) {
 			params: investigateFailedPlanApplicationParams{
 				Cluster:     "test-cluster",
 				MachineName: testPlanNode,
-				LogLineTail: 30,
+				LogLineTail: 100,
 			},
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: newPlanApplicationDynClient(
@@ -287,6 +300,16 @@ func TestInvestigateFailedPlanApplication(t *testing.T) {
 			fakeClientset: newFakeClientSet(),
 			fakeDynClient: newPlanApplicationDynClient(),
 			expectedError: "logLineTail must be between",
+		},
+		"investigate failed plan with a log line tail below the minimum": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				MachineName: testPlanNode,
+				LogLineTail: 99,
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(),
+			expectedError: "logLineTail must be between 100 and 1000",
 		},
 		"investigate failed plan with a log line tail above the maximum": {
 			params: investigateFailedPlanApplicationParams{
@@ -364,6 +387,154 @@ func TestInvestigateFailedPlanApplication(t *testing.T) {
 				newLogGathererPod(testPlanNode, corev1.PodSucceeded)),
 			verifyUnfilteredJob: true,
 			expectedResult:      fmt.Sprintf(expectedFallbackResult, "no plan found in machine plan resource"),
+		},
+		"investigate failed plan with a removed plan uses the failed checksum to filter the logs": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				MachineName: testPlanNode,
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(
+				newPlanMachine(testPlanNode, "test-cluster"),
+				newManagementCluster("test-cluster", true),
+				newMachinePlanSecret(testPlanNode, map[string][]byte{
+					"plan-state":      []byte("failed"),
+					"failed-checksum": []byte(expectedChecksum),
+				}),
+				newLogGathererPod(testPlanNode, corev1.PodSucceeded)),
+			verifyJob: true,
+			expectedResult: fmt.Sprintf(`{
+				"llm": [
+					{"logs": {"journald-reader": "fake logs"}},
+					{
+						"checksum": %q,
+						"checksum-note": %q,
+						"failed-checksum": %q,
+						"failure-count": "",
+						"last-apply-time": "",
+						"max-failures": "",
+						"plan-revision": "",
+						"plan-state": "failed",
+						"probe-statuses": ""
+					}
+				]
+			}`, expectedChecksum, removedPlanChecksumNote, expectedChecksum),
+		},
+		"investigate failed plan prefers the failed checksum over a newer plan when the plan state is failed": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				MachineName: testPlanNode,
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(
+				newPlanMachine(testPlanNode, "test-cluster"),
+				newManagementCluster("test-cluster", true),
+				newMachinePlanSecret(testPlanNode, map[string][]byte{
+					"plan":            []byte(testPlan),
+					"plan-state":      []byte("failed"),
+					"failed-checksum": []byte(olderFailedChecksum),
+				}),
+				newLogGathererPod(testPlanNode, corev1.PodSucceeded)),
+			verifyJobChecksum: olderFailedChecksum,
+			expectedResult: fmt.Sprintf(`{
+				"llm": [
+					{"logs": {"journald-reader": "fake logs"}},
+					{
+						"checksum": %q,
+						"checksum-note": %q,
+						"failed-checksum": %q,
+						"failure-count": "",
+						"last-apply-time": "",
+						"max-failures": "",
+						"plan-revision": "",
+						"plan-state": "failed",
+						"probe-statuses": ""
+					}
+				]
+			}`, olderFailedChecksum, fmt.Sprintf("The checksum is of the last failed plan, as recorded by the system-agent. The plan state is failed, but the current plan has a different checksum (%s), so the failure may be of an earlier plan.", expectedChecksum), olderFailedChecksum),
+		},
+		"investigate failed plan uses the current plan checksum while a newer plan is in progress": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				MachineName: testPlanNode,
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(
+				newPlanMachine(testPlanNode, "test-cluster"),
+				newManagementCluster("test-cluster", true),
+				newMachinePlanSecret(testPlanNode, map[string][]byte{
+					"plan":            []byte(testPlan),
+					"plan-state":      []byte("in-progress"),
+					"failed-checksum": []byte(olderFailedChecksum),
+				}),
+				newLogGathererPod(testPlanNode, corev1.PodSucceeded)),
+			verifyJobChecksum: expectedChecksum,
+			expectedResult: fmt.Sprintf(`{
+				"llm": [
+					{"logs": {"journald-reader": "fake logs"}},
+					{
+						"checksum": %q,
+						"checksum-note": %q,
+						"failed-checksum": %q,
+						"failure-count": "",
+						"last-apply-time": "",
+						"max-failures": "",
+						"plan-revision": "",
+						"plan-state": "in-progress",
+						"probe-statuses": ""
+					}
+				]
+			}`, expectedChecksum, "The checksum is of the current plan, which is not in a failed state. A plan failed before it, but that plan is not shown.", olderFailedChecksum),
+		},
+		"investigate failed plan uses the current plan checksum when the failed checksum is malformed": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				MachineName: testPlanNode,
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(
+				newPlanMachine(testPlanNode, "test-cluster"),
+				newManagementCluster("test-cluster", true),
+				newMachinePlanSecret(testPlanNode, map[string][]byte{
+					"plan":            []byte(testPlan),
+					"plan-state":      []byte("failed"),
+					"failed-checksum": []byte("not-a-checksum"),
+				}),
+				newLogGathererPod(testPlanNode, corev1.PodSucceeded)),
+			verifyJobChecksum: expectedChecksum,
+			expectedResult: fmt.Sprintf(`{
+				"llm": [
+					{"logs": {"journald-reader": "fake logs"}},
+					{
+						"checksum": %q,
+						"checksum-note": %q,
+						"failed-checksum": "",
+						"failure-count": "",
+						"last-apply-time": "",
+						"max-failures": "",
+						"plan-revision": "",
+						"plan-state": "failed",
+						"probe-statuses": ""
+					}
+				]
+			}`, expectedChecksum, "The checksum is of the current plan. The failed-checksum recorded by the system-agent is not a valid checksum, so it was ignored."),
+		},
+		"investigate failed plan with a malformed failed checksum falls back to the logs": {
+			params: investigateFailedPlanApplicationParams{
+				Cluster:     "test-cluster",
+				MachineName: testPlanNode,
+			},
+			fakeClientset: newFakeClientSet(),
+			fakeDynClient: newPlanApplicationDynClient(
+				newPlanMachine(testPlanNode, "test-cluster"),
+				newManagementCluster("test-cluster", true),
+				newMachinePlanSecret(testPlanNode, map[string][]byte{
+					"plan-state":      []byte("failed"),
+					"failed-checksum": []byte("x; touch /tmp/pwned #"),
+				}),
+				newLogGathererPod(testPlanNode, corev1.PodSucceeded)),
+			verifyUnfilteredJob: true,
+			expectedResult:      fmt.Sprintf(expectedFallbackResult, "no plan found in machine plan resource, and its failed-checksum is not a valid checksum"),
 		},
 		"investigate failed plan without a machine plan secret when the log gatherer job already exists": {
 			params: investigateFailedPlanApplicationParams{
@@ -506,6 +677,9 @@ func TestInvestigateFailedPlanApplication(t *testing.T) {
 			if tt.verifyJob {
 				verifyLogGathererJob(t, tt.fakeDynClient, tt.params.MachineName, testPlanNodeName, expectedChecksum)
 			}
+			if tt.verifyJobChecksum != "" {
+				verifyLogGathererJob(t, tt.fakeDynClient, tt.params.MachineName, testPlanNodeName, tt.verifyJobChecksum)
+			}
 			if tt.verifyUnfilteredJob {
 				verifyUnfilteredLogGathererJob(t, tt.fakeDynClient, tt.params.MachineName, testPlanNodeName, defaultLogLineTail)
 			}
@@ -519,6 +693,13 @@ func verifyLogGathererJob(t *testing.T, dynClient *dynamicfake.FakeDynamicClient
 
 	command := verifyLogGathererJobPodSpec(t, dynClient, machineName, nodeName)
 	assert.Contains(t, command, fmt.Sprintf("grep %s", expectedChecksum))
+	// the execution lines are emitted after the context lines so they survive the tail of the pod logs
+	applyinatorFilter := fmt.Sprintf("Applying one-time instructions for plan with checksum %s/ {split(\"\", l); n=0; seen=1}", expectedChecksum)
+	require.Contains(t, command, applyinatorFilter)
+	// the output of the plan's instructions is prefixed with the checksum and the index of the instruction
+	require.Contains(t, command, fmt.Sprintf("grep -F -e '[Applyinator]' -e 'error executing instruction' -e '[%s_' | head -n", expectedChecksum))
+	assert.Greater(t, strings.Index(command, applyinatorFilter), strings.Index(command, fmt.Sprintf("grep %s -A 15 -B 10", expectedChecksum)))
+	assert.Contains(t, command, "-A 15 -B 10 | tail -n ")
 	assert.Contains(t, command, "journalctl -eu rancher-system-agent.service")
 }
 
@@ -598,7 +779,7 @@ func TestInvestigateFailedPlanApplicationLogLineTailDefault(t *testing.T) {
 		expected int
 	}{
 		"unset uses the default": {input: 0, expected: defaultLogLineTail},
-		"provided value is kept": {input: 42, expected: 42},
+		"provided value is kept": {input: 123, expected: 123},
 		"maximum value is kept":  {input: 1000, expected: 1000},
 	}
 
@@ -614,4 +795,455 @@ func TestInvestigateFailedPlanApplicationLogLineTailDefault(t *testing.T) {
 			assert.Equal(t, tt.expected, params.LogLineTail)
 		})
 	}
+}
+
+const (
+	logsTestChecksum = "10405428a216903b96cce03e6c7c5ea48af1e5cb9d2fe348d14579a69fb9476b"
+	logsTestPrefix   = `Nov 25 15:37:01 node rancher-system-agent[16606]: time="2026-11-25T15:37:01Z" level=`
+	executionHeader  = "--- system-agent execution lines for the machine plan hash ---"
+)
+
+// logScriptOptions describes the node a log gathering script is run against.
+type logScriptOptions struct {
+	logLineTail int
+	journal     []string
+	// statusLines is the number of lines printed by the stand-in for systemctl status
+	statusLines int
+	// statusExitCode is the exit code of the stand-in for systemctl status
+	statusExitCode int
+}
+
+func requireBash(t *testing.T) string {
+	t.Helper()
+
+	bash, err := exec.LookPath("bash")
+	require.NoError(t, err, "bash is required to run the log gathering script")
+	return bash
+}
+
+// runLogScript builds the log gathering script for the checksum and runs it against the journal. It returns the output.
+func runLogScript(t *testing.T, opts logScriptOptions) string {
+	t.Helper()
+
+	journalFile := filepath.Join(t.TempDir(), "journal.log")
+	require.NoError(t, os.WriteFile(journalFile, []byte(strings.Join(opts.journal, "\n")+"\n"), 0o600))
+
+	params := investigateFailedPlanApplicationParams{
+		MachineName: testPlanNode,
+		LogLineTail: opts.logLineTail,
+		target:      planTarget{nodeName: testPlanNode},
+	}
+	uJob, err := buildFailedPlanLogGathererJob(params, testToolboxImage, logsTestChecksum, zap.NewNop())
+	require.NoError(t, err)
+	job := &batchv1.Job{}
+	require.NoError(t, runtime.DefaultUnstructuredConverter.FromUnstructured(uJob.Object, job))
+	require.Len(t, job.Spec.Template.Spec.Containers, 1)
+	command := job.Spec.Template.Spec.Containers[0].Command
+	require.Equal(t, []string{"chroot", "/host", "bash", "-c"}, command[:4])
+	script := command[len(command)-1]
+
+	// the script runs in the node's root, where the journal and systemctl exist. Stand in for them.
+	systemctl := fmt.Sprintf("%sreturn %d", strings.Repeat("echo 'status line'; ", opts.statusLines), opts.statusExitCode)
+	journalctl := fmt.Sprintf(`[ "$*" = "-eu rancher-system-agent.service --no-pager -o cat" ] || { echo "unexpected journalctl arguments: $*" >&2; return 1; }; cat %s`, journalFile)
+	stubs := fmt.Sprintf("journalctl() { %s; }; systemctl() { %s; }; ", journalctl, systemctl)
+	out, err := exec.Command(requireBash(t), "-c", stubs+script).CombinedOutput()
+	require.NoError(t, err, string(out))
+	return string(out)
+}
+
+func applyinatorLine(msg string) string {
+	return logsTestPrefix + `info msg="[Applyinator] ` + msg + `"`
+}
+
+func applyingLine() string {
+	return applyinatorLine("Applying one-time instructions for plan with checksum " + logsTestChecksum)
+}
+
+func repeatedFailureLine() string {
+	return logsTestPrefix + `error msg="[K8s] Maximum failure threshold exceeded for plan with checksum value of ` + logsTestChecksum + `, (failures: 1, threshold: 1)"`
+}
+
+// TestFailedPlanLogCommandKeepsTheExecution runs the generated log gathering script against a journal in which a failed
+// plan logs its checksum many times after the execution. The execution lines must be emitted last, including the ones
+// which do not mention the checksum, and nothing from before the plan may be included.
+func TestFailedPlanLogCommandKeepsTheExecution(t *testing.T) {
+	requireBash(t)
+
+	execution := []string{
+		applyingLine(),
+		applyinatorLine("No image provided, creating empty working directory /var/lib/rancher/agent/work/20261125-153701/" + logsTestChecksum + "_0"),
+		applyinatorLine("Running command: /bin/sh [-c grep -rE -q token /etc/rancher/rke2/config.yaml || (exit 1)]"),
+		// the output of an instruction does not mention [Applyinator]
+		logsTestPrefix + `info msg="[` + logsTestChecksum + `_0:stderr]: unable to join: connection refused"`,
+		applyinatorLine("Command /bin/sh [-c grep -rE -q token /etc/rancher/rke2/config.yaml || (exit 1)] finished with err: <nil> and exit code: 1"),
+		logsTestPrefix + `error msg="error executing instruction 0: <nil>"`,
+	}
+	earlier := applyinatorLine("Applying one-time instructions for plan with checksum 0000000000000000000000000000000000000000000000000000000000000000")
+
+	journal := []string{earlier, logsTestPrefix + `info msg="[K8s] unrelated"`}
+	journal = append(journal, execution...)
+	journal = append(journal, logsTestPrefix+`info msg="[K8s] updated plan secret c-vbh59/imported-machine-plan with feedback"`)
+	for range 50 {
+		journal = append(journal, repeatedFailureLine())
+	}
+
+	out := runLogScript(t, logScriptOptions{logLineTail: defaultLogLineTail, journal: journal})
+
+	// the execution lines follow the separator, after the context lines around the checksum
+	_, executionSection, found := strings.Cut(out, executionHeader+"\n")
+	require.True(t, found, out)
+	assert.Equal(t, strings.Join(execution, "\n"), strings.TrimSpace(executionSection))
+
+	// the output is tailed by the pod log retrieval, so only the final lines are guaranteed
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	assert.Equal(t, execution, lines[len(lines)-len(execution):])
+}
+
+// TestFailedPlanLogCommandShowsTheLatestExecution checks that when a plan is applied several times, only the latest
+// application is shown as the execution.
+func TestFailedPlanLogCommandShowsTheLatestExecution(t *testing.T) {
+	requireBash(t)
+
+	firstAttempt := []string{
+		applyingLine(),
+		applyinatorLine("Running command: first attempt"),
+		logsTestPrefix + `error msg="error executing instruction 0: first attempt"`,
+	}
+	latestAttempt := []string{
+		applyingLine(),
+		applyinatorLine("Running command: latest attempt"),
+		logsTestPrefix + `error msg="error executing instruction 0: latest attempt"`,
+	}
+
+	var journal []string
+	journal = append(journal, firstAttempt...)
+	journal = append(journal, repeatedFailureLine())
+	journal = append(journal, latestAttempt...)
+	journal = append(journal, repeatedFailureLine(), repeatedFailureLine())
+
+	out := runLogScript(t, logScriptOptions{logLineTail: defaultLogLineTail, journal: journal})
+
+	_, executionSection, found := strings.Cut(out, executionHeader+"\n")
+	require.True(t, found, out)
+	assert.Equal(t, strings.Join(latestAttempt, "\n"), strings.TrimSpace(executionSection))
+}
+
+// TestFailedPlanLogCommandWithoutTheApplication checks that when the line announcing the application has been rotated
+// out of the journal, the execution starts at the first mention of the checksum instead.
+func TestFailedPlanLogCommandWithoutTheApplication(t *testing.T) {
+	requireBash(t)
+
+	first := applyinatorLine("Running command: mentions " + logsTestChecksum)
+	journal := []string{
+		applyinatorLine("Running command: before the checksum"),
+		first,
+		applyinatorLine("Running command: after the checksum"),
+	}
+
+	out := runLogScript(t, logScriptOptions{logLineTail: defaultLogLineTail, journal: journal})
+
+	_, executionSection, found := strings.Cut(out, executionHeader+"\n")
+	require.True(t, found, out)
+	assert.Equal(t, strings.Join(journal[1:], "\n"), strings.TrimSpace(executionSection))
+}
+
+// TestFailedPlanLogCommandWithAVeryLongJournal checks that the execution is still found when the journal is much larger
+// than the number of lines kept in memory.
+func TestFailedPlanLogCommandWithAVeryLongJournal(t *testing.T) {
+	requireBash(t)
+
+	latestAttempt := []string{
+		applyingLine(),
+		applyinatorLine("Running command: latest attempt"),
+		logsTestPrefix + `error msg="error executing instruction 0: latest attempt"`,
+	}
+
+	var journal []string
+	journal = append(journal, applyingLine(), applyinatorLine("Running command: first attempt"))
+	for range 3 * maxExecutionScanLines {
+		journal = append(journal, applyinatorLine("Running periodic instruction"))
+	}
+	journal = append(journal, latestAttempt...)
+
+	out := runLogScript(t, logScriptOptions{logLineTail: defaultLogLineTail, journal: journal})
+
+	_, executionSection, found := strings.Cut(out, executionHeader+"\n")
+	require.True(t, found, out)
+	assert.Equal(t, strings.Join(latestAttempt, "\n"), strings.TrimSpace(executionSection))
+}
+
+// TestFailedPlanLogCommandWithoutTheApplicationInALongJournal checks that when there is no application line to start
+// from, only the lines kept in memory after the first mention of the checksum are considered.
+func TestFailedPlanLogCommandWithoutTheApplicationInALongJournal(t *testing.T) {
+	requireBash(t)
+
+	var journal []string
+	for i := range 3 * maxExecutionScanLines {
+		journal = append(journal, applyinatorLine(fmt.Sprintf("Running command: step %d mentions %s", i, logsTestChecksum)))
+	}
+
+	out := runLogScript(t, logScriptOptions{logLineTail: defaultLogLineTail, journal: journal})
+
+	_, executionSection, found := strings.Cut(out, executionHeader+"\n")
+	require.True(t, found, out)
+	lines := strings.Split(strings.TrimSpace(executionSection), "\n")
+	require.Len(t, lines, defaultLogLineTail/2)
+	assert.Contains(t, lines[0], "step 0 ")
+
+	// the first mention is the first line kept, so the last line kept is the one at the cap
+	journal = []string{repeatedFailureLine()}
+	// the cap is spelled out here so that changing it is a deliberate choice
+	for i := 2; i < 5000; i++ {
+		journal = append(journal, fmt.Sprintf("unrelated line %d", i))
+	}
+	journal = append(journal,
+		applyinatorLine("Running command: last line kept"),
+		applyinatorLine("Running command: first line dropped"))
+
+	out = runLogScript(t, logScriptOptions{logLineTail: defaultLogLineTail, journal: journal})
+	assert.Contains(t, out, "last line kept")
+	assert.NotContains(t, out, "first line dropped")
+}
+
+// TestFailedPlanLogCommandFitsTheMinimumLogLineTail checks that at the smallest allowed tail, the last mention of the
+// checksum and the whole execution survive when the pod logs are tailed, even with a full size execution and a long
+// service status.
+func TestFailedPlanLogCommandFitsTheMinimumLogLineTail(t *testing.T) {
+	requireBash(t)
+
+	// the execution is capped at half the tail
+	execution := []string{applyingLine()}
+	for i := 1; i < minLogLineTail/2; i++ {
+		execution = append(execution, applyinatorLine(fmt.Sprintf("Running command: step %d", i)))
+	}
+	lastMention := logsTestPrefix + `error msg="last mention of ` + logsTestChecksum + `"`
+
+	var journal []string
+	for i := range 100 {
+		journal = append(journal, fmt.Sprintf("unrelated line %d", i))
+	}
+	journal = append(journal, execution...)
+	// periodic instructions keep logging after the execution, which must not push the execution out of the tail
+	for range 80 {
+		journal = append(journal, applyinatorLine("Running periodic instruction"))
+	}
+	for range 100 {
+		journal = append(journal, repeatedFailureLine())
+	}
+	journal = append(journal, lastMention)
+	for i := range 20 {
+		journal = append(journal, fmt.Sprintf("trailing line %d", i))
+	}
+
+	const statusLines = 12
+	out := runLogScript(t, logScriptOptions{logLineTail: minLogLineTail, journal: journal, statusLines: statusLines})
+
+	// the context, separator, execution and status make up the output, which the pod then tails
+	lines := strings.Split(strings.TrimSpace(out), "\n")
+	assert.Len(t, lines, 40+1+len(execution)+statusLines)
+	podLogs := strings.Join(lines[len(lines)-minLogLineTail:], "\n")
+
+	assert.Contains(t, podLogs, lastMention)
+	for _, line := range execution {
+		assert.Contains(t, podLogs, line)
+	}
+}
+
+// TestFailedPlanLogCommandWithoutMatchingLogs checks that the tail of the service logs is returned when the checksum is
+// not in the journal, and that a failing service status is reported.
+func TestFailedPlanLogCommandWithoutMatchingLogs(t *testing.T) {
+	requireBash(t)
+
+	var journal []string
+	for i := range 40 {
+		journal = append(journal, fmt.Sprintf("unrelated line %d", i))
+	}
+
+	out := runLogScript(t, logScriptOptions{logLineTail: defaultLogLineTail, journal: journal, statusLines: 2, statusExitCode: 3})
+
+	assert.Contains(t, out, "No logs found for the machine plan hash")
+	assert.NotContains(t, out, executionHeader)
+	assert.NotContains(t, out, "unrelated line 14\n")
+	assert.Contains(t, out, "unrelated line 15\n")
+	assert.Contains(t, out, "unrelated line 39\n")
+	assert.Contains(t, out, "systemctl status returned exit code 3")
+}
+
+func TestBuildFailedPlanLogGathererJobRejectsUnsafeHash(t *testing.T) {
+	params := investigateFailedPlanApplicationParams{
+		MachineName: testPlanNode,
+		LogLineTail: defaultLogLineTail,
+		target:      planTarget{nodeName: testPlanNode},
+	}
+	for _, hash := range []string{"x; touch /tmp/pwned #", "a'b", "-v", "a\nb", "a/b"} {
+		_, err := buildFailedPlanLogGathererJob(params, testToolboxImage, hash, zap.NewNop())
+		assert.ErrorContains(t, err, "invalid plan hash", hash)
+	}
+}
+
+// TestGetMachinePlanFieldsChecksum checks which checksum is reported for each state of a machine plan.
+func TestGetMachinePlanFieldsChecksum(t *testing.T) {
+	currentChecksum := plan.Checksum([]byte(testPlan))
+	failedChecksum := "fedcba9876543210fedcba9876543210fedcba9876543210fedcba9876543210"
+
+	const (
+		currentNote = "The checksum is of the current plan. The system-agent has not recorded a failed plan checksum."
+		failedNote  = "The checksum is of the last failed plan, as recorded by the system-agent."
+	)
+	notFailedNote := "The checksum is of the current plan, which is not in a failed state. A plan failed before it, but that plan is not shown."
+
+	tests := map[string]struct {
+		data             map[string][]byte
+		expectedChecksum string
+		expectedNote     string
+		expectedError    string
+		// expectedFailedChecksum is the recorded failure which is reported, whether it was used or not
+		expectedFailedChecksum string
+	}{
+		"failed plan without a recorded failure": {
+			data:                   map[string][]byte{"plan": []byte(testPlan), "plan-state": []byte("failed")},
+			expectedChecksum:       currentChecksum,
+			expectedNote:           currentNote,
+			expectedFailedChecksum: "",
+		},
+		"failed plan which matches the recorded failure": {
+			data:                   map[string][]byte{"plan": []byte(testPlan), "plan-state": []byte("failed"), "failed-checksum": []byte(currentChecksum)},
+			expectedChecksum:       currentChecksum,
+			expectedNote:           failedNote + " It is also the current plan.",
+			expectedFailedChecksum: currentChecksum,
+		},
+		"failed state with a different recorded failure": {
+			data:                   map[string][]byte{"plan": []byte(testPlan), "plan-state": []byte("failed"), "failed-checksum": []byte(failedChecksum)},
+			expectedChecksum:       failedChecksum,
+			expectedNote:           fmt.Sprintf("%s The plan state is failed, but the current plan has a different checksum (%s), so the failure may be of an earlier plan.", failedNote, currentChecksum),
+			expectedFailedChecksum: failedChecksum,
+		},
+		"empty state with a different recorded failure": {
+			data:                   map[string][]byte{"plan": []byte(testPlan), "failed-checksum": []byte(failedChecksum)},
+			expectedChecksum:       failedChecksum,
+			expectedNote:           fmt.Sprintf("%s The current plan has a different checksum (%s), so it has not been applied yet or has not failed since.", failedNote, currentChecksum),
+			expectedFailedChecksum: failedChecksum,
+		},
+		"pending plan after a failure": {
+			data:                   map[string][]byte{"plan": []byte(testPlan), "plan-state": []byte("pending"), "failed-checksum": []byte(failedChecksum)},
+			expectedChecksum:       currentChecksum,
+			expectedNote:           notFailedNote,
+			expectedFailedChecksum: failedChecksum,
+		},
+		"in progress plan after a failure": {
+			data:                   map[string][]byte{"plan": []byte(testPlan), "plan-state": []byte("in-progress"), "failed-checksum": []byte(failedChecksum)},
+			expectedChecksum:       currentChecksum,
+			expectedNote:           notFailedNote,
+			expectedFailedChecksum: failedChecksum,
+		},
+		"cancelled plan after a failure": {
+			data:                   map[string][]byte{"plan": []byte(testPlan), "plan-state": []byte("cancelled"), "failed-checksum": []byte(failedChecksum)},
+			expectedChecksum:       currentChecksum,
+			expectedNote:           notFailedNote,
+			expectedFailedChecksum: failedChecksum,
+		},
+		"succeeded plan with a stale recorded failure": {
+			data:                   map[string][]byte{"plan": []byte(testPlan), "plan-state": []byte("succeeded"), "failed-checksum": []byte(failedChecksum)},
+			expectedChecksum:       currentChecksum,
+			expectedNote:           notFailedNote,
+			expectedFailedChecksum: failedChecksum,
+		},
+		"in progress plan which failed before": {
+			data:                   map[string][]byte{"plan": []byte(testPlan), "plan-state": []byte("in-progress"), "failed-checksum": []byte(currentChecksum)},
+			expectedChecksum:       currentChecksum,
+			expectedNote:           "The checksum is of the current plan, which failed before and is not in a failed state now.",
+			expectedFailedChecksum: currentChecksum,
+		},
+		"succeeded plan without a recorded failure": {
+			data:                   map[string][]byte{"plan": []byte(testPlan), "plan-state": []byte("succeeded"), "failed-checksum": []byte{}},
+			expectedChecksum:       currentChecksum,
+			expectedNote:           currentNote,
+			expectedFailedChecksum: "",
+		},
+		"removed plan in a failed state": {
+			data:                   map[string][]byte{"plan-state": []byte("failed"), "failed-checksum": []byte(failedChecksum)},
+			expectedChecksum:       failedChecksum,
+			expectedNote:           failedNote + " The plan has been removed from the machine plan.",
+			expectedFailedChecksum: failedChecksum,
+		},
+		"removed plan in a state which is not failed": {
+			data:                   map[string][]byte{"plan-state": []byte("pending"), "failed-checksum": []byte(failedChecksum)},
+			expectedChecksum:       failedChecksum,
+			expectedNote:           failedNote + " The plan has been removed from the machine plan.",
+			expectedFailedChecksum: failedChecksum,
+		},
+		"malformed recorded failure with a plan": {
+			data:                   map[string][]byte{"plan": []byte(testPlan), "plan-state": []byte("failed"), "failed-checksum": []byte("x; touch /tmp/pwned #")},
+			expectedChecksum:       currentChecksum,
+			expectedNote:           "The checksum is of the current plan. The failed-checksum recorded by the system-agent is not a valid checksum, so it was ignored.",
+			expectedFailedChecksum: "",
+		},
+		"malformed recorded failure without a plan": {
+			data:          map[string][]byte{"plan-state": []byte("failed"), "failed-checksum": []byte("x; touch /tmp/pwned #")},
+			expectedError: "its failed-checksum is not a valid checksum",
+		},
+		"neither a plan nor a recorded failure": {
+			data:          map[string][]byte{"plan-state": []byte("failed")},
+			expectedError: "no plan found in machine plan resource",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			tools := newTestTools(newPlanApplicationDynClient(newMachinePlanSecret(testPlanNode, tt.data)))
+			target := planTarget{
+				nodeName:            testPlanNode,
+				planSecretNamespace: DefaultClusterResourcesNamespace,
+				planSecretName:      fmt.Sprintf("%s-machine-plan", testPlanNode),
+			}
+
+			fields, checksum, err := getMachinePlanFields(middleware.WithToken(t.Context(), testToken), target, tools.client, zap.NewNop())
+			if tt.expectedError != "" {
+				require.ErrorContains(t, err, tt.expectedError)
+				return
+			}
+
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedChecksum, checksum)
+			assert.Equal(t, tt.expectedChecksum, fields["checksum"])
+			assert.Equal(t, tt.expectedNote, fields["checksum-note"])
+			assert.Equal(t, tt.expectedFailedChecksum, fields["failed-checksum"])
+		})
+	}
+}
+
+// TestValidateResolvesTheCluster checks that the cluster of the tool is resolved before it is used, whichever way it is
+// named.
+func TestValidateResolvesTheCluster(t *testing.T) {
+	validate := func(tools *Tools, params investigateFailedPlanApplicationParams) (investigateFailedPlanApplicationParams, error) {
+		_, err := params.validate(middleware.WithToken(t.Context(), testToken), tools, newToolRequest("investigate"))
+		return params, err
+	}
+
+	t.Run("imported cluster by its display name", func(t *testing.T) {
+		cluster := newImportedCluster("c-validate-display", "")
+		require.NoError(t, unstructured.SetNestedField(cluster.Object, "Validate Display Name", "spec", "displayName"))
+		tools, _ := newImportedTools(withObjects(day2OpsEnabled(), cluster)...)
+
+		params, err := validate(tools, investigateFailedPlanApplicationParams{Cluster: "Validate Display Name", MachineName: testImportedMachine, NodeName: testImportedNode})
+		require.NoError(t, err)
+		assert.Equal(t, "c-validate-display", params.Cluster)
+		assert.Equal(t, planTarget{nodeName: testImportedNode, planSecretNamespace: "c-validate-display", imported: true}, params.target)
+	})
+
+	t.Run("cluster which has no management cluster yet", func(t *testing.T) {
+		tools := newTestTools(newPlanApplicationDynClient(newProvisioningCluster("test-cluster", "fleet-default", "")))
+
+		_, err := validate(tools, investigateFailedPlanApplicationParams{Cluster: "test-cluster", MachineName: testPlanNode})
+		require.ErrorContains(t, err, "cluster test-cluster has not been assigned a management cluster yet")
+	})
+
+	t.Run("display name of the local cluster", func(t *testing.T) {
+		cluster := newManagementCluster("local", true)
+		require.NoError(t, unstructured.SetNestedField(cluster.Object, "my-local", "spec", "displayName"))
+		tools := newTestTools(newPlanApplicationDynClient(cluster))
+
+		_, err := validate(tools, investigateFailedPlanApplicationParams{Cluster: "my-local", MachineName: testPlanNode})
+		require.ErrorContains(t, err, "plans are not used to control the local cluster")
+	})
 }
