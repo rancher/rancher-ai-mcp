@@ -30,6 +30,7 @@ const (
 	ManagementKindPrefix          = "management"
 	ManagementGroup               = "management.cattle.io"
 	ManagementClusterResourceKind = ManagementKindPrefix + "cluster"
+	ManagementNodeResourceKind    = ManagementKindPrefix + "node"
 
 	RKEGroup = "rke.cattle.io"
 )
@@ -115,6 +116,7 @@ var K8sKindsToGVRs = map[string]schema.GroupVersionResource{
 
 	// --- RANCHER CORE Resources (Group: "management.cattle.io") ---
 	ManagementClusterResourceKind: {Group: ManagementGroup, Version: "v3", Resource: "clusters"},
+	ManagementNodeResourceKind:    {Group: ManagementGroup, Version: "v3", Resource: "nodes"},
 	"project":                     {Group: ManagementGroup, Version: "v3", Resource: "projects"},
 	"user":                        {Group: ManagementGroup, Version: "v3", Resource: "users"},
 	"roletemplate":                {Group: ManagementGroup, Version: "v3", Resource: "roletemplates"},

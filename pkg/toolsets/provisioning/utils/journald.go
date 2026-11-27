@@ -3,6 +3,7 @@ package utils
 import (
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"go.uber.org/zap"
 	batchv1 "k8s.io/api/batch/v1"
@@ -10,8 +11,12 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 )
 
-const nodeHostnameLabel = "kubernetes.io/hostname"
+// SystemdLogGathererJobDeadline bounds the lifetime of a log-gathering Job.
+const SystemdLogGathererJobDeadline = 3 * time.Minute
 
+// CreateSystemdLogGathererJob builds a job which reads the journal of a systemd unit on a single node.
+// nodeName must be the name of the Kubernetes Node object. It is not the hostname, which is not
+// guaranteed to match or to be unique, and it is not the CAPI machine name.
 func CreateSystemdLogGathererJob(jobName, nodeName, unit, image string, log *zap.Logger, command ...string) (*unstructured.Unstructured, error) {
 	defaultCommand := []string{
 		"chroot",
@@ -39,7 +44,7 @@ func CreateSystemdLogGathererJob(jobName, nodeName, unit, image string, log *zap
 			BackoffLimit:            new(int32(1)),
 			Completions:             new(int32(1)),
 			TTLSecondsAfterFinished: new(int32(120)),
-			ActiveDeadlineSeconds:   new(int64(10)),
+			ActiveDeadlineSeconds:   new(int64(SystemdLogGathererJobDeadline / time.Second)),
 			Template: corev1.PodTemplateSpec{
 				Spec: corev1.PodSpec{
 					RestartPolicy: corev1.RestartPolicyNever,
@@ -65,8 +70,15 @@ func CreateSystemdLogGathererJob(jobName, nodeName, unit, image string, log *zap
 							},
 						},
 					},
-					NodeSelector: map[string]string{
-						nodeHostnameLabel: nodeName,
+					// Bind directly to the node instead of going through the scheduler. The node name is the
+					// only identifier present and unique on every cluster type, and skipping the scheduler means
+					// the job still runs when the scheduler is unavailable or the node is tainted or cordoned.
+					// Those are common states for the nodes being investigated.
+					NodeName: nodeName,
+					// nodeName bypasses scheduling taints, but the kubelet still evicts pods which do not
+					// tolerate NoExecute taints (e.g. not-ready).
+					Tolerations: []corev1.Toleration{
+						{Operator: corev1.TolerationOpExists},
 					},
 					Volumes: []corev1.Volume{
 						{
