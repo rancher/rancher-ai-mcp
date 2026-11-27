@@ -118,6 +118,15 @@ This should only be used when information about the supported rke2 and k3s is ne
 Returns the name, creation time, node, location, storage type (local or s3), size, and status of each snapshot.`},
 		t.listClusterSnapshots)
 
+	mcp.AddTool(mcpServer, &mcp.Tool{
+		Name: "getClusterRegistrationCommand",
+		Meta: map[string]any{
+			toolsSetAnn: ToolsSet,
+		},
+		Description: `Returns the registration commands and URLs for a cluster, with the registration token filled in. Use when asked how to register a cluster.
+Clusters with machine pools don't use this: use scaleClusterNodePool. The output contains a secret token, share it only with the user.`},
+		t.getClusterRegistrationCommand)
+
 	if !t.ReadOnly {
 		if t.toolboxImage != "" {
 			// while investigateFailedPlanApplication doesn't create resources
