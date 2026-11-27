@@ -23,6 +23,7 @@ import (
 
 const (
 	tlsName       = "rancher-mcp-server.cattle-ai-agent-system.svc"
+	tlsFQDN       = tlsName + ".cluster.local" // for clients without DNS search domains, e.g. sandboxes
 	certNamespace = "cattle-ai-agent-system"
 	certName      = "cattle-mcp-tls"
 	caName        = "cattle-mcp-ca"
@@ -236,6 +237,7 @@ func startTLSServer(handler http.Handler) error {
 		TLSListenerConfig: dynamiclistener.Config{
 			SANs: []string{
 				tlsName,
+				tlsFQDN,
 			},
 			FilterCN: dynamiclistener.OnlyAllow(tlsName),
 			TLSConfig: &tls.Config{
