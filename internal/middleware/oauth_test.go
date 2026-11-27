@@ -55,6 +55,64 @@ func TestMiddlewareWithLegacyTokenHeaderWhenOAuthDisabled(t *testing.T) {
 	}
 }
 
+func TestMiddlewareWithBearerTokenWhenOAuthDisabled(t *testing.T) {
+	config := &OAuthConfig{}
+	handler := config.OAuthMiddleware(testHandler())
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Authorization", "Bearer rancher-token")
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", rr.Code)
+	}
+
+	expectedBody := "success with token rancher-token"
+	if rr.Body.String() != expectedBody {
+		t.Errorf("Expected body %q, got %q", expectedBody, rr.Body)
+	}
+}
+
+func TestMiddlewareLegacyTokenHeaderWinsWhenOAuthDisabled(t *testing.T) {
+	config := &OAuthConfig{}
+	handler := config.OAuthMiddleware(testHandler())
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("R_token", "legacy-token")
+	req.Header.Set("Authorization", "Bearer bearer-token")
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", rr.Code)
+	}
+
+	expectedBody := "success with token legacy-token"
+	if rr.Body.String() != expectedBody {
+		t.Errorf("Expected body %q, got %q", expectedBody, rr.Body)
+	}
+}
+
+func TestMiddlewareWithNonBearerAuthorizationWhenOAuthDisabled(t *testing.T) {
+	config := &OAuthConfig{}
+	handler := config.OAuthMiddleware(testHandler())
+	req := httptest.NewRequest(http.MethodGet, "/test", nil)
+	req.Header.Set("Authorization", "Basic dXNlcjpwYXNz")
+
+	rr := httptest.NewRecorder()
+	handler.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusOK {
+		t.Errorf("Expected status 200, got %d", rr.Code)
+	}
+
+	expectedBody := "success with token "
+	if rr.Body.String() != expectedBody {
+		t.Errorf("Expected body %q, got %q", expectedBody, rr.Body)
+	}
+}
+
 func TestMiddlewareWithNoTokenAndNoOAuth(t *testing.T) {
 	config := &OAuthConfig{}
 	handler := config.OAuthMiddleware(testHandler())
